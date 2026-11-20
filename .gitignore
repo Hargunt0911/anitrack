@@ -1,0 +1,10 @@
+# File sensitif & environment
+.env
+wa-bot/.env
+wa-bot/auth_info/
+wa-bot/node_modules/
+*.key
+*.pem
+*.log
+.DS_Store
+Thumbs.db

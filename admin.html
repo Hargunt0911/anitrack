@@ -1,0 +1,2248 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Portal Admin — AniTrack • SMKN 4 Malang</title>
+    <link rel="icon" type="image/png" href="./logo-anitrack.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        card: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                        cardHover: '0 8px 24px rgba(15, 23, 42, 0.07)',
+                        blueGlow: '0 6px 16px rgba(0, 149, 255, 0.25)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        html, body { background-color: #F3F6FB; color: #1E293B; overflow-x: clip; -webkit-tap-highlight-color: transparent; }
+        .num-tabular { font-variant-numeric: tabular-nums; }
+        #sidebar { transition: width 200ms ease, transform 200ms ease; }
+        .nav-tooltip { pointer-events: none; opacity: 0; transform: translateX(-4px); transition: opacity 150ms ease, transform 150ms ease; }
+        .nav-item:hover .nav-tooltip { opacity: 1; transform: translateX(0); }
+        input[type="range"] { accent-color: #0095FF; }
+        .safe-bottom { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+    </style>
+</head>
+
+<body class="bg-[#F3F6FB] text-[#1E293B] min-h-screen antialiased selection:bg-[#EAF4FF] selection:text-[#0095FF]">
+
+    <!-- Toast Notification -->
+    <div id="appToast"
+        class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] hidden max-w-[92vw] sm:max-w-md px-5 py-3 rounded-xl bg-[#1E293B] text-white text-xs sm:text-sm font-semibold shadow-2xl flex items-center gap-2.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#F7C200] shrink-0"></span>
+        <span id="appToastText"></span>
+    </div>
+
+    <div class="min-h-screen flex bg-[#F3F6FB]">
+        <div id="sidebarBackdrop" onclick="toggleMobileSidebar(false)"
+            class="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-[1px] hidden lg:hidden"></div>
+
+        <!-- Sidebar Khusus Superadmin -->
+        <aside id="sidebar"
+            class="fixed lg:sticky lg:self-start top-0 left-0 z-50 h-screen w-[74px] bg-white border-r border-[#EDF1F7] flex flex-col justify-between py-4 -translate-x-full lg:translate-x-0 shrink-0 shadow-[2px_0_16px_rgba(15,23,42,0.03)]">
+            <div class="flex flex-col items-center px-3 space-y-5">
+                <button onclick="switchTab('overview')" title="AniTrack — Admin"
+                    class="w-full flex items-center justify-center sidebar-brand-wrap gap-2.5 py-0.5 cursor-pointer">
+                    <img src="./logo-anitrack.png" alt="Logo AniTrack" class="w-11 h-11 object-contain shrink-0" />
+                    <div class="sidebar-label hidden text-left min-w-0">
+                        <div class="text-sm font-extrabold tracking-tight text-[#1E293B] leading-tight">AniTrack</div>
+                        <div class="text-[10px] font-semibold text-[#F13B6E] uppercase tracking-wider">Superadmin</div>
+                    </div>
+                </button>
+
+                <nav class="w-full flex flex-col items-center gap-2 pt-1">
+                    <button onclick="switchTab('overview')" data-tab="overview"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-[#0095FF] bg-[#EAF4FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5.25 9.75V20a1 1 0 001 1h4v-6h3.5v6h4a1 1 0 001-1V9.75" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Dashboard</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Dashboard</span>
+                    </button>
+
+                    <button onclick="switchTab('materials')" data-tab="materials"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Materi Ajar</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Kelola Materi Ajar</span>
+                    </button>
+
+                    <button onclick="switchTab('tasks')" data-tab="tasks"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Daily Task</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Monitoring Semua Siswa</span>
+                    </button>
+
+                    <button onclick="switchTab('projects')" data-tab="projects"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Project Tracker</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Project Tracker &amp; Deadline</span>
+                    </button>
+
+                    <button onclick="switchTab('plotting')" data-tab="plotting"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Plotting</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Plotting Pembimbing</span>
+                    </button>
+
+                    <button onclick="switchTab('storage')" data-tab="storage"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Drive &amp; Backup</span>
+                        <span id="driveSyncDot" class="absolute top-2 right-2 w-2 h-2 rounded-full bg-slate-300 ring-2 ring-white"></span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Drive &amp; Export .xlsx</span>
+                    </button>
+
+                    <button onclick="switchTab('profile')" data-tab="profile"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Akun Saya</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Foto Profil &amp; Akun</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="px-3">
+                <button onclick="logoutUser()"
+                    class="nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#F13B6E] hover:bg-[#FFF1F5] transition cursor-pointer">
+                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Keluar</span>
+                    <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Keluar</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Column -->
+        <div class="flex-1 min-w-0 flex flex-col min-h-screen">
+            <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[#EDF1F7]">
+                <div class="px-4 sm:px-6 h-16 sm:h-[68px] flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 max-w-md">
+                        <button onclick="handleSidebarToggle()" title="Toggle menu"
+                            class="w-10 h-10 rounded-xl bg-[#EAF4FF] hover:bg-[#D9ECFF] text-[#0095FF] flex items-center justify-center shrink-0 transition cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h12M4 18h16" />
+                            </svg>
+                        </button>
+
+                        <div class="relative hidden sm:block flex-1 max-w-[280px]">
+                            <input id="globalSearch" type="text" oninput="handleGlobalSearch(this.value)"
+                                placeholder="Cari materi, siswa, task..."
+                                class="w-full h-10 pl-3.5 pr-9 rounded-xl bg-[#F7F9FC] border border-[#EDF1F7] text-sm text-[#1E293B] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#0095FF] transition" />
+                            <svg class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                            </svg>
+                        </div>
+
+                        <div class="sm:hidden flex items-center gap-2 min-w-0">
+                            <img src="./logo-anitrack.png" alt="AniTrack" class="w-8 h-8 object-contain shrink-0" />
+                            <div class="min-w-0">
+                                <div class="text-sm font-extrabold text-[#1E293B] leading-tight truncate">AniTrack</div>
+                                <div id="mobileTabLabel" class="text-[11px] text-slate-400 leading-tight truncate">Dashboard</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                        <button onclick="toggleMobileSearch()" aria-label="Cari"
+                            class="sm:hidden w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] flex items-center justify-center transition cursor-pointer">
+                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                            </svg>
+                        </button>
+
+                        <button onclick="switchTab('storage')" title="Drive & Export .xlsx"
+                            class="hidden sm:flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#4CB6A7] items-center justify-center transition cursor-pointer">
+                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                        </button>
+
+                        <button onclick="refreshAllData()" title="Segarkan Data"
+                            class="hidden sm:flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
+                            <svg id="refreshIcon" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+
+                        <button onclick="switchTab('tasks')" title="Monitoring Daily Task"
+                            class="relative hidden sm:flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
+                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <span id="notifDot" class="hidden absolute top-1.5 right-2 w-2 h-2 rounded-full bg-[#F13B6E] ring-2 ring-white"></span>
+                        </button>
+
+                        <button onclick="toggleFullscreen()" title="Layar Penuh"
+                            class="hidden md:flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
+                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                            </svg>
+                        </button>
+
+                        <button onclick="switchTab('profile')"
+                            class="flex items-center gap-2.5 pl-1 sm:pl-2 pr-1 py-1 rounded-xl hover:bg-[#F7F9FC] transition cursor-pointer">
+                            <div class="text-right hidden sm:block">
+                                <div id="topUserName" class="text-xs sm:text-[13px] font-bold text-[#1E293B] leading-tight max-w-[140px] truncate">-</div>
+                                <span id="rolePill" class="text-[10px] font-bold uppercase tracking-wider text-[#F13B6E]">ADMIN</span>
+                            </div>
+                            <div id="topUserAvatar"
+                                class="w-9 h-9 rounded-full bg-[#EAF4FF] border-2 border-white shadow-sm text-[#0095FF] font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                                A2
+                            </div>
+                        </button>
+
+                        <button onclick="logoutUser()" title="Keluar"
+                            class="w-9 h-9 rounded-xl bg-[#EAF4FF] hover:bg-[#FFF1F5] text-[#0095FF] hover:text-[#F13B6E] flex items-center justify-center transition cursor-pointer">
+                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="mobileSearchRow" class="hidden sm:hidden px-4 pb-3">
+                    <div class="relative flex items-center">
+                        <input id="globalSearchMobile" type="text" oninput="handleGlobalSearch(this.value)"
+                            placeholder="Cari materi, siswa, task..."
+                            class="w-full h-10 pl-3.5 pr-9 rounded-xl bg-[#F7F9FC] border border-[#E2E8F0] text-base text-[#1E293B] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#0095FF] transition" />
+                        <svg class="w-4 h-4 text-slate-400 absolute right-3 pointer-events-none"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                        </svg>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-5 pb-24 lg:pb-8 space-y-6">
+
+                <!-- ==================== TAB 0: DASHBOARD SUPERADMIN ==================== -->
+                <section id="tab-overview" class="space-y-6">
+                    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+                        <div class="xl:col-span-9 relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#45B1A2] via-[#4FB8AA] to-[#58C2B4] text-white p-5 sm:p-7 shadow-card flex flex-col justify-between min-h-[205px]">
+                            <div class="pointer-events-none absolute -top-10 right-52 w-40 h-40 rounded-full bg-white/10"></div>
+                            <div class="pointer-events-none absolute -bottom-16 right-16 w-48 h-48 rounded-full bg-white/10"></div>
+
+                            <div class="relative z-10 max-w-lg space-y-2">
+                                <h1 class="text-xl sm:text-[26px] font-extrabold tracking-tight leading-snug">
+                                    Pusat Kendali Animasi SMKN 4 Malang
+                                </h1>
+                                <p class="text-xs sm:text-sm text-white/90 leading-relaxed">
+                                    Pantau seluruh siswa lintas kelas, plotting guru pembimbing, kelola materi ajar, dan backup data ke Google Drive.
+                                </p>
+                            </div>
+
+                            <div class="relative z-10 mt-6 flex flex-wrap items-center gap-6 sm:gap-9 num-tabular">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-11 h-11 rounded-full bg-[#F13B6E] shadow-md flex items-center justify-center shrink-0 ring-4 ring-white/20">
+                                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-semibold text-white/90">Total Siswa</div>
+                                        <div id="metricStudents" class="text-lg font-extrabold leading-tight">0</div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <div class="w-11 h-11 rounded-full bg-[#F7C200] shadow-md flex items-center justify-center shrink-0 ring-4 ring-white/20">
+                                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-semibold text-white/90">Guru Pembimbing</div>
+                                        <div id="metricMentors" class="text-lg font-extrabold leading-tight">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hidden md:block absolute right-3 bottom-0 h-[92%] w-[260px] pointer-events-none select-none">
+                                <svg viewBox="0 0 280 200" fill="none" class="w-full h-full">
+                                    <circle cx="48" cy="36" r="3" fill="#F7C200" />
+                                    <circle cx="148" cy="24" r="3.5" fill="#F13B6E" />
+                                    <circle cx="240" cy="40" r="3" fill="#F7C200" />
+                                    <g transform="translate(22, 24)">
+                                        <path d="M44 128L30 166" stroke="#1E293B" stroke-width="7" stroke-linecap="round" />
+                                        <path d="M52 128L66 154L56 164" stroke="#1E293B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M35 66L16 96L30 104" stroke="#243142" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M56 66L78 52" stroke="#243142" stroke-width="9" stroke-linecap="round" />
+                                        <path d="M30 62C30 56 36 52 46 52C56 52 62 56 62 62L66 128H26L30 62Z" fill="#2B374B" />
+                                        <path d="M40 54L46 72L52 54" fill="#F7C200" />
+                                        <circle cx="46" cy="38" r="11" fill="#F2B88B" />
+                                        <path d="M30 30L46 23L62 30L46 37L30 30Z" fill="#1E293B" />
+                                        <rect x="18" y="96" width="22" height="7" rx="3.5" transform="rotate(-28 18 96)" fill="#F7C200" />
+                                    </g>
+                                    <g transform="translate(106, 16)">
+                                        <path d="M36 126L22 162" stroke="#1E293B" stroke-width="7" stroke-linecap="round" />
+                                        <path d="M48 126L62 152L74 146" stroke="#1E293B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M30 64L10 38" stroke="#243142" stroke-width="9" stroke-linecap="round" />
+                                        <path d="M54 64L74 36" stroke="#243142" stroke-width="9" stroke-linecap="round" />
+                                        <path d="M26 60C26 54 32 50 42 50C52 50 58 54 58 60L64 128H20L26 60Z" fill="#1F2A3C" />
+                                        <path d="M36 52L42 70L48 52" fill="#F13B6E" />
+                                        <circle cx="42" cy="36" r="11" fill="#A66B4F" />
+                                        <path d="M26 28L42 21L58 28L42 35L26 28Z" fill="#1E293B" />
+                                        <rect x="6" y="28" width="22" height="7" rx="3.5" transform="rotate(-15 6 28)" fill="#F7C200" />
+                                    </g>
+                                    <g transform="translate(186, 26)">
+                                        <path d="M34 128L30 166" stroke="#1E293B" stroke-width="6.5" stroke-linecap="round" />
+                                        <path d="M46 128L52 166" stroke="#1E293B" stroke-width="6.5" stroke-linecap="round" />
+                                        <path d="M28 36C28 24 52 24 52 36L56 58H24L28 36Z" fill="#C96B3B" />
+                                        <path d="M26 60C26 54 32 50 40 50C48 50 54 54 54 60L60 130H20L26 60Z" fill="#2B374B" />
+                                        <circle cx="40" cy="37" r="10.5" fill="#F5C39B" />
+                                        <path d="M26 29L40 22L54 29L40 35L26 29Z" fill="#1E293B" />
+                                        <rect x="29" y="72" width="24" height="17" rx="3" fill="white" />
+                                        <circle cx="41" cy="80" r="3" fill="#F7C200" />
+                                    </g>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="xl:col-span-3 flex flex-col justify-between gap-4">
+                            <div class="bg-white/60 border border-[#E8EEF6] rounded-2xl p-4 text-center flex flex-col items-center justify-center gap-3">
+                                <h2 class="text-[15px] font-bold text-[#1E293B] leading-snug">Punya materi baru untuk dibagikan?</h2>
+                                <button onclick="handleHeroCta()"
+                                    class="w-full py-2.5 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs sm:text-sm font-semibold shadow-blueGlow transition flex items-center justify-center gap-1.5 cursor-pointer">
+                                    <span>+ Buat Materi Baru</span>
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 num-tabular">
+                                <button onclick="switchTab('materials')"
+                                    class="bg-white rounded-xl overflow-hidden shadow-card hover:shadow-cardHover border border-[#EDF1F7] text-center transition cursor-pointer">
+                                    <div class="bg-[#EAF4FF] text-[#0095FF] text-[11px] font-bold py-2 px-2 truncate">Materi Ajar</div>
+                                    <div id="metricMaterials" class="py-3.5 text-2xl sm:text-3xl font-extrabold text-[#1E2B4D]">0</div>
+                                </button>
+                                <button onclick="switchTab('tasks')"
+                                    class="bg-white rounded-xl overflow-hidden shadow-card hover:shadow-cardHover border border-[#EDF1F7] text-center transition cursor-pointer">
+                                    <div class="bg-[#EAF4FF] text-[#0095FF] text-[11px] font-bold py-2 px-2 truncate">Daily Task</div>
+                                    <div id="metricTasks" class="py-3.5 text-2xl sm:text-3xl font-extrabold text-[#1E2B4D]">0</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                        <div class="lg:col-span-4 space-y-3.5">
+                            <div class="flex items-center justify-between px-0.5">
+                                <h2 class="text-[16px] font-bold text-[#1E293B] tracking-tight">Materi Terbaru</h2>
+                                <button onclick="switchTab('materials')" class="text-xs font-semibold text-slate-400 hover:text-[#0095FF] transition cursor-pointer">Semua Materi</button>
+                            </div>
+                            <div id="dashboardMaterialsList" class="space-y-3"></div>
+                        </div>
+
+                        <div class="lg:col-span-4 space-y-3.5">
+                            <div class="flex items-center justify-between px-0.5">
+                                <h2 class="text-[16px] font-bold text-[#1E293B] tracking-tight">Aktivitas Sekolah</h2>
+                                <span class="text-xs font-semibold text-slate-400">Live Sync</span>
+                            </div>
+
+                            <div class="bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card">
+                                <div class="flex items-start justify-between gap-3 mb-3">
+                                    <div>
+                                        <h3 class="text-[15px] font-bold text-[#1E293B]">Progres Seluruh Siswa</h3>
+                                        <p class="text-[11px] text-slate-400 mt-0.5">Rata-rata progres per sub-konsentrasi</p>
+                                    </div>
+                                    <div class="w-9 h-9 rounded-full bg-[#EAF4FF] text-[#0095FF] flex items-center justify-center shrink-0">📈</div>
+                                </div>
+                                <svg viewBox="0 0 320 135" class="w-full h-[135px] overflow-visible">
+                                    <defs>
+                                        <linearGradient id="chartBlueGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#0095FF" stop-opacity="0.28" />
+                                            <stop offset="100%" stop-color="#0095FF" stop-opacity="0.01" />
+                                        </linearGradient>
+                                    </defs>
+                                    <g stroke="#F1F5F9" stroke-width="1">
+                                        <line x1="34" y1="15" x2="310" y2="15" />
+                                        <line x1="34" y1="40" x2="310" y2="40" />
+                                        <line x1="34" y1="65" x2="310" y2="65" />
+                                        <line x1="34" y1="90" x2="310" y2="90" />
+                                        <line x1="34" y1="112" x2="310" y2="112" />
+                                    </g>
+                                    <g fill="#94A3B8" font-size="9">
+                                        <text x="0" y="18">100%</text><text x="5" y="43">75%</text><text x="5" y="68">50%</text><text x="5" y="93">25%</text><text x="10" y="115">0%</text>
+                                    </g>
+                                    <path id="chartAreaPath" d="M34 112 L310 112 Z" fill="url(#chartBlueGrad)" />
+                                    <path id="chartLinePath" d="M34 112 L310 112" fill="none" stroke="#0095FF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                                    <g id="chartPoints"></g>
+                                    <g fill="#94A3B8" font-size="9" text-anchor="middle">
+                                        <text x="44" y="130">2D Ani</text><text x="104" y="130">2D MG</text><text x="168" y="130">3D Ani</text><text x="232" y="130">3D Mod</text><text x="296" y="130">3D MG</text>
+                                    </g>
+                                </svg>
+                                <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+                                    <div id="metricAvgBar" class="h-full bg-[#0095FF] rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3.5 num-tabular">
+                                <div onclick="switchTab('tasks')" class="bg-[#F7C200] rounded-2xl p-4 text-white flex flex-col justify-between min-h-[126px] shadow-[0_8px_20px_rgba(247,194,0,0.22)] cursor-pointer">
+                                    <div>
+                                        <div id="metricAvg" class="text-2xl sm:text-[26px] font-extrabold leading-tight">0</div>
+                                        <div class="text-xs font-medium text-white/95 mt-0.5">Task Hari Ini</div>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-3">
+                                        <span class="text-[11px] text-white/90">Data terbaru</span>
+                                        <span class="w-8 h-8 rounded-full bg-white text-[#E6AE00] flex items-center justify-center shadow-sm">↗</span>
+                                    </div>
+                                </div>
+                                <div onclick="switchTab('tasks')" class="bg-[#F13B6E] rounded-2xl p-4 text-white flex flex-col justify-between min-h-[126px] shadow-[0_8px_20px_rgba(241,59,110,0.22)] cursor-pointer">
+                                    <div>
+                                        <div id="metricCompleted" class="text-2xl sm:text-[26px] font-extrabold leading-tight">0</div>
+                                        <div class="text-xs font-medium text-white/95 mt-0.5">Task Selesai</div>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-3">
+                                        <span class="text-[11px] text-white/90">Lihat detail</span>
+                                        <span class="w-8 h-8 rounded-full bg-white text-[#F13B6E] flex items-center justify-center shadow-sm">▶</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-4 space-y-3.5">
+                            <div class="flex items-center justify-between px-0.5">
+                                <h2 class="text-[16px] font-bold text-[#1E293B] tracking-tight">Pembimbing Aktif</h2>
+                                <button onclick="handleMentorsAction()" class="text-xs font-semibold text-slate-400 hover:text-[#0095FF] transition cursor-pointer">Atur Plotting</button>
+                            </div>
+                            <div id="dashboardMentorsList" class="space-y-3"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        <div class="lg:col-span-5 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-[15px] font-bold text-[#1E293B]">Performa 5 Sub-Konsentrasi</h3>
+                                <span class="text-[11px] font-semibold text-slate-400">Seluruh siswa</span>
+                            </div>
+                            <div id="subconcPerfList" class="space-y-3 num-tabular"></div>
+                        </div>
+                        <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-[15px] font-bold text-[#1E293B]">Persentase Ketuntasan</h3>
+                                <span class="text-[11px] font-semibold text-slate-400">Status task</span>
+                            </div>
+                            <div class="flex items-center gap-5">
+                                <div class="relative w-24 h-24 shrink-0">
+                                    <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
+                                        <circle cx="50" cy="50" r="38" fill="none" stroke="#EDF2F7" stroke-width="11" />
+                                        <circle id="donutArc" cx="50" cy="50" r="38" fill="none" stroke="#4CB6A7" stroke-width="11" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76" class="transition-all duration-500" />
+                                    </svg>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center num-tabular">
+                                        <span id="passPctLabel" class="text-lg font-extrabold text-[#1E293B]">0%</span>
+                                        <span class="text-[10px] text-slate-400 font-medium">Selesai</span>
+                                    </div>
+                                </div>
+                                <div id="statusBreakdownList" class="flex-1 space-y-2 text-xs num-tabular"></div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-3 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-[15px] font-bold text-[#1E293B]">Tipe Materi</h3>
+                                <span class="text-[11px] font-semibold text-slate-400">Konten</span>
+                            </div>
+                            <div id="contentUsageList" class="space-y-3 num-tabular"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 1: KELOLA MATERI AJAR & COURSE PLAYER ==================== -->
+                <section id="tab-materials" class="hidden space-y-5">
+                    <div id="materialsCatalogView" class="space-y-5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Kelola Materi Ajar</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Tambahkan modul PDF, video pembelajaran, atau keduanya beserta detail penjelasan.</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href="https://drive.google.com/drive/folders/1XSLl2xb6-WxrtHNS3SEUrgC2rpLeWdBT?usp=sharing" target="_blank" rel="noopener noreferrer"
+                                    class="px-3.5 py-2 bg-white border border-[#E2E8F0] hover:border-[#0095FF] rounded-xl text-xs font-semibold text-[#1E293B] hover:text-[#0095FF] shadow-card transition">
+                                    Folder Drive Materi ↗
+                                </a>
+                                <select id="filterStage" onchange="loadMaterials()" class="px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 shadow-card focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Tahap</option>
+                                    <option value="Pre-Production">Pre-Production</option>
+                                    <option value="Production">Production</option>
+                                    <option value="Post-Production">Post-Production</option>
+                                </select>
+                                <select id="filterMaterialSubconc" onchange="loadMaterials()" class="px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 shadow-card focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Konsentrasi</option>
+                                    <option value="2D Animator">2D Animator</option>
+                                    <option value="2D Motion Graphic">2D Motion Graphic</option>
+                                    <option value="3D Animator">3D Animator</option>
+                                    <option value="3D Modeller">3D Modeller</option>
+                                    <option value="3D Motion Graphic">3D Motion Graphic</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <form id="addMaterialForm" class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-[#4CB6A7]"></span>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-[#1E293B]">Tambah Materi Baru (PDF, Video, atau Keduanya)</span>
+                                </div>
+                                <span id="materialFeedback" class="text-xs font-semibold text-[#3FA496]"></span>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+                                <input id="matTitle" type="text" required placeholder="Judul materi *"
+                                    class="lg:col-span-5 px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <select id="matStage" class="lg:col-span-3 px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                    <option value="Pre-Production">Pre-Production</option>
+                                    <option value="Production">Production</option>
+                                    <option value="Post-Production">Post-Production</option>
+                                </select>
+                                <select id="matSubconc" class="lg:col-span-4 px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Sub-Konsentrasi</option>
+                                    <option value="2D Animator">2D Animator</option>
+                                    <option value="2D Motion Graphic">2D Motion Graphic</option>
+                                    <option value="3D Animator">3D Animator</option>
+                                    <option value="3D Modeller">3D Modeller</option>
+                                    <option value="3D Motion Graphic">3D Motion Graphic</option>
+                                </select>
+
+                                <div class="lg:col-span-12">
+                                    <textarea id="matDesc" rows="2" placeholder="Detail / ringkasan materi, tujuan pembelajaran, atau catatan praktik untuk siswa..."
+                                        class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]"></textarea>
+                                </div>
+
+                                <div class="lg:col-span-6 bg-[#FFFDF5] border border-[#FDE68A] rounded-xl p-3.5 space-y-2.5">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <label for="matPdfUrl" class="text-xs font-bold text-[#B88600]">📄 Modul PDF (Opsional)</label>
+                                        <label for="matPdfFile" class="px-3 py-1 rounded-lg bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-[11px] font-bold transition cursor-pointer">Upload PDF ke Drive</label>
+                                        <input id="matPdfFile" type="file" accept="application/pdf,.pdf" class="hidden" onchange="handlePdfFilePick(this)" />
+                                    </div>
+                                    <input id="matPdfUrl" type="url" placeholder="Tempel link PDF (Google Drive / URL .pdf)"
+                                        class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-base sm:text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                    <p id="matPdfFileLabel" class="text-[11px] text-slate-500 truncate">Bisa isi PDF saja, Video saja, atau keduanya.</p>
+                                </div>
+
+                                <div class="lg:col-span-6 bg-[#FFF7F9] border border-[#FECDD6] rounded-xl p-3.5 space-y-2.5">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <label for="matVideoUrl" class="text-xs font-bold text-[#D81B5A]">▶ Video Pembelajaran (Opsional)</label>
+                                        <label for="matVideoFile" class="px-3 py-1 rounded-lg bg-[#FFE7EE] hover:bg-[#F13B6E] text-[#D81B5A] hover:text-white text-[11px] font-bold transition cursor-pointer">Upload Video ke Drive</label>
+                                        <input id="matVideoFile" type="file" accept="video/*" class="hidden" onchange="handleVideoFilePick(this)" />
+                                    </div>
+                                    <input id="matVideoUrl" type="url" placeholder="Tempel link YouTube (youtu.be / youtube.com) atau Drive Video"
+                                        class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-base sm:text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                    <p id="matVideoFileLabel" class="text-[11px] text-slate-500 truncate">Link YouTube &amp; Google Drive Video otomatis tampil di player.</p>
+                                </div>
+
+                                <div class="lg:col-span-12 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                                    <p id="matFileHint" class="text-[11px] text-slate-400">Isi minimal salah satu (PDF atau Video), atau isi keduanya sekaligus.</p>
+                                    <button id="saveMaterialBtn" type="submit"
+                                        class="w-full sm:w-auto px-6 py-2.5 bg-[#0095FF] hover:bg-[#0082E6] text-white text-sm sm:text-xs font-semibold rounded-xl shadow-blueGlow transition cursor-pointer">
+                                        + Simpan Materi
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <div id="materialsList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5"></div>
+                    </div>
+
+                    <!-- FULL COURSE PLAYER PREVIEW + HAPUS -->
+                    <div id="materialPlayerView" class="hidden space-y-4">
+                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <button type="button" onclick="closeMaterialPlayer()"
+                                    class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-[#1E293B] hover:text-[#0095FF] text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 shrink-0">
+                                    ← Kembali ke Daftar Materi
+                                </button>
+                                <span id="playerBreadcrumb" class="text-xs font-semibold text-slate-500 truncate"></span>
+                            </div>
+                            <button id="playerDeleteBtn" type="button" onclick="deleteCurrentMaterial()"
+                                class="px-3.5 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">
+                                Hapus Materi
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                            <div class="lg:col-span-8 space-y-4 min-w-0">
+                                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                                    <div id="playerMediaTabs" class="hidden px-4 sm:px-5 py-3 bg-[#F7FAFF] border-b border-[#EDF1F7] flex flex-wrap items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                                            <button id="playerTabVideoBtn" type="button" onclick="switchPlayerMediaTab('video')" class="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold bg-[#F13B6E] text-white transition cursor-pointer">▶ Video Pembelajaran</button>
+                                            <button id="playerTabPdfBtn" type="button" onclick="switchPlayerMediaTab('pdf')" class="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold bg-white border border-[#E2E8F0] text-slate-600 transition cursor-pointer">📄 Modul PDF</button>
+                                        </div>
+                                        <span class="text-[11px] font-semibold text-slate-400 hidden sm:inline">Pratinjau Video &amp; Modul PDF</span>
+                                    </div>
+                                    <div id="playerVideoPane" class="hidden">
+                                        <div id="playerVideoEmbed" class="w-full aspect-video bg-slate-900"></div>
+                                        <div class="px-4 sm:px-5 py-3 bg-[#F7F9FC] border-t border-[#EDF1F7] flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-xs text-slate-500">Pemutar Video Pembelajaran</span>
+                                            <a id="playerVideoOpenLink" href="#" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 rounded-xl bg-[#FFE7EE] hover:bg-[#F13B6E] text-[#E62E63] hover:text-white text-xs font-bold transition">Buka Video di Tab Baru ↗</a>
+                                        </div>
+                                    </div>
+                                    <div id="playerPdfPane" class="hidden">
+                                        <div id="playerPdfEmbed" class="w-full h-[460px] sm:h-[600px] bg-[#F7F9FC]"></div>
+                                        <div class="px-4 sm:px-5 py-3 bg-[#F7F9FC] border-t border-[#EDF1F7] flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-xs text-slate-500">Pembaca Modul PDF</span>
+                                            <a id="playerPdfOpenLink" href="#" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-xs font-bold transition">Buka / Unduh PDF ↗</a>
+                                        </div>
+                                    </div>
+                                    <div id="playerGenericPane" class="hidden p-6 bg-[#EAF4FF] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div class="text-xs sm:text-sm text-[#0082E6] font-semibold">Tautan referensi eksternal.</div>
+                                        <a id="playerGenericOpenLink" href="#" target="_blank" rel="noopener noreferrer" class="text-center px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition">Buka Tautan ↗</a>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-4">
+                                    <div class="space-y-2">
+                                        <div id="playerBadges" class="flex flex-wrap items-center gap-1.5"></div>
+                                        <h2 id="playerTitle" class="text-lg sm:text-2xl font-extrabold text-[#1E293B] leading-snug"></h2>
+                                    </div>
+                                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-[#EDF1F7]">
+                                        <button id="playerPrevBtn" type="button" onclick="navigatePlayerMaterial(-1)" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-[#F3F6FB] hover:bg-[#E2E8F0] disabled:opacity-40 text-[#1E293B] text-xs font-bold transition cursor-pointer">← Sebelumnya</button>
+                                        <button id="playerNextBtn" type="button" onclick="navigatePlayerMaterial(1)" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] disabled:opacity-40 text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">Berikutnya →</button>
+                                    </div>
+                                    <div class="bg-[#F7F9FC] border border-[#EDF1F7] rounded-xl p-4 space-y-1.5">
+                                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Detail &amp; Penjelasan Materi</div>
+                                        <p id="playerDesc" class="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <aside class="lg:col-span-4 lg:sticky lg:top-20 bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                                <div class="p-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-2">
+                                    <h3 class="text-sm font-extrabold text-[#1E293B]">Daftar Modul</h3>
+                                    <span id="playerSidebarProgress" class="text-[11px] font-bold text-[#0095FF] num-tabular"></span>
+                                </div>
+                                <div id="playerCurriculumList" class="divide-y divide-[#F1F5F9] max-h-[540px] overflow-y-auto"></div>
+                            </aside>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 2: MONITORING DAILY TASK SELURUH SISWA ==================== -->
+                <section id="tab-tasks" class="hidden space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Monitoring Daily Task Seluruh Siswa</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Pantau laporan harian semua siswa lintas kelas, berikan feedback, dan export rekap (.xlsx).</p>
+                        </div>
+                        <button onclick="switchTab('storage')"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-xs font-semibold text-[#1E293B] hover:text-[#0095FF] shadow-card transition cursor-pointer shrink-0">
+                            <span>Rekap .xlsx &amp; Sync Drive</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-bold text-[#1E293B]">Kepatuhan Pengisian Hari Ini</h3>
+                                <p id="staffComplianceSummary" class="text-xs text-slate-500 mt-0.5 num-tabular">Memuat rekap hari ini...</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                                <button type="button" onclick="toggleMissingStudentsBox()"
+                                    class="px-4 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    <span id="missingCountBadge">0</span> Belum Isi Hari Ini
+                                </button>
+                                <button type="button" onclick="toggleResetInputsBox()"
+                                    class="px-4 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    🗑️ Bersihkan Input Siswa
+                                </button>
+                            </div>
+                        </div>
+                        <div id="missingStudentsBox" class="hidden bg-[#FFFDF5] border border-[#FDE68A] rounded-xl p-4 space-y-2">
+                            <div class="text-xs font-bold text-[#B88600]">Daftar Siswa Belum Mengisi Daily Task Hari Ini:</div>
+                            <div id="missingStudentsList" class="flex flex-wrap gap-1.5 text-xs"></div>
+                        </div>
+                        <div id="resetInputsBox" class="hidden bg-[#FFF5F7] border border-[#FECDD6] rounded-xl p-4 space-y-3">
+                            <div>
+                                <div class="text-xs font-extrabold text-[#BE123C]">Hapus / Batalkan Input Siswa</div>
+                                <p class="text-[11px] text-slate-600 mt-0.5">Pilih siswa (atau semua siswa) serta jenis data input yang ingin dihapus permanen dari database.</p>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                                <div class="lg:col-span-5">
+                                    <label for="resetTargetStudentSelect" class="block text-[11px] font-semibold text-slate-600 mb-1">Target Siswa</label>
+                                    <select id="resetTargetStudentSelect" class="w-full px-3 py-2 bg-white border border-[#FECDD6] rounded-xl text-xs font-semibold text-[#1E293B] focus:outline-none focus:border-[#F13B6E]"></select>
+                                </div>
+                                <div class="lg:col-span-4 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-700 py-1.5">
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer"><input id="resetOptDaily" type="checkbox" checked class="accent-[#F13B6E] rounded" /> Daily Task</label>
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer"><input id="resetOptProject" type="checkbox" checked class="accent-[#F13B6E] rounded" /> Project</label>
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer"><input id="resetOptMaterial" type="checkbox" checked class="accent-[#F13B6E] rounded" /> Progres Materi</label>
+                                </div>
+                                <div class="lg:col-span-3">
+                                    <button id="executeResetInputsBtn" type="button" onclick="executeResetStudentInputs()"
+                                        class="w-full py-2 px-3.5 rounded-xl bg-[#F13B6E] hover:bg-[#D81B5A] text-white text-xs font-bold transition cursor-pointer">
+                                        Hapus / Batalkan Input Terpilih
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="resetInputsFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <select id="filterTaskPeriod" onchange="loadDailyTaskFeed()" class="px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="today">Hari Ini</option>
+                                <option value="all" selected>Semua Riwayat</option>
+                            </select>
+                            <select id="filterTaskStatus" onchange="loadDailyTaskFeed()" class="px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Status</option>
+                                <option value="belum_mulai">Belum Mulai</option>
+                                <option value="sedang_dikerjakan">Sedang Dikerjakan</option>
+                                <option value="menunggu_review">Menunggu Review</option>
+                                <option value="revisi">Revisi</option>
+                                <option value="selesai">Selesai</option>
+                            </select>
+                            <select id="filterTaskClass" onchange="loadDailyTaskFeed()" class="px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Kelas</option>
+                                <option value="X ANI A">X ANI A</option>
+                                <option value="X ANI B">X ANI B</option>
+                                <option value="X ANI C">X ANI C</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3.5">
+                        <div class="flex items-center justify-between px-0.5">
+                            <h3 class="text-[15px] font-bold text-[#1E293B]">Daftar Daily Task Seluruh Siswa</h3>
+                            <span id="dailyTaskFeedCount" class="text-xs font-bold px-3 py-1 rounded-full bg-white border border-[#EDF1F7] text-[#0095FF] shadow-card num-tabular">0 entri</span>
+                        </div>
+                        <div id="taskProgressContainer" class="space-y-3.5"></div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 2B: PROJECT TRACKER (DEADLINE & REVISI) ==================== -->
+                <section id="tab-projects" class="hidden space-y-5">
+                    <div id="staffProjectSummary"></div>
+
+                    <!-- Form Tambah Tugas Project + Deadline + Import Excel -->
+                    <form id="addProjectTaskForm" class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-[#0095FF]"></span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-[#1E293B]">Tambah Tugas Project &amp; Deadline</span>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span id="projectTaskFeedback" class="text-xs font-semibold text-[#3FA496]"></span>
+                                <button type="button" onclick="downloadProjectTemplateXlsx()"
+                                    class="px-3 py-1.5 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#2F8F81] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    📥 Download Format (.xlsx)
+                                </button>
+                                <label for="importProjectFile"
+                                    class="px-3 py-1.5 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    📤 Import Excel (.xlsx)
+                                </label>
+                                <input id="importProjectFile" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleProjectImportFile(this)" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+                            <input id="projTitle" type="text" required placeholder="Judul tugas project * (contoh: Character Model Sheet & Turnaround)"
+                                class="lg:col-span-5 px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            <select id="projStage" class="lg:col-span-2 px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="Pre-Production">Pre-Production</option>
+                                <option value="Production">Production</option>
+                                <option value="Post-Production">Post-Production</option>
+                            </select>
+                            <select id="projSubconc" class="lg:col-span-3 px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Sub-Konsentrasi</option>
+                                <option value="2D Animator">2D Animator</option>
+                                <option value="2D Motion Graphic">2D Motion Graphic</option>
+                                <option value="3D Animator">3D Animator</option>
+                                <option value="3D Modeller">3D Modeller</option>
+                                <option value="3D Motion Graphic">3D Motion Graphic</option>
+                            </select>
+                            <div class="lg:col-span-2">
+                                <input id="projDueDate" type="date" required title="Deadline tugas project"
+                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-9">
+                                <input id="projDesc" type="text" placeholder="Instruksi, kriteria ACC, atau format bukti yang wajib diunggah siswa..."
+                                    class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-3">
+                                <button id="saveProjectTaskBtn" type="submit"
+                                    class="w-full py-2.5 px-4 bg-[#0095FF] hover:bg-[#0082E6] text-white text-sm sm:text-xs font-semibold rounded-xl shadow-blueGlow transition cursor-pointer">
+                                    + Tambah Tugas Project
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Pratinjau Import Excel Project Tracker -->
+                    <div id="projectImportPreviewBox" class="hidden bg-white border-2 border-[#0095FF] rounded-2xl shadow-card p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <h3 class="text-sm font-extrabold text-[#1E293B]">Pratinjau Import Tugas Project</h3>
+                                <p id="projectImportMeta" class="text-xs text-slate-500 mt-0.5"></p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="cancelProjectImport()"
+                                    class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-600 text-xs font-bold transition cursor-pointer">
+                                    Batal
+                                </button>
+                                <button id="confirmProjectImportBtn" type="button" onclick="confirmProjectImport()"
+                                    class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
+                                    ✓ Import Tugas
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto border border-[#EDF1F7] rounded-xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-[#F7FAFF] text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="py-2.5 px-3 w-10">No</th>
+                                        <th class="py-2.5 px-3">Judul Tugas</th>
+                                        <th class="py-2.5 px-3">Tahap</th>
+                                        <th class="py-2.5 px-3">Sub-Konsentrasi</th>
+                                        <th class="py-2.5 px-3">Deadline</th>
+                                        <th class="py-2.5 px-3">Deskripsi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="projectImportTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Filter Project Tracker -->
+                    <div class="flex flex-wrap items-center justify-between gap-2.5">
+                        <h3 class="text-base font-extrabold text-[#1E293B]">Daftar Tugas Project &amp; Review Siswa</h3>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="filterProjectStage" onchange="loadProjectTracker()" class="px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 shadow-card focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Tahap</option>
+                                <option value="Pre-Production">Pre-Production</option>
+                                <option value="Production">Production</option>
+                                <option value="Post-Production">Post-Production</option>
+                            </select>
+                            <select id="filterProjectSubconc" onchange="loadProjectTracker()" class="px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 shadow-card focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Konsentrasi</option>
+                                <option value="2D Animator">2D Animator</option>
+                                <option value="2D Motion Graphic">2D Motion Graphic</option>
+                                <option value="3D Animator">3D Animator</option>
+                                <option value="3D Modeller">3D Modeller</option>
+                                <option value="3D Motion Graphic">3D Motion Graphic</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="projectTasksContainer" class="space-y-4"></div>
+                </section>
+
+                <!-- ==================== TAB 3: PLOTTING PEMBIMBING (KHUSUS SUPERADMIN) ==================== -->
+                <section id="tab-plotting" class="hidden space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Guru Pembimbing &amp; Plotting Lintas Kelas</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Tambahkan akun guru pembimbing (wajib Nomor WA aktif) serta tetapkan plotting siswa secara manual atau Excel (.xlsx).</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 shrink-0">
+                            <button type="button" onclick="downloadPlottingTemplateXlsx()"
+                                class="px-3.5 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#2F8F81] hover:text-white text-xs font-bold transition cursor-pointer">
+                                📥 Download Format (.xlsx)
+                            </button>
+                            <label for="importPlottingFile"
+                                class="px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-xs font-bold transition cursor-pointer">
+                                📤 Import Plotting (.xlsx)
+                            </label>
+                            <input id="importPlottingFile" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handlePlottingImportFile(this)" />
+                        </div>
+                    </div>
+
+                    <!-- Kelola Akun Guru Pembimbing (Tambah / Edit WA & Password / Hapus) -->
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-[#4CB6A7]"></span>
+                                <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#1E293B]">Kelola Akun Guru Pembimbing (Wajib Nomor WA)</h3>
+                            </div>
+                            <span id="mentorManageCount" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#E3F6F3] text-[#2F8F81] self-start sm:self-auto">0 guru</span>
+                        </div>
+
+                        <form id="addMentorForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                            <div class="lg:col-span-3">
+                                <label for="newMentorName" class="block text-[11px] font-semibold text-slate-500 mb-1">Nama Lengkap Guru <span class="text-[#F13B6E]">*</span></label>
+                                <input id="newMentorName" type="text" required placeholder="Contoh: Budi Santoso, S.Pd."
+                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-2">
+                                <label for="newMentorUsername" class="block text-[11px] font-semibold text-slate-500 mb-1">Username <span class="text-[#F13B6E]">*</span></label>
+                                <input id="newMentorUsername" type="text" required placeholder="guru3"
+                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-2">
+                                <label for="newMentorPassword" class="block text-[11px] font-semibold text-slate-500 mb-1">Password / PIN <span class="text-[#F13B6E]">*</span></label>
+                                <input id="newMentorPassword" type="text" required value="123456" placeholder="123456"
+                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-3">
+                                <label for="newMentorWhatsapp" class="block text-[11px] font-semibold text-slate-500 mb-1">Nomor WA Aktif <span class="text-[#F13B6E]">*</span></label>
+                                <input id="newMentorWhatsapp" type="tel" required placeholder="081234567890"
+                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-2">
+                                <button id="addMentorBtn" type="submit"
+                                    class="w-full py-2.5 px-4 bg-[#4CB6A7] hover:bg-[#3FA496] text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer">
+                                    + Tambah Guru
+                                </button>
+                            </div>
+                        </form>
+                        <div id="mentorManageFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+
+                        <div id="mentorsManageList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                    </div>
+
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                            <div class="lg:col-span-3">
+                                <label class="block text-xs font-semibold text-slate-500 mb-1.5">Guru Pembimbing</label>
+                                <select id="targetMentorSelect" class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]"></select>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-500 mb-1.5">Kelas</label>
+                                <select id="plottingClassFilter" onchange="loadPlottingStudents()" class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Kelas</option>
+                                    <option value="X ANI A">X ANI A</option>
+                                    <option value="X ANI B">X ANI B</option>
+                                    <option value="X ANI C">X ANI C</option>
+                                </select>
+                            </div>
+                            <div class="lg:col-span-3">
+                                <label class="block text-xs font-semibold text-slate-500 mb-1.5">Cari Nama / Username</label>
+                                <input id="plottingSearch" oninput="renderPlottingTable()" type="text" placeholder="Ketik nama atau username..."
+                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-4 flex items-center gap-2 pt-1 sm:pt-0">
+                                <button onclick="assignSelectedStudents()" class="flex-1 px-3.5 py-2.5 bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-semibold rounded-xl shadow-blueGlow transition cursor-pointer">Tetapkan ke Guru</button>
+                                <button onclick="clearSelectedMentors()" class="px-3.5 py-2.5 bg-[#FFF1F5] hover:bg-[#FFE0EA] text-[#F13B6E] text-xs font-semibold rounded-xl transition cursor-pointer">Lepas</button>
+                            </div>
+                        </div>
+                        <div id="plottingStatus" class="text-xs font-semibold text-[#3FA496] min-h-[1rem]"></div>
+                    </div>
+
+                    <!-- Pratinjau Import Excel Plotting Pembimbing -->
+                    <div id="plottingImportPreviewBox" class="hidden bg-white border-2 border-[#0095FF] rounded-2xl shadow-card p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div>
+                                <h3 class="text-sm font-extrabold text-[#1E293B]">Pratinjau Import Plotting Siswa</h3>
+                                <p id="plottingImportMeta" class="text-xs text-slate-500 mt-0.5"></p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="cancelPlottingImport()"
+                                    class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-600 text-xs font-bold transition cursor-pointer">
+                                    Batal
+                                </button>
+                                <button id="confirmPlottingImportBtn" type="button" onclick="confirmPlottingImport()"
+                                    class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
+                                    ✓ Terapkan Plotting
+                                </button>
+                            </div>
+                        </div>
+                        <div id="plottingImportWarnings" class="hidden rounded-xl bg-[#FFF6D6] border border-[#F7C200]/50 px-3.5 py-2.5 text-xs text-[#946800] space-y-1"></div>
+                        <div class="overflow-x-auto max-h-96 overflow-y-auto border border-[#EDF1F7] rounded-xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="sticky top-0 z-10">
+                                    <tr class="bg-[#F7FAFF] text-[10.5px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#EDF1F7]">
+                                        <th class="py-2.5 px-3 w-10">No</th>
+                                        <th class="py-2.5 px-3">Siswa</th>
+                                        <th class="py-2.5 px-3">Kelas</th>
+                                        <th class="py-2.5 px-3">Sub-Konsentrasi</th>
+                                        <th class="py-2.5 px-3">Pembimbing</th>
+                                        <th class="py-2.5 px-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plottingImportTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="plottingTableWrap" class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden"></div>
+                </section>
+
+                <!-- ==================== TAB 4: DRIVE & BACKUP .XLSX ==================== -->
+                <section id="tab-storage" class="hidden space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Penyimpanan Google Drive &amp; Export (.xlsx)</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Pusat file Materi Ajar serta sinkronisasi &amp; backup seluruh data ke Excel (.xlsx).</p>
+                        </div>
+                        <a href="https://drive.google.com/drive/folders/1XSLl2xb6-WxrtHNS3SEUrgC2rpLeWdBT?usp=sharing" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-semibold shadow-blueGlow transition shrink-0">
+                            <span>Buka Folder Google Drive ↗</span>
+                        </a>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-[#45B1A2] to-[#56C2B4] text-white rounded-2xl p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1 min-w-0">
+                            <span class="inline-block text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 text-white">Folder Pusat Terhubung</span>
+                            <div class="text-base font-bold">Google Drive Penyimpanan Utama AniTrack</div>
+                            <div class="text-xs font-mono text-white/85 truncate">https://drive.google.com/drive/folders/1XSLl2xb6-WxrtHNS3SEUrgC2rpLeWdBT?usp=sharing</div>
+                        </div>
+                        <span id="storageConnBadge" class="self-start sm:self-auto text-xs font-bold px-3.5 py-1.5 rounded-xl bg-white/20 text-white shrink-0">Mode Manual / Export</span>
+                    </div>
+
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-4">
+                        <div>
+                            <h3 class="text-base font-bold text-[#1E293B]">Sinkronisasi Otomatis via Google Apps Script</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Aktifkan upload file Materi Ajar langsung dari form dan backup Excel (.xlsx) satu klik ke Google Drive.</p>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                            <div class="lg:col-span-8">
+                                <label for="gasUrlInput" class="block text-xs font-semibold text-slate-600 mb-1.5">URL Web App Google Apps Script (<span class="font-mono text-[#0095FF]">.../exec</span>)</label>
+                                <input id="gasUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec"
+                                    class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-4 flex items-center gap-2">
+                                <button type="button" onclick="saveAndTestGasUrl()" class="flex-1 px-4 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-semibold shadow-blueGlow transition cursor-pointer">Simpan &amp; Tes</button>
+                                <button type="button" onclick="clearGasUrl()" class="px-4 py-2.5 rounded-xl bg-[#FFF1F5] hover:bg-[#FFE0EA] text-[#F13B6E] text-xs font-semibold transition cursor-pointer">Reset</button>
+                            </div>
+                        </div>
+                        <div id="gasStatusFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+                        <div class="bg-[#F7FAFF] border border-[#DCEBFF] rounded-xl p-4 text-xs text-slate-600 space-y-1.5 leading-relaxed">
+                            <div class="font-bold text-[#1E293B]">Cara Aktivasi (2 Menit):</div>
+                            <ol class="list-decimal list-inside space-y-1">
+                                <li>Buka <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] font-semibold hover:underline">script.google.com</a> lalu buat proyek baru.</li>
+                                <li>Salin isi <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-[#E2E8F0]">google-drive-sync.gs</code> dan tempelkan ke editor Apps Script.</li>
+                                <li>Klik <strong>Deploy → New deployment → Web app</strong> (Execute as: <em>Me</em>, Who has access: <em>Anyone</em>).</li>
+                                <li>Salin URL <code class="font-mono">/exec</code>, tempel di atas, lalu klik <strong>Simpan &amp; Tes</strong>.</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                            <div>
+                                <h3 class="text-base font-bold text-[#1E293B]">Sync &amp; Backup (.xlsx) ke Drive</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Kirim rekap Excel lengkap langsung ke subfolder <strong>Backup Data AniTrack</strong> di Google Drive.</p>
+                            </div>
+                            <button id="syncDriveNowBtn" type="button" onclick="syncAllDataToDrive()"
+                                class="w-full py-2.5 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs sm:text-sm font-semibold shadow-blueGlow transition cursor-pointer">
+                                Sync Semua Data (.xlsx) ke Google Drive
+                            </button>
+                            <div id="syncNowFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+                        </div>
+
+                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                            <div>
+                                <h3 class="text-base font-bold text-[#1E293B]">Download Export Excel (.xlsx)</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Unduh file Excel (<code>.xlsx</code>) siap buka untuk arsip lokal.</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                <button type="button" onclick="exportLocal('tasks')" class="px-3.5 py-2.5 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0095FF] hover:text-white text-xs font-bold transition cursor-pointer">Rekap Task (.xlsx)</button>
+                                <button type="button" onclick="exportLocal('materials')" class="px-3.5 py-2.5 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#329889] hover:text-white text-xs font-bold transition cursor-pointer">Materi (.xlsx)</button>
+                                <button type="button" onclick="exportLocal('full')" class="px-3.5 py-2.5 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#C99200] hover:text-white text-xs font-bold transition cursor-pointer">Full Backup (.xlsx)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== NOTIFIKASI WA OTOMATIS DEADLINE JAM 07:00 WIB ==================== -->
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="space-y-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#E7F9EE] text-[#15803D]">Otomatis Setiap Jam 07:00 WIB</span>
+                                    <span id="waScheduleBadge" class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Belum Aktif</span>
+                                </div>
+                                <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">🔔 Notifikasi WhatsApp Otomatis Deadline Project</h3>
+                                <p class="text-xs text-slate-500 leading-relaxed">
+                                    <strong>Aturan Pengiriman:</strong> (1) Saat <strong>H-2, H-1, dan Hari-H</strong> deadline, siswa otomatis mendapat WA pengingat pukul <strong>07:00 WIB</strong>. (2) Jika siswa <strong>belum lapor selesai melebihi deadline</strong>, sistem terus mengirim WA <strong>setiap hari pukul 07:00 WIB</strong> sampai siswa melapor selesai.
+                                </p>
+                            </div>
+                            <button type="button" onclick="loadWaAutomationPanel()"
+                                class="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer shrink-0">
+                                ↻ Muat Ulang Antrean
+                            </button>
+                        </div>
+
+                        <!-- Pengaturan Gateway WA (Fonnte / Wablas / Custom Webhook) -->
+                        <div class="bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                                <div class="md:col-span-3">
+                                    <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Provider WA Gateway</label>
+                                    <select id="waProviderSelect" onchange="onWaProviderChange()"
+                                        class="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
+                                        <option value="fonnte">Fonnte (Direkomendasikan)</option>
+                                        <option value="wablas">Wablas</option>
+                                        <option value="custom_webhook">Custom Webhook URL</option>
+                                    </select>
+                                </div>
+                                <div class="md:col-span-5">
+                                    <label for="waApiTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">API Token WA Gateway</label>
+                                    <input id="waApiTokenInput" type="password" placeholder="Tempel Token API Fonnte / Wablas di sini..."
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="md:col-span-4">
+                                    <label for="waAppUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Link Portal AniTrack (Opsional)</label>
+                                    <input id="waAppUrlInput" type="url" placeholder="https://anitrack.republikanimasi.my.id"
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div id="waCustomUrlWrap" class="hidden md:col-span-12">
+                                    <label for="waCustomUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Endpoint URL Gateway (Khusus Wablas / Custom Webhook)</label>
+                                    <input id="waCustomUrlInput" type="url" placeholder="https://pati.wablas.com/api/send-message"
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                                <label class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                                    <input id="waScheduleEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#16A34A]" />
+                                    <span class="text-xs font-bold text-[#1E293B]">Aktifkan pengiriman otomatis setiap hari jam 07:00 WIB (via Google Apps Script Trigger)</span>
+                                </label>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button id="saveWaConfigBtn" type="button" onclick="saveWaReminderConfig()"
+                                        class="px-4 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold shadow-sm transition cursor-pointer">
+                                        💾 Simpan &amp; Pasang Jadwal 07:00
+                                    </button>
+                                    <button id="testWaBtn" type="button" onclick="testSendWaReminder()"
+                                        class="px-3.5 py-2 rounded-xl bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] text-xs font-bold transition cursor-pointer">
+                                        🧪 Tes Kirim WA
+                                    </button>
+                                    <button id="runWaNowBtn" type="button" onclick="runWaReminderNow()"
+                                        class="px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
+                                        📨 Jalankan Sekarang
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="waConfigFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+                            <div class="text-[11px] text-slate-500 leading-relaxed border-t border-[#DCEBFF] pt-2.5">
+                                <strong>Cara Aktifkan 100% Otomatis:</strong> Daftar akun di <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] font-semibold hover:underline">fonnte.com</a> → hubungkan WhatsApp sekolah → salin <strong>Token</strong> ke atas → pastikan <code class="font-mono bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">google-drive-sync.gs</code> versi terbaru sudah di-Deploy di Google Apps Script → klik <strong>Simpan &amp; Pasang Jadwal 07:00</strong>. Setelah aktif, pengingat berjalan otomatis di server Google setiap jam 07:00 WIB walau komputer mati.
+                            </div>
+                        </div>
+
+                        <!-- Pratinjau Antrean Pengingat WA Hari Ini (+ Fallback Kirim Manual wa.me) -->
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <h4 class="text-sm font-extrabold text-[#1E293B]">Antrean Siswa Penerima Pengingat Hari Ini</h4>
+                                <div id="waQueueSummary" class="flex flex-wrap items-center gap-2 text-xs"></div>
+                            </div>
+                            <div id="waQueueList" class="border border-[#EDF1F7] rounded-xl overflow-hidden"></div>
+                        </div>
+
+                        <!-- Riwayat Log Pengiriman WA -->
+                        <div class="space-y-2.5">
+                            <h4 class="text-sm font-extrabold text-[#1E293B]">Riwayat Log Pengiriman WA Terbaru</h4>
+                            <div id="waLogsList" class="border border-[#EDF1F7] rounded-xl overflow-hidden"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 5: AKUN SAYA ==================== -->
+                <section id="tab-profile" class="hidden max-w-xl mx-auto lg:mx-0 space-y-5">
+                    <div>
+                        <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Foto Profil &amp; Akun</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Ganti foto profil, username, atau password Anda kapan saja.</p>
+                    </div>
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-5">
+                        <div class="pb-5 border-b border-[#EDF1F7] space-y-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3.5 min-w-0">
+                                    <div id="profileAvatarBig" class="w-16 h-16 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xl flex items-center justify-center shrink-0 overflow-hidden ring-4 ring-[#F4F8FF]">A2</div>
+                                    <div class="min-w-0">
+                                        <div id="profileName" class="font-bold text-base text-[#1E293B] truncate">-</div>
+                                        <div id="profileMeta" class="text-xs font-mono text-slate-400 mt-0.5 truncate">-</div>
+                                    </div>
+                                </div>
+                                <span id="profileBadge" class="font-mono text-[11px] font-bold uppercase px-3 py-1 rounded-full bg-[#FFF0F4] text-[#F13B6E] shrink-0">ADMIN</span>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <label for="avatarFileInput" class="px-4 py-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0095FF] hover:text-white text-xs font-bold transition cursor-pointer">Ganti Foto Profil</label>
+                                <input id="avatarFileInput" type="file" accept="image/*" class="hidden" onchange="handleAvatarFilePick(this)" />
+                                <button id="removeAvatarBtn" type="button" onclick="removeAvatarDraft()" class="hidden px-4 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">Hapus Foto</button>
+                                <span id="avatarHint" class="text-[11px] text-slate-400">JPG/PNG/WebP, otomatis dipotong kotak rapi.</span>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="newWhatsappInput" class="block text-xs font-semibold text-slate-600 mb-1.5">Nomor WhatsApp Aktif (Opsional / Tes WA)</label>
+                                <input id="newWhatsappInput" type="tel" placeholder="Contoh: 081234567890"
+                                    class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div>
+                                <label for="newUsernameInput" class="block text-xs font-semibold text-slate-600 mb-1.5">Username Baru</label>
+                                <input id="newUsernameInput" type="text" class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div>
+                                <label for="newPasswordInput" class="block text-xs font-semibold text-slate-600 mb-1.5">Password Baru (Opsional)</label>
+                                <div class="relative flex items-center">
+                                    <input id="newPasswordInput" type="password" placeholder="Kosongkan jika tidak ingin mengubah password"
+                                        class="w-full pl-3.5 pr-11 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                    <button type="button" onclick="toggleNewPasswordVis()" aria-label="Lihat password" class="absolute right-3 text-slate-400 hover:text-[#1E293B] p-1 cursor-pointer">👁</button>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <button id="saveAccountBtn" onclick="saveAccountChanges()" class="w-full sm:w-auto px-5 py-2.5 bg-[#0095FF] hover:bg-[#0082E6] text-white text-sm sm:text-xs font-semibold rounded-xl shadow-blueGlow transition cursor-pointer">Simpan Perubahan</button>
+                                <button onclick="logoutUser()" class="sm:hidden w-full px-5 py-2.5 bg-[#FFF1F5] text-[#F13B6E] text-sm font-semibold rounded-xl transition cursor-pointer">Keluar</button>
+                            </div>
+                            <div id="accountFeedback" class="text-xs font-semibold"></div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Mobile Bottom Nav (Admin: 5 Menu) -->
+        <nav class="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-[#EDF1F7] safe-bottom">
+            <div class="flex items-center justify-around px-2 pt-1.5 pb-1">
+                <button onclick="switchTab('overview')" data-tab="overview" class="mob-link flex-1 flex flex-col items-center gap-1 py-1.5 rounded-xl text-[#0095FF] cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5.25 9.75V20a1 1 0 001 1h4v-6h3.5v6h4a1 1 0 001-1V9.75" /></svg>
+                    <span class="text-[10px] font-semibold">Home</span>
+                </button>
+                <button onclick="switchTab('materials')" data-tab="materials" class="mob-link flex-1 flex flex-col items-center gap-1 py-1.5 rounded-xl text-slate-400 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    <span class="text-[10px] font-semibold">Materi</span>
+                </button>
+                <button onclick="switchTab('tasks')" data-tab="tasks" class="mob-link flex-1 flex flex-col items-center gap-1 py-1.5 rounded-xl text-slate-400 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                    <span class="text-[10px] font-semibold">Task</span>
+                </button>
+                <button onclick="switchTab('projects')" data-tab="projects" class="mob-link flex-1 flex flex-col items-center gap-1 py-1.5 rounded-xl text-slate-400 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+                    <span class="text-[10px] font-semibold">Project</span>
+                </button>
+                <button onclick="switchTab('plotting')" data-tab="plotting" class="mob-link flex-1 flex flex-col items-center gap-1 py-1.5 rounded-xl text-slate-400 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span class="text-[10px] font-semibold">Plotting</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script src="./anitrack-core.js"></script>
+    <script>
+        (function () {
+            const A = window.AniTrack;
+            const { supabase, SUBCONCS } = A;
+
+            let mentorsList = [];
+            let plottingStudentsCache = [];
+            let editingMentorId = null;
+
+            const portal = A.initStaffPortal({
+                role: 'superadmin',
+                tabTitles: {
+                    overview: 'Dashboard',
+                    materials: 'Materi Ajar',
+                    tasks: 'Daily Task',
+                    projects: 'Project Tracker',
+                    plotting: 'Guru & Plotting',
+                    storage: 'Drive & Notifikasi WA',
+                    profile: 'Akun Saya'
+                },
+                extraRefresh: () => Promise.all([loadPlottingStudents(), loadWaAutomationPanel()]),
+                onSearchExtra: (val, activeTab) => {
+                    if (activeTab === 'plotting') {
+                        const inp = document.getElementById('plottingSearch');
+                        if (inp) { inp.value = val; renderPlottingTable(); }
+                    }
+                }
+            });
+            if (!portal) return;
+
+            async function loadPlottingStudents() {
+                const cls = document.getElementById('plottingClassFilter').value;
+                const [{ data: mentors }, studRes, { data: allStudMentors }] = await Promise.all([
+                    supabase.from('profiles').select('id, full_name, username, whatsapp_number, avatar_url').eq('role', 'mentor').order('full_name'),
+                    (() => {
+                        let q = supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name');
+                        if (cls) q = q.eq('class_name', cls);
+                        return q;
+                    })(),
+                    supabase.from('profiles').select('mentor_id').eq('role', 'student').not('mentor_id', 'is', null)
+                ]);
+
+                mentorsList = mentors || [];
+                const studentCountByMentor = {};
+                (allStudMentors || []).forEach((r) => {
+                    studentCountByMentor[r.mentor_id] = (studentCountByMentor[r.mentor_id] || 0) + 1;
+                });
+
+                const sel = document.getElementById('targetMentorSelect');
+                const prev = sel.value;
+                sel.innerHTML = mentorsList.length
+                    ? mentorsList.map((m) => `<option value="${m.id}">${A.esc(m.full_name)} (@${A.esc(m.username)})</option>`).join('')
+                    : '<option value="">Belum ada akun mentor</option>';
+                if (prev) sel.value = prev;
+
+                renderMentorsManageList(studentCountByMentor);
+                plottingStudentsCache = studRes.data || [];
+                renderPlottingTable();
+            }
+            window.loadPlottingStudents = loadPlottingStudents;
+
+            function setMentorFeedback(msg, isError = false) {
+                const el = document.getElementById('mentorManageFeedback');
+                if (!el) return;
+                el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#3FA496]'}`;
+                el.textContent = msg;
+            }
+
+            function renderMentorsManageList(studentCountByMentor = {}) {
+                const wrap = document.getElementById('mentorsManageList');
+                const cntEl = document.getElementById('mentorManageCount');
+                if (cntEl) cntEl.textContent = `${mentorsList.length} guru`;
+                if (!wrap) return;
+
+                if (!mentorsList.length) {
+                    wrap.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-slate-400 bg-[#FAFBFD] border border-dashed border-[#E2E8F0] rounded-xl">Belum ada akun guru pembimbing. Tambahkan guru pertama di form atas.</div>`;
+                    return;
+                }
+
+                wrap.innerHTML = mentorsList.map((m) => {
+                    const cnt = studentCountByMentor[m.id] || 0;
+                    const hasWa = Boolean(A.normalizeWhatsapp(m.whatsapp_number));
+                    const isEditing = editingMentorId === m.id;
+                    const waLocal = hasWa ? A.formatWhatsappDisplay(m.whatsapp_number).replaceAll('-', '') : '';
+
+                    return `
+                        <div class="rounded-xl border ${hasWa ? 'border-[#EDF1F7] bg-[#FAFBFD]' : 'border-[#FECDD6] bg-[#FFF8FA]'} p-3.5 space-y-2.5">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <div class="w-9 h-9 rounded-full bg-[#E3F6F3] text-[#2F8F81] font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                                        ${A.renderAvatarMarkup(m.avatar_url, m.full_name)}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-xs text-[#1E293B] truncate">${A.esc(m.full_name)}</div>
+                                        <div class="text-[11px] font-mono text-slate-400 truncate">@${A.esc(m.username)} • ${cnt} siswa</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <button type="button" onclick="toggleEditMentor('${m.id}')"
+                                        class="px-2 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-[#0082E6] text-[10.5px] font-bold transition cursor-pointer">
+                                        ${isEditing ? 'Tutup' : 'Edit'}
+                                    </button>
+                                    <button type="button" onclick="deleteMentorAccount('${m.id}', '${A.esc(m.full_name)}')"
+                                        class="px-2 py-1 rounded-lg bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-[10.5px] font-bold transition cursor-pointer">
+                                        Hapus
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${hasWa
+                                    ? A.renderWhatsappLink(m.whatsapp_number, false)
+                                    : `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib diisi)</span>`}
+                            </div>
+
+                            ${isEditing ? `
+                            <div class="pt-2 border-t border-[#E2E8F0] space-y-2">
+                                <input id="editMentorName_${m.id}" type="text" value="${A.esc(m.full_name)}" placeholder="Nama Lengkap"
+                                    class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:border-[#0095FF]" />
+                                <input id="editMentorWa_${m.id}" type="tel" value="${A.esc(waLocal)}" placeholder="Nomor WA Aktif * (08...)"
+                                    class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                <input id="editMentorPass_${m.id}" type="text" placeholder="Password baru (kosongkan jika tetap)"
+                                    class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                <button type="button" onclick="saveEditMentor('${m.id}')"
+                                    class="w-full py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer">
+                                    Simpan Perubahan Guru
+                                </button>
+                            </div>` : ''}
+                        </div>`;
+                }).join('');
+            }
+
+            window.toggleEditMentor = function (mentorId) {
+                editingMentorId = editingMentorId === mentorId ? null : mentorId;
+                loadPlottingStudents();
+            };
+
+            document.getElementById('addMentorForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('newMentorName').value.trim();
+                const username = document.getElementById('newMentorUsername').value.trim().toLowerCase();
+                const password = document.getElementById('newMentorPassword').value.trim();
+                const rawWa = document.getElementById('newMentorWhatsapp').value.trim();
+                const btn = document.getElementById('addMentorBtn');
+
+                if (!name) { setMentorFeedback('Nama lengkap guru wajib diisi.', true); return; }
+                if (!/^[a-z0-9._]{3,24}$/.test(username)) {
+                    setMentorFeedback('Username harus 3–24 karakter (huruf kecil, angka, titik, atau underscore).', true);
+                    return;
+                }
+                if (password.length < 4) {
+                    setMentorFeedback('Password / PIN minimal 4 karakter.', true);
+                    return;
+                }
+                const cleanWa = A.normalizeWhatsapp(rawWa);
+                if (!cleanWa) {
+                    setMentorFeedback('Nomor WhatsApp aktif wajib diisi dengan format valid (08xxx / 628xxx, 10–15 digit).', true);
+                    document.getElementById('newMentorWhatsapp')?.focus();
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Menyimpan...';
+
+                const { data: dup } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
+                if (dup) {
+                    btn.disabled = false;
+                    btn.textContent = '+ Tambah Guru';
+                    setMentorFeedback(`Username "@${username}" sudah dipakai akun lain.`, true);
+                    return;
+                }
+
+                const { error } = await supabase.from('profiles').insert({
+                    full_name: name,
+                    username,
+                    pin_or_password: password,
+                    role: 'mentor',
+                    whatsapp_number: cleanWa
+                });
+
+                btn.disabled = false;
+                btn.textContent = '+ Tambah Guru';
+                if (error) {
+                    setMentorFeedback(`Gagal menambah guru: ${error.message}`, true);
+                    return;
+                }
+
+                e.target.reset();
+                document.getElementById('newMentorPassword').value = '123456';
+                setMentorFeedback(`Guru "${name}" (@${username}) dengan WA ${A.formatWhatsappDisplay(cleanWa)} berhasil ditambahkan ✓`);
+                A.showToast(`Akun guru ${name} berhasil dibuat!`);
+                await loadPlottingStudents();
+                portal.refreshMetrics();
+            });
+
+            window.saveEditMentor = async function (mentorId) {
+                const name = document.getElementById(`editMentorName_${mentorId}`)?.value.trim() || '';
+                const rawWa = document.getElementById(`editMentorWa_${mentorId}`)?.value.trim() || '';
+                const newPass = document.getElementById(`editMentorPass_${mentorId}`)?.value.trim() || '';
+
+                if (!name) { setMentorFeedback('Nama guru tidak boleh kosong.', true); return; }
+                const cleanWa = A.normalizeWhatsapp(rawWa);
+                if (!cleanWa) {
+                    setMentorFeedback('Setiap guru wajib memiliki Nomor WA aktif yang valid (awalan 08 atau 628).', true);
+                    return;
+                }
+
+                const payload = { full_name: name, whatsapp_number: cleanWa };
+                if (newPass) payload.pin_or_password = newPass;
+
+                const { error } = await supabase.from('profiles').update(payload).eq('id', mentorId);
+                if (error) {
+                    setMentorFeedback(`Gagal memperbarui guru: ${error.message}`, true);
+                    return;
+                }
+                editingMentorId = null;
+                setMentorFeedback(`Data guru "${name}" & Nomor WA berhasil diperbarui ✓`);
+                A.showToast('Data guru diperbarui ✓');
+                await loadPlottingStudents();
+                portal.refreshMetrics();
+            };
+
+            window.deleteMentorAccount = async function (mentorId, mentorName) {
+                if (!confirm(`Hapus akun guru "${mentorName}"?\n\nSeluruh siswa yang sedang di-plot ke guru ini akan dilepas pembimbingnya (tidak menghapus akun siswa).`)) return;
+                await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', mentorId);
+                const { error } = await supabase.from('profiles').delete().eq('id', mentorId).eq('role', 'mentor');
+                if (error) {
+                    setMentorFeedback(`Gagal menghapus guru: ${error.message}`, true);
+                    return;
+                }
+                setMentorFeedback(`Akun guru "${mentorName}" berhasil dihapus.`);
+                A.showToast(`Akun guru ${mentorName} dihapus.`);
+                await loadPlottingStudents();
+                portal.refreshMetrics();
+            };
+
+            function renderPlottingTable() {
+                const term = (document.getElementById('plottingSearch')?.value || '').trim().toLowerCase();
+                const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m.full_name]));
+                const list = plottingStudentsCache.filter((s) => !term ||
+                    (s.full_name || '').toLowerCase().includes(term) ||
+                    (s.username || '').toLowerCase().includes(term) ||
+                    (s.sub_concentration || '').toLowerCase().includes(term)
+                );
+
+                if (!list.length) {
+                    document.getElementById('plottingTableWrap').innerHTML = `<div class="p-10 text-center text-sm text-slate-400">Tidak ada siswa yang sesuai pencarian.</div>`;
+                    return;
+                }
+
+                document.getElementById('plottingTableWrap').innerHTML = `
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-[#EDF1F7] bg-[#F7FAFF] text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    <th class="py-3.5 px-4 w-10"><input type="checkbox" onchange="toggleAllPlotChecks(this.checked)" class="rounded border-slate-300 accent-[#0095FF]" /></th>
+                                    <th class="py-3.5 px-4">Siswa</th>
+                                    <th class="py-3.5 px-4">Kelas</th>
+                                    <th class="py-3.5 px-4">Sub-Konsentrasi</th>
+                                    <th class="py-3.5 px-4">Pembimbing</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[#F1F5F9]">
+                                ${list.map((s) => `
+                                    <tr class="hover:bg-[#F8FBFF] transition">
+                                        <td class="py-3 px-4"><input type="checkbox" class="plot-check rounded border-slate-300 accent-[#0095FF]" value="${s.id}" onchange="syncCheck('${s.id}', this.checked)" /></td>
+                                        <td class="py-3 px-4">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="w-8 h-8 rounded-full bg-[#EAF4FF] text-[#0095FF] font-bold text-[11px] flex items-center justify-center shrink-0 overflow-hidden">
+                                                    ${A.renderAvatarMarkup(s.avatar_url, s.full_name)}
+                                                </div>
+                                                <div>
+                                                    <div class="font-bold text-[#1E293B]">${A.esc(s.full_name)}</div>
+                                                    <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                        <span class="text-xs font-mono text-slate-400">@${A.esc(s.username)}</span>
+                                                        ${A.renderWhatsappLink(s.whatsapp_number, false)}
+                                                        ${s.project_drive_url ? `<a href="${A.esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition">📁 Drive ↗</a>` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3 px-4"><span class="font-mono text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#F1F5F9] text-slate-600">${A.esc(s.class_name || '-')}</span></td>
+                                        <td class="py-3 px-4">
+                                            <select onchange="updateStudentSubconc('${s.id}', this.value)" class="px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                                <option value="">-- Pilih --</option>
+                                                ${SUBCONCS.map((sc) => `<option value="${sc}" ${s.sub_concentration === sc ? 'selected' : ''}>${sc}</option>`).join('')}
+                                            </select>
+                                        </td>
+                                        <td class="py-3 px-4 text-xs">
+                                            ${s.mentor_id ? `<span class="font-semibold px-2.5 py-1 rounded-lg bg-[#E3F6F3] text-[#2F8F81]">${A.esc(mentorMap[s.mentor_id] || 'Mentor')}</span>` : `<span class="text-slate-400">Belum di-plot</span>`}
+                                        </td>
+                                    </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="md:hidden divide-y divide-[#F1F5F9]">
+                        <div class="px-4 py-3 bg-[#F7FAFF] flex items-center justify-between text-xs font-semibold text-slate-500">
+                            <label class="flex items-center gap-2.5 cursor-pointer">
+                                <input type="checkbox" onchange="toggleAllPlotChecks(this.checked)" class="w-4 h-4 rounded accent-[#0095FF]" />
+                                <span>Pilih Semua (${list.length})</span>
+                            </label>
+                        </div>
+                        ${list.map((s) => `
+                            <div class="p-4 space-y-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <label class="flex items-start gap-3 min-w-0 cursor-pointer">
+                                        <input type="checkbox" class="plot-check mt-1 w-4 h-4 rounded accent-[#0095FF] shrink-0" value="${s.id}" onchange="syncCheck('${s.id}', this.checked)" />
+                                        <div class="min-w-0">
+                                            <div class="font-bold text-sm text-[#1E293B] truncate">${A.esc(s.full_name)}</div>
+                                            <div class="text-xs font-mono text-slate-400">@${A.esc(s.username)} • ${A.esc(s.class_name || '-')}</div>
+                                            <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                                ${A.renderWhatsappLink(s.whatsapp_number, false)}
+                                                ${s.project_drive_url ? `<a href="${A.esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">📁 Drive ↗</a>` : ''}
+                                            </div>
+                                        </div>
+                                    </label>
+                                    ${s.mentor_id ? `<span class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#E3F6F3] text-[#2F8F81] shrink-0">${A.esc(mentorMap[s.mentor_id] || 'Mentor')}</span>` : `<span class="text-[11px] text-slate-400 shrink-0">Belum di-plot</span>`}
+                                </div>
+                                <select onchange="updateStudentSubconc('${s.id}', this.value)" class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">-- Sub-Konsentrasi --</option>
+                                    ${SUBCONCS.map((sc) => `<option value="${sc}" ${s.sub_concentration === sc ? 'selected' : ''}>${sc}</option>`).join('')}
+                                </select>
+                            </div>`).join('')}
+                    </div>`;
+            }
+            window.renderPlottingTable = renderPlottingTable;
+
+            window.syncCheck = function (id, checked) { document.querySelectorAll(`.plot-check[value="${id}"]`).forEach((c) => { c.checked = checked; }); };
+            window.toggleAllPlotChecks = function (checked) { document.querySelectorAll('.plot-check').forEach((c) => { c.checked = checked; }); };
+            function getSelectedPlotIds() { return [...new Set([...document.querySelectorAll('.plot-check:checked')].map((el) => el.value))]; }
+
+            window.updateStudentSubconc = async function (studentId, subconc) {
+                await supabase.from('profiles').update({ sub_concentration: subconc || null }).eq('id', studentId);
+                const item = plottingStudentsCache.find((x) => x.id === studentId);
+                if (item) item.sub_concentration = subconc || null;
+                document.getElementById('plottingStatus').textContent = 'Sub-konsentrasi diperbarui ✓';
+                portal.refreshMetrics();
+                setTimeout(() => { document.getElementById('plottingStatus').textContent = ''; }, 1400);
+            };
+
+            window.assignSelectedStudents = async function () {
+                const mentorId = document.getElementById('targetMentorSelect').value;
+                const ids = getSelectedPlotIds();
+                if (!mentorId || !ids.length) return;
+                const { error } = await supabase.from('profiles').update({ mentor_id: mentorId }).in('id', ids);
+                document.getElementById('plottingStatus').textContent = error ? 'Gagal menetapkan pembimbing.' : `${ids.length} siswa berhasil di-plot ✓`;
+                loadPlottingStudents();
+                portal.refreshMetrics();
+            };
+
+            window.clearSelectedMentors = async function () {
+                const ids = getSelectedPlotIds();
+                if (!ids.length) return;
+                const { error } = await supabase.from('profiles').update({ mentor_id: null }).in('id', ids);
+                document.getElementById('plottingStatus').textContent = error ? 'Gagal melepas plotting.' : `Plotting dilepas untuk ${ids.length} siswa.`;
+                loadPlottingStudents();
+                portal.refreshMetrics();
+            };
+
+            /* ==================== PLOTTING EXCEL FORMAT & IMPORT ==================== */
+            let pendingPlottingImportRows = [];
+
+            function setPlottingStatus(msg, isError = false) {
+                const el = document.getElementById('plottingStatus');
+                if (!el) return;
+                el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#F13B6E]' : 'text-[#3FA496]'}`;
+                el.textContent = msg;
+            }
+
+            function normalizePlotHeader(k) {
+                return String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            }
+
+            function normalizePlotSubconc(raw) {
+                const txt = String(raw ?? '').trim();
+                if (!txt || /^(-|belum|kosong|none|null|belum dipilih|-- pilih --)$/i.test(txt)) {
+                    return { value: null, invalid: false };
+                }
+                const clean = txt.toLowerCase().replace(/\s+/g, ' ');
+                const exact = SUBCONCS.find((sc) => sc.toLowerCase() === clean);
+                if (exact) return { value: exact, invalid: false };
+                const aliasMap = {
+                    '2d anim': '2D Animator',
+                    '2d animator': '2D Animator',
+                    '2d motion': '2D Motion Graphic',
+                    '2d motion graphic': '2D Motion Graphic',
+                    '2d motion graphics': '2D Motion Graphic',
+                    '3d anim': '3D Animator',
+                    '3d animator': '3D Animator',
+                    '3d modeler': '3D Modeller',
+                    '3d modeller': '3D Modeller',
+                    '3d modeling': '3D Modeller',
+                    '3d modelling': '3D Modeller',
+                    '3d motion': '3D Motion Graphic',
+                    '3d motion graphic': '3D Motion Graphic',
+                    '3d motion graphics': '3D Motion Graphic'
+                };
+                if (aliasMap[clean]) return { value: aliasMap[clean], invalid: false };
+                return { value: null, invalid: true, raw: txt };
+            }
+
+            function resolvePlotMentor(raw, mentors) {
+                const txt = String(raw ?? '').trim();
+                if (!txt || /^(-|belum|belum di-?plot|lepas|kosong|none|null)$/i.test(txt)) {
+                    return { mentor: null, invalid: false };
+                }
+                // Cocokkan pola "Nama Guru (@username)"
+                const parenMatch = txt.match(/\(@?([a-zA-Z0-9._-]+)\)/);
+                if (parenMatch) {
+                    const u = parenMatch[1].toLowerCase();
+                    const found = mentors.find((m) => (m.username || '').toLowerCase() === u);
+                    if (found) return { mentor: found, invalid: false };
+                }
+                const stripped = txt.replace(/^@/, '').toLowerCase().trim();
+                const byUser = mentors.find((m) => (m.username || '').toLowerCase() === stripped);
+                if (byUser) return { mentor: byUser, invalid: false };
+                const byExactName = mentors.find((m) => (m.full_name || '').toLowerCase().trim() === stripped);
+                if (byExactName) return { mentor: byExactName, invalid: false };
+                const byPartial = mentors.filter((m) => (m.full_name || '').toLowerCase().includes(stripped));
+                if (byPartial.length === 1) return { mentor: byPartial[0], invalid: false };
+                return { mentor: null, invalid: true, raw: txt };
+            }
+
+            window.downloadPlottingTemplateXlsx = async function () {
+                if (!window.XLSX) {
+                    setPlottingStatus('Library Excel (SheetJS) belum siap. Coba muat ulang halaman.', true);
+                    return;
+                }
+                setPlottingStatus('Menyiapkan template Excel berisi seluruh siswa...');
+                const [{ data: mentors, error: mErr }, { data: allStudents, error: sErr }] = await Promise.all([
+                    supabase.from('profiles').select('id, full_name, username').eq('role', 'mentor').order('full_name'),
+                    supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id').eq('role', 'student').order('class_name').order('full_name')
+                ]);
+
+                if (mErr || sErr) {
+                    setPlottingStatus('Gagal mengambil data siswa/pembimbing dari database.', true);
+                    return;
+                }
+
+                const mentorList = mentors || [];
+                const studentList = allStudents || [];
+                const mentorById = Object.fromEntries(mentorList.map((m) => [m.id, m]));
+
+                const sheetRows = studentList.map((s, idx) => {
+                    const m = s.mentor_id ? mentorById[s.mentor_id] : null;
+                    return {
+                        'No': idx + 1,
+                        'Username': s.username || '',
+                        'Nama Siswa': s.full_name || '',
+                        'Kelas': s.class_name || '',
+                        'Sub-Konsentrasi': s.sub_concentration || '',
+                        'Pembimbing': m ? m.username : ''
+                    };
+                });
+
+                const guideRows = [
+                    { 'Daftar / Panduan': '=== DAFTAR GURU PEMBIMBING AKTIF ===', 'Nilai / Username': '', 'Keterangan': '' },
+                    ...mentorList.map((m, i) => ({
+                        'Daftar / Panduan': `${i + 1}. ${m.full_name}`,
+                        'Nilai / Username': m.username,
+                        'Keterangan': `Bisa isi "${m.username}", "@${m.username}", atau "${m.full_name}" di kolom Pembimbing`
+                    })),
+                    { 'Daftar / Panduan': '', 'Nilai / Username': '', 'Keterangan': '' },
+                    { 'Daftar / Panduan': '=== PILIHAN SUB-KONSENTRASI VALID ===', 'Nilai / Username': '', 'Keterangan': '' },
+                    ...SUBCONCS.map((sc, i) => ({
+                        'Daftar / Panduan': `Pilihan ${i + 1}`,
+                        'Nilai / Username': sc,
+                        'Keterangan': 'Salin persis ke kolom Sub-Konsentrasi'
+                    })),
+                    { 'Daftar / Panduan': '', 'Nilai / Username': '', 'Keterangan': '' },
+                    { 'Daftar / Panduan': '=== PETUNJUK PENGISIAN ===', 'Nilai / Username': '', 'Keterangan': '' },
+                    { 'Daftar / Panduan': '1. Kolom Username', 'Nilai / Username': 'Wajib (Jangan diubah)', 'Keterangan': 'Dipakai sistem untuk mencocokkan akun siswa secara akurat.' },
+                    { 'Daftar / Panduan': '2. Kolom Sub-Konsentrasi', 'Nilai / Username': 'Opsional', 'Keterangan': 'Isi salah satu dari 5 pilihan di atas. Kosongkan atau isi "-" untuk mengosongkan.' },
+                    { 'Daftar / Panduan': '3. Kolom Pembimbing', 'Nilai / Username': 'Opsional', 'Keterangan': 'Isi Username atau Nama Pembimbing di atas. Kosongkan atau isi "-" untuk melepas pembimbing.' },
+                    { 'Daftar / Panduan': '4. Import Parsial', 'Nilai / Username': 'Didukung', 'Keterangan': 'Anda boleh mengunggah seluruh siswa atau hanya sebagian siswa yang ingin diperbarui.' }
+                ];
+
+                const wb = XLSX.utils.book_new();
+                const wsMain = XLSX.utils.json_to_sheet(sheetRows);
+                wsMain['!cols'] = [
+                    { wch: 5 },
+                    { wch: 18 },
+                    { wch: 32 },
+                    { wch: 11 },
+                    { wch: 22 },
+                    { wch: 26 }
+                ];
+                XLSX.utils.book_append_sheet(wb, wsMain, 'Plotting Siswa');
+
+                const wsGuide = XLSX.utils.json_to_sheet(guideRows);
+                wsGuide['!cols'] = [{ wch: 36 }, { wch: 24 }, { wch: 58 }];
+                XLSX.utils.book_append_sheet(wb, wsGuide, 'Daftar Pembimbing & Panduan');
+
+                XLSX.writeFile(wb, 'Template-Plotting-AniTrack.xlsx');
+                setPlottingStatus(`Format Excel berhasil diunduh (${studentList.length} siswa & ${mentorList.length} pembimbing) ✓`);
+                setTimeout(() => { setPlottingStatus(''); }, 3200);
+            };
+
+            window.handlePlottingImportFile = async function (inp) {
+                const file = inp.files?.[0];
+                if (!file) return;
+                if (!window.XLSX) {
+                    setPlottingStatus('Library Excel (SheetJS) belum siap.', true);
+                    inp.value = '';
+                    return;
+                }
+
+                setPlottingStatus(`Membaca file "${file.name}"...`);
+                try {
+                    const [buf, mentorsRes, studentsRes] = await Promise.all([
+                        file.arrayBuffer(),
+                        supabase.from('profiles').select('id, full_name, username').eq('role', 'mentor').order('full_name'),
+                        supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id').eq('role', 'student').order('class_name').order('full_name')
+                    ]);
+
+                    const mentors = mentorsRes.data || [];
+                    const allStudents = studentsRes.data || [];
+                    const mentorById = Object.fromEntries(mentors.map((m) => [m.id, m]));
+                    const studentByUsername = Object.fromEntries(allStudents.map((s) => [(s.username || '').toLowerCase().trim(), s]));
+                    const studentByName = Object.fromEntries(allStudents.map((s) => [(s.full_name || '').toLowerCase().trim(), s]));
+
+                    const wb = XLSX.read(buf, { type: 'array' });
+                    const sheetName = wb.SheetNames.includes('Plotting Siswa') ? 'Plotting Siswa' : wb.SheetNames[0];
+                    const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+
+                    if (!rawRows.length) {
+                        setPlottingStatus('File Excel kosong atau tidak memiliki baris data.', true);
+                        inp.value = '';
+                        return;
+                    }
+
+                    const headers = Object.keys(rawRows[0] || {}).map(normalizePlotHeader);
+                    const hasSubconcCol = headers.some((h) => ['subkonsentrasi', 'subconc', 'konsentrasi', 'subconcentration'].includes(h));
+                    const hasMentorCol = headers.some((h) => ['pembimbing', 'gurupembimbing', 'mentor', 'usernamepembimbing', 'namapembimbing', 'guru'].includes(h));
+
+                    if (!hasSubconcCol && !hasMentorCol) {
+                        setPlottingStatus('Kolom "Sub-Konsentrasi" atau "Pembimbing" tidak ditemukan. Gunakan format resmi (.xlsx).', true);
+                        inp.value = '';
+                        return;
+                    }
+
+                    const parsedByStudent = new Map();
+                    const warnings = [];
+                    let unmatchedCount = 0;
+
+                    rawRows.forEach((raw, idx) => {
+                        const norm = {};
+                        Object.keys(raw).forEach((k) => { norm[normalizePlotHeader(k)] = raw[k]; });
+
+                        const rawUser = String(norm.username || norm.user || norm.akunsiswa || '').replace(/^@/, '').trim();
+                        const rawName = String(norm.namasiswa || norm.nama || norm.siswa || norm.fullname || '').trim();
+                        if (!rawUser && !rawName) return;
+
+                        const student = (rawUser && studentByUsername[rawUser.toLowerCase()]) ||
+                            (rawName && studentByName[rawName.toLowerCase()]);
+
+                        if (!student) {
+                            unmatchedCount++;
+                            warnings.push(`Baris ${idx + 2}: Siswa "${rawName || rawUser}" tidak ditemukan di database.`);
+                            return;
+                        }
+
+                        const rowIssues = [];
+                        let nextSubconc = student.sub_concentration || null;
+                        if (hasSubconcCol) {
+                            const rawSub = norm.subkonsentrasi ?? norm.subconc ?? norm.konsentrasi ?? norm.subconcentration ?? '';
+                            const subRes = normalizePlotSubconc(rawSub);
+                            if (subRes.invalid) {
+                                rowIssues.push(`Sub-Konsentrasi "${subRes.raw}" tidak dikenali`);
+                                warnings.push(`Baris ${idx + 2} (${student.full_name}): Sub-Konsentrasi "${subRes.raw}" tidak valid — nilai lama dipertahankan.`);
+                            } else {
+                                nextSubconc = subRes.value;
+                            }
+                        }
+
+                        let nextMentorId = student.mentor_id || null;
+                        if (hasMentorCol) {
+                            const rawMentor = norm.pembimbing ?? norm.gurupembimbing ?? norm.mentor ?? norm.usernamepembimbing ?? norm.namapembimbing ?? norm.guru ?? '';
+                            const mRes = resolvePlotMentor(rawMentor, mentors);
+                            if (mRes.invalid) {
+                                rowIssues.push(`Pembimbing "${mRes.raw}" tidak ditemukan`);
+                                warnings.push(`Baris ${idx + 2} (${student.full_name}): Pembimbing "${mRes.raw}" tidak ditemukan — pembimbing lama dipertahankan.`);
+                            } else {
+                                nextMentorId = mRes.mentor ? mRes.mentor.id : null;
+                            }
+                        }
+
+                        const changed = nextSubconc !== (student.sub_concentration || null) || nextMentorId !== (student.mentor_id || null);
+                        parsedByStudent.set(student.id, {
+                            rowNum: idx + 2,
+                            student,
+                            prevSubconc: student.sub_concentration || null,
+                            nextSubconc,
+                            prevMentorId: student.mentor_id || null,
+                            nextMentorId,
+                            nextMentorName: nextMentorId ? (mentorById[nextMentorId]?.full_name || 'Mentor') : null,
+                            changed,
+                            issues: rowIssues
+                        });
+                    });
+
+                    const allParsed = [...parsedByStudent.values()];
+                    if (!allParsed.length) {
+                        setPlottingStatus('Tidak ada baris siswa yang cocok dengan database.', true);
+                        inp.value = '';
+                        return;
+                    }
+
+                    // Urutkan agar baris yang berubah / ada peringatan tampil paling atas di pratinjau
+                    allParsed.sort((a, b) => {
+                        const score = (x) => (x.issues.length ? 0 : x.changed ? 1 : 2);
+                        return score(a) - score(b) || (a.student.class_name || '').localeCompare(b.student.class_name || '') || (a.student.full_name || '').localeCompare(b.student.full_name || '');
+                    });
+
+                    pendingPlottingImportRows = allParsed;
+                    const changedRows = allParsed.filter((r) => r.changed);
+                    const unchangedCount = allParsed.length - changedRows.length;
+
+                    const box = document.getElementById('plottingImportPreviewBox');
+                    const meta = document.getElementById('plottingImportMeta');
+                    const warnBox = document.getElementById('plottingImportWarnings');
+                    const tbody = document.getElementById('plottingImportTableBody');
+                    const confirmBtn = document.getElementById('confirmPlottingImportBtn');
+
+                    meta.textContent = `File "${file.name}" (sheet: ${sheetName}) — ${allParsed.length} siswa cocok, ${changedRows.length} akan diperbarui, ${unchangedCount} tidak berubah${unmatchedCount ? `, ${unmatchedCount} tidak ditemukan` : ''}.`;
+
+                    if (warnings.length) {
+                        const maxShow = 6;
+                        warnBox.innerHTML = `<div class="font-bold">⚠️ ${warnings.length} Catatan / Peringatan:</div>` +
+                            `<ul class="list-disc list-inside space-y-0.5">${warnings.slice(0, maxShow).map((w) => `<li>${A.esc(w)}</li>`).join('')}</ul>` +
+                            (warnings.length > maxShow ? `<div class="text-[11px] opacity-80">...dan ${warnings.length - maxShow} peringatan lainnya.</div>` : '');
+                        warnBox.classList.remove('hidden');
+                    } else {
+                        warnBox.innerHTML = '';
+                        warnBox.classList.add('hidden');
+                    }
+
+                    tbody.innerHTML = allParsed.map((r, i) => {
+                        const statusBadge = r.issues.length
+                            ? `<span class="inline-block px-2 py-0.5 rounded-lg bg-[#FFF1F5] text-[#F13B6E] font-bold">${A.esc(r.issues.join(' • '))}</span>`
+                            : r.changed
+                                ? `<span class="inline-block px-2 py-0.5 rounded-lg bg-[#EAF4FF] text-[#0095FF] font-bold">Akan Diperbarui</span>`
+                                : `<span class="inline-block px-2 py-0.5 rounded-lg bg-[#F1F5F9] text-slate-400 font-semibold">Sama</span>`;
+                        return `
+                            <tr class="border-t border-[#EDF1F7] ${r.changed ? 'bg-[#FAFDFF]' : ''}">
+                                <td class="py-2 px-3 font-mono text-slate-400">${i + 1}</td>
+                                <td class="py-2 px-3">
+                                    <div class="font-bold text-[#1E293B]">${A.esc(r.student.full_name)}</div>
+                                    <div class="text-[11px] font-mono text-slate-400">@${A.esc(r.student.username)}</div>
+                                </td>
+                                <td class="py-2 px-3 font-mono text-slate-600">${A.esc(r.student.class_name || '-')}</td>
+                                <td class="py-2 px-3">
+                                    ${r.nextSubconc
+                                        ? `<span class="px-2 py-0.5 rounded-lg bg-[#F3F6FB] text-[#1E293B] font-semibold">${A.esc(r.nextSubconc)}</span>`
+                                        : `<span class="text-slate-400">-</span>`}
+                                </td>
+                                <td class="py-2 px-3">
+                                    ${r.nextMentorName
+                                        ? `<span class="px-2 py-0.5 rounded-lg bg-[#E3F6F3] text-[#2F8F81] font-semibold">${A.esc(r.nextMentorName)}</span>`
+                                        : `<span class="text-slate-400">Belum di-plot</span>`}
+                                </td>
+                                <td class="py-2 px-3">${statusBadge}</td>
+                            </tr>`;
+                    }).join('');
+
+                    confirmBtn.disabled = changedRows.length === 0;
+                    confirmBtn.textContent = changedRows.length
+                        ? `✓ Terapkan Plotting (${changedRows.length} Siswa)`
+                        : 'Tidak Ada Perubahan';
+                    confirmBtn.classList.toggle('opacity-50', changedRows.length === 0);
+                    confirmBtn.classList.toggle('cursor-not-allowed', changedRows.length === 0);
+
+                    box.classList.remove('hidden');
+                    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    setPlottingStatus('');
+                } catch (err) {
+                    setPlottingStatus(`Gagal membaca file Excel: ${err.message || err}`, true);
+                } finally {
+                    inp.value = '';
+                }
+            };
+
+            window.cancelPlottingImport = function () {
+                pendingPlottingImportRows = [];
+                document.getElementById('plottingImportPreviewBox')?.classList.add('hidden');
+                const tbody = document.getElementById('plottingImportTableBody');
+                if (tbody) tbody.innerHTML = '';
+            };
+
+            window.confirmPlottingImport = async function () {
+                const toUpdate = pendingPlottingImportRows.filter((r) => r.changed);
+                if (!toUpdate.length) return;
+                const btn = document.getElementById('confirmPlottingImportBtn');
+                btn.disabled = true;
+
+                let successCount = 0;
+                let failCount = 0;
+                const chunkSize = 10;
+
+                for (let i = 0; i < toUpdate.length; i += chunkSize) {
+                    const chunk = toUpdate.slice(i, i + chunkSize);
+                    btn.textContent = `Menyimpan ${Math.min(i + chunk.length, toUpdate.length)}/${toUpdate.length}...`;
+                    const results = await Promise.all(
+                        chunk.map((item) =>
+                            supabase.from('profiles')
+                                .update({
+                                    sub_concentration: item.nextSubconc,
+                                    mentor_id: item.nextMentorId
+                                })
+                                .eq('id', item.student.id)
+                        )
+                    );
+                    results.forEach((res) => {
+                        if (res.error) failCount++;
+                        else successCount++;
+                    });
+                }
+
+                btn.disabled = false;
+                window.cancelPlottingImport();
+
+                if (failCount) {
+                    setPlottingStatus(`Selesai: ${successCount} siswa berhasil di-plotting, ${failCount} gagal disimpan.`, true);
+                } else {
+                    setPlottingStatus(`${successCount} siswa berhasil diperbarui dari Excel ✓`);
+                }
+                await loadPlottingStudents();
+                portal.refreshMetrics();
+            };
+
+            /* ==================== NOTIFIKASI WA OTOMATIS DEADLINE JAM 07:00 WIB ==================== */
+            function setWaConfigFeedback(msg, isError = false) {
+                const el = document.getElementById('waConfigFeedback');
+                if (!el) return;
+                el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#15803D]'}`;
+                el.textContent = msg;
+            }
+
+            window.onWaProviderChange = function () {
+                const prov = document.getElementById('waProviderSelect')?.value || 'fonnte';
+                document.getElementById('waCustomUrlWrap')?.classList.toggle('hidden', prov === 'fonnte');
+            };
+
+            function readWaConfigForm() {
+                return {
+                    provider: document.getElementById('waProviderSelect')?.value || 'fonnte',
+                    apiToken: (document.getElementById('waApiTokenInput')?.value || '').trim(),
+                    customUrl: (document.getElementById('waCustomUrlInput')?.value || '').trim(),
+                    appUrl: (document.getElementById('waAppUrlInput')?.value || '').trim(),
+                    enabled: Boolean(document.getElementById('waScheduleEnabled')?.checked),
+                    hour: 7
+                };
+            }
+
+            async function loadWaAutomationPanel() {
+                const queueSummaryEl = document.getElementById('waQueueSummary');
+                const queueListEl = document.getElementById('waQueueList');
+                const logsListEl = document.getElementById('waLogsList');
+                const badgeEl = document.getElementById('waScheduleBadge');
+                if (!queueListEl || !logsListEl) return;
+
+                const [
+                    { data: cfgRow },
+                    { data: profiles },
+                    { data: tasks },
+                    { data: subs },
+                    { data: logs }
+                ] = await Promise.all([
+                    supabase.from('app_settings').select('value').eq('key', 'wa_gateway_config').maybeSingle(),
+                    supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number'),
+                    supabase.from('project_tasks').select('id, title, pipeline_stage, sub_concentration, due_date'),
+                    supabase.from('project_submissions').select('project_task_id, student_id, status'),
+                    supabase.from('wa_notification_logs').select('*').order('created_at', { ascending: false }).limit(15)
+                ]);
+
+                // Muat konfigurasi tersimpan
+                if (cfgRow?.value) {
+                    try {
+                        const cfg = JSON.parse(cfgRow.value);
+                        if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
+                        if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
+                        if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
+                        if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
+                        document.getElementById('waScheduleEnabled').checked = Boolean(cfg.enabled);
+                        window.onWaProviderChange();
+                        if (badgeEl) {
+                            const active = Boolean(cfg.enabled && (cfg.apiToken || cfg.provider === 'custom_webhook') && A.getGasUrl());
+                            badgeEl.textContent = active ? 'Aktif • 07:00 WIB' : (cfg.apiToken ? 'Siap Diaktifkan' : 'Belum Aktif');
+                            badgeEl.className = `inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${active ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-500'}`;
+                        }
+                    } catch { /* ignore */ }
+                }
+
+                // Hitung antrean siswa hari ini (H-2/H-1/Hari-H & Lewat Deadline belum lapor selesai)
+                const allProf = profiles || [];
+                const students = allProf.filter((p) => p.role === 'student');
+                const mentors = allProf.filter((p) => p.role === 'mentor');
+                const queue = A.computeDeadlineReminderQueue(students, mentors, tasks || [], subs || []);
+
+                const overdueCnt = queue.filter((q) => q.overdue.length > 0).length;
+                const upcomingCnt = queue.filter((q) => q.upcoming.length > 0 && q.overdue.length === 0).length;
+                const noWaCnt = queue.filter((q) => !q.hasWa).length;
+
+                if (queueSummaryEl) {
+                    queueSummaryEl.innerHTML = `
+                        <span class="px-2.5 py-1 rounded-lg bg-[#FFF0F4] text-[#E11D48] font-bold num-tabular">🔴 ${overdueCnt} Lewat Deadline</span>
+                        <span class="px-2.5 py-1 rounded-lg bg-[#FFF6D6] text-[#B88600] font-bold num-tabular">🟡 ${upcomingCnt} H-2 s/d Hari-H</span>
+                        ${noWaCnt ? `<span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 font-semibold num-tabular">${noWaCnt} belum isi WA</span>` : ''}
+                    `;
+                }
+
+                if (!queue.length) {
+                    queueListEl.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 bg-[#FAFBFD]">Tidak ada siswa yang masuk kategori H-2 atau melewati deadline hari ini. Semua aman! ✓</div>`;
+                } else {
+                    queueListEl.innerHTML = `
+                        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="sticky top-0 z-10">
+                                    <tr class="bg-[#F7FAFF] border-b border-[#EDF1F7] text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="py-2.5 px-3">Siswa</th>
+                                        <th class="py-2.5 px-3">Kategori</th>
+                                        <th class="py-2.5 px-3">Tugas yang Diingatkan</th>
+                                        <th class="py-2.5 px-3 text-right">Kirim Manual</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-[#F1F5F9]">
+                                    ${queue.map((q) => {
+                                        const waUrl = A.getWhatsappUrl(q.student.whatsapp_number, q.message);
+                                        const catBadge = q.overdue.length
+                                            ? `<span class="inline-block px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48] font-bold">🔴 Lewat Deadline (Harian)</span>`
+                                            : `<span class="inline-block px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#B88600] font-bold">🟡 Mendekati Deadline</span>`;
+                                        const itemsText = [
+                                            ...q.overdue.map((x) => `Telat ${x.lateDays}h: ${x.task.title}`),
+                                            ...q.upcoming.map((x) => `${x.diffDays === 0 ? 'Hari Ini' : `H-${x.diffDays}`}: ${x.task.title}`)
+                                        ].join(' • ');
+                                        return `
+                                            <tr class="hover:bg-[#F8FBFF]">
+                                                <td class="py-2.5 px-3">
+                                                    <div class="font-bold text-[#1E293B]">${A.esc(q.student.full_name)}</div>
+                                                    <div class="text-[10.5px] text-slate-400">${A.esc(q.student.class_name || '-')} • ${q.hasWa ? A.formatWhatsappDisplay(q.student.whatsapp_number) : 'WA belum diisi'}</div>
+                                                </td>
+                                                <td class="py-2.5 px-3">${catBadge}</td>
+                                                <td class="py-2.5 px-3 text-slate-600 max-w-xs truncate" title="${A.esc(itemsText)}">${A.esc(itemsText)}</td>
+                                                <td class="py-2.5 px-3 text-right">
+                                                    ${waUrl
+                                                        ? `<a href="${A.esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white font-bold transition">💬 Kirim WA</a>`
+                                                        : `<span class="text-[10.5px] text-slate-400">Belum ada WA</span>`}
+                                                </td>
+                                            </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>`;
+                }
+
+                // Riwayat Log Pengiriman WA
+                const logRows = logs || [];
+                if (!logRows.length) {
+                    logsListEl.innerHTML = `<div class="p-5 text-center text-xs text-slate-400 bg-[#FAFBFD]">Belum ada riwayat pengiriman notifikasi WA otomatis.</div>`;
+                } else {
+                    logsListEl.innerHTML = `
+                        <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="sticky top-0 z-10">
+                                    <tr class="bg-[#F7FAFF] border-b border-[#EDF1F7] text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="py-2 px-3">Waktu</th>
+                                        <th class="py-2 px-3">Penerima</th>
+                                        <th class="py-2 px-3">Tipe</th>
+                                        <th class="py-2 px-3">Ringkasan Tugas</th>
+                                        <th class="py-2 px-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-[#F1F5F9]">
+                                    ${logRows.map((l) => `
+                                        <tr>
+                                            <td class="py-2 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">${A.formatDateTime(l.created_at)}</td>
+                                            <td class="py-2 px-3">
+                                                <div class="font-bold text-[#1E293B]">${A.esc(l.student_name)}</div>
+                                                <div class="text-[10.5px] font-mono text-slate-400">${A.esc(A.formatWhatsappDisplay(l.whatsapp_number) || l.whatsapp_number)}</div>
+                                            </td>
+                                            <td class="py-2 px-3 font-mono text-[10.5px]">${A.esc(l.reminder_type)}</td>
+                                            <td class="py-2 px-3 text-slate-600 max-w-xs truncate" title="${A.esc(l.task_summary || '')}">${A.esc(l.task_summary || '-')}</td>
+                                            <td class="py-2 px-3">
+                                                ${l.status === 'sent'
+                                                    ? `<span class="px-2 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-bold">Terkirim ✓</span>`
+                                                    : `<span class="px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48] font-bold" title="${A.esc(l.response_detail || '')}">Gagal</span>`}
+                                            </td>
+                                        </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>`;
+                }
+            }
+            window.loadWaAutomationPanel = loadWaAutomationPanel;
+
+            window.saveWaReminderConfig = async function () {
+                const cfg = readWaConfigForm();
+                const btn = document.getElementById('saveWaConfigBtn');
+                if (cfg.enabled && !cfg.apiToken && cfg.provider !== 'custom_webhook') {
+                    setWaConfigFeedback('Masukkan API Token WA Gateway terlebih dahulu sebelum mengaktifkan jadwal otomatis.', true);
+                    document.getElementById('waApiTokenInput')?.focus();
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Menyimpan...';
+
+                // 1. Simpan ke app_settings Supabase
+                const { error: dbErr } = await supabase
+                    .from('app_settings')
+                    .upsert({ key: 'wa_gateway_config', value: JSON.stringify(cfg), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+
+                if (dbErr) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Simpan & Pasang Jadwal 07:00';
+                    setWaConfigFeedback(`Gagal menyimpan ke database: ${dbErr.message}`, true);
+                    return;
+                }
+
+                // 2. Sinkronkan & pasang trigger harian 07:00 WIB di Google Apps Script
+                if (!A.getGasUrl()) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Simpan & Pasang Jadwal 07:00';
+                    setWaConfigFeedback('Konfigurasi tersimpan di database, tetapi URL Google Apps Script di atas belum diisi sehingga trigger jam 07:00 belum terpasang.', true);
+                    loadWaAutomationPanel();
+                    return;
+                }
+
+                try {
+                    const res = await A.postToGas({ action: 'save_wa_config', ...cfg });
+                    btn.disabled = false;
+                    btn.textContent = '💾 Simpan & Pasang Jadwal 07:00';
+                    if (!res?.ok) throw new Error(res?.error || 'Respon Apps Script tidak valid (pastikan google-drive-sync.gs versi terbaru sudah di-Deploy).');
+                    setWaConfigFeedback(res.message || 'Jadwal WA otomatis pukul 07:00 WIB berhasil diaktifkan ✓');
+                    A.showToast(res.triggerActive ? 'Jadwal WA otomatis 07:00 WIB aktif ✓' : 'Pengaturan WA disimpan ✓');
+                    loadWaAutomationPanel();
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Simpan & Pasang Jadwal 07:00';
+                    setWaConfigFeedback(`Konfigurasi tersimpan, namun sinkron Apps Script gagal: ${err.message}`, true);
+                }
+            };
+
+            window.testSendWaReminder = async function () {
+                const cfg = readWaConfigForm();
+                if (!A.getGasUrl()) {
+                    setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
+                    return;
+                }
+                if (!cfg.apiToken && cfg.provider !== 'custom_webhook') {
+                    setWaConfigFeedback('Masukkan API Token WA Gateway terlebih dahulu.', true);
+                    return;
+                }
+                const defaultWa = A.formatWhatsappDisplay(A.getUser()?.whatsapp_number || '').replaceAll('-', '');
+                const target = prompt('Masukkan Nomor WhatsApp tujuan untuk tes kirim pesan:', defaultWa || '08');
+                if (!target) return;
+                const cleanWa = A.normalizeWhatsapp(target);
+                if (!cleanWa) {
+                    setWaConfigFeedback('Nomor WA tes tidak valid (gunakan awalan 08 atau 628).', true);
+                    return;
+                }
+
+                const btn = document.getElementById('testWaBtn');
+                btn.disabled = true;
+                btn.textContent = 'Mengirim...';
+                try {
+                    const res = await A.postToGas({ action: 'test_send_wa', phone: cleanWa, config: cfg });
+                    btn.disabled = false;
+                    btn.textContent = '🧪 Tes Kirim WA';
+                    if (!res?.ok) throw new Error(res?.error || res?.detail || 'Pengiriman WA gagal.');
+                    setWaConfigFeedback(`Pesan tes berhasil dikirim ke ${A.formatWhatsappDisplay(cleanWa)} ✓`);
+                    A.showToast('Pesan WA tes terkirim ✓');
+                    loadWaAutomationPanel();
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = '🧪 Tes Kirim WA';
+                    setWaConfigFeedback(`Tes WA gagal: ${err.message}`, true);
+                }
+            };
+
+            window.runWaReminderNow = async function () {
+                const cfg = readWaConfigForm();
+                if (!A.getGasUrl()) {
+                    setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
+                    return;
+                }
+                if (!cfg.apiToken && cfg.provider !== 'custom_webhook') {
+                    setWaConfigFeedback('Masukkan API Token WA Gateway terlebih dahulu.', true);
+                    return;
+                }
+                if (!confirm('Jalankan pengecekan & kirim notifikasi WA sekarang ke seluruh siswa yang masuk H-2 s/d Hari-H atau melewati deadline (belum lapor selesai)?')) return;
+
+                const btn = document.getElementById('runWaNowBtn');
+                btn.disabled = true;
+                btn.textContent = 'Mengirim...';
+                try {
+                    const res = await A.postToGas({ action: 'run_wa_deadline_check_now', config: cfg });
+                    btn.disabled = false;
+                    btn.textContent = '📨 Jalankan Sekarang';
+                    if (!res?.ok) throw new Error(res?.error || 'Gagal menjalankan pengingat WA.');
+                    setWaConfigFeedback(`Selesai (${res.sentDate}): ${res.sentCount} WA terkirim, ${res.failedCount} gagal, ${res.skippedNoWa} belum isi WA (dari ${res.eligibleStudents} siswa memenuhi syarat).`);
+                    A.showToast(`${res.sentCount} notifikasi WA pengingat deadline terkirim ✓`);
+                    loadWaAutomationPanel();
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = '📨 Jalankan Sekarang';
+                    setWaConfigFeedback(`Gagal menjalankan pengingat WA: ${err.message}`, true);
+                }
+            };
+        })();
+    </script>
+</body>
+
+</html>
