@@ -318,6 +318,7 @@ function doPost(e) {
         apiToken: String(payload.apiToken || '').trim(),
         customUrl: String(payload.customUrl || '').trim(),
         appUrl: String(payload.appUrl || '').trim(),
+        messageTemplate: String(payload.messageTemplate || '').trim(),
         hour: Number(payload.hour || 7)
       };
       PropertiesService.getScriptProperties().setProperty('ANITRACK_WA_CONFIG', JSON.stringify(cfg));
@@ -344,7 +345,8 @@ function doPost(e) {
         triggerCount: triggers.length,
         hour: cfg.hour || 7,
         provider: cfg.provider || 'fonnte',
-        hasToken: Boolean(cfg.apiToken)
+        hasToken: Boolean(cfg.apiToken),
+        hasTemplate: Boolean(cfg.messageTemplate)
       });
     }
 
@@ -353,12 +355,19 @@ function doPost(e) {
       const cfg = payload.config ? payload.config : getWaConfigFromProperties();
       const targetPhone = normalizeWaPhoneGas(payload.phone || '');
       if (!targetPhone) return jsonResponse({ ok: false, error: 'Nomor WA tujuan tidak valid.' });
+      const sampleTasks = '🟡 *MENDEKATI DEADLINE:*\n1. *Storyline, Treatment & Storyboard* — *Besok (H-1)* (Contoh Tes)';
       const msg = payload.message || (
-        '🔔 *Tes Notifikasi AniTrack — SMKN 4 Malang*\n\n' +
-        'Koneksi WhatsApp Gateway berhasil terhubung!\n' +
-        'Pengingat deadline project otomatis akan dikirim setiap jam 07:00 WIB:\n' +
-        '• H-2, H-1, dan Hari-H deadline\n' +
-        '• Setiap hari bagi siswa yang belum lapor selesai melewati deadline.'
+        '🔔 *[TES TEMPLATE WA ANITRACK]*\n\n' +
+        renderWaTemplateGas(cfg.messageTemplate || '', {
+          nama: payload.sampleName || 'Budi Santoso (Contoh)',
+          kelas: 'X ANI A',
+          subkonsentrasi: '3D Animator',
+          daftar_tugas: sampleTasks,
+          tugas_terlambat: '',
+          tugas_mendekati: sampleTasks,
+          pembimbing: '👨‍🏫 Pembimbing: *Guru Pembimbing*',
+          link_anitrack: cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : ''
+        })
       );
       const sendRes = sendWaMessageViaGateway(cfg, targetPhone, msg);
       insertWaLogToSupabase({
@@ -396,6 +405,43 @@ function doPost(e) {
 
 /* ==================== ENGINE NOTIFIKASI WA OTOMATIS JAM 07:00 WIB ==================== */
 
+const DEFAULT_WA_TEMPLATE_GAS = [
+  'Halo *{nama}* ({kelas}),',
+  'Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:',
+  '',
+  '{daftar_tugas}',
+  '📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
+  '{pembimbing}',
+  '{link_anitrack}'
+].join('\n');
+
+function renderWaTemplateGas(template, vars) {
+  const raw = (template && String(template).trim()) ? String(template) : DEFAULT_WA_TEMPLATE_GAS;
+  const map = {
+    nama: vars.nama || 'Siswa',
+    kelas: vars.kelas || 'Siswa Animasi',
+    subkonsentrasi: vars.subkonsentrasi || 'Animasi',
+    daftar_tugas: vars.daftar_tugas || '-',
+    tugas_terlambat: vars.tugas_terlambat || '',
+    tugas_mendekati: vars.tugas_mendekati || '',
+    pembimbing: vars.pembimbing || '',
+    link_anitrack: vars.link_anitrack || ''
+  };
+  const hasTaskToken = /\{(daftar_tugas|tugas_terlambat|tugas_mendekati)\}/i.test(raw);
+  const hasMentorToken = /\{pembimbing\}/i.test(raw);
+  const hasLinkToken = /\{link_anitrack\}/i.test(raw);
+  let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|pembimbing|link_anitrack)\}/gi, function (_, k) {
+    const key = String(k).toLowerCase();
+    return map[key] !== undefined ? map[key] : '';
+  });
+  const autoExtra = [];
+  if (!hasTaskToken && map.daftar_tugas && map.daftar_tugas !== '-') autoExtra.push(map.daftar_tugas);
+  if (!hasMentorToken && map.pembimbing) autoExtra.push(map.pembimbing);
+  if (!hasLinkToken && map.link_anitrack) autoExtra.push(map.link_anitrack);
+  if (autoExtra.length) rendered = rendered.trim() + '\n\n' + autoExtra.join('\n');
+  return rendered.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function getWaConfigFromProperties() {
   try {
     const raw = PropertiesService.getScriptProperties().getProperty('ANITRACK_WA_CONFIG');
@@ -408,7 +454,7 @@ function getWaConfigFromProperties() {
       return JSON.parse(rows[0].value);
     }
   } catch (err) { /* ignore */ }
-  return { enabled: false, provider: 'fonnte', apiToken: '', customUrl: '', appUrl: '', hour: 7 };
+  return { enabled: false, provider: 'fonnte', apiToken: '', customUrl: '', appUrl: '', messageTemplate: '', hour: 7 };
 }
 
 function syncDailyWaTrigger(enabled, hour) {
@@ -627,39 +673,44 @@ function executeDailyWaDeadlineReminder(forceRun) {
     }
 
     const mentor = s.mentor_id ? mentorMap[s.mentor_id] : null;
-    const lines = [];
-    lines.push(`Halo *${s.full_name}* (${s.class_name || 'Siswa Animasi'}),`);
-    lines.push('Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:');
-    lines.push('');
-
+    const overdueLines = [];
     if (overdueList.length) {
-      lines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
+      overdueLines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
       overdueList.forEach(function (item, idx) {
         const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
-        lines.push(`${idx + 1}. *${item.title}*${revTag} — Terlambat *${item.lateDays} hari* (Deadline: ${item.dueDate})`);
+        overdueLines.push(`${idx + 1}. *${item.title}*${revTag} — Terlambat *${item.lateDays} hari* (Deadline: ${item.dueDate})`);
       });
-      lines.push('_Notifikasi ini akan dikirim setiap hari pukul 07:00 WIB sampai kamu melapor selesai di AniTrack._');
-      lines.push('');
+      overdueLines.push('_Notifikasi ini akan dikirim setiap hari pukul 07:00 WIB sampai kamu melapor selesai di AniTrack._');
     }
 
+    const upcomingLines = [];
     if (upcomingList.length) {
-      lines.push('🟡 *MENDEKATI DEADLINE:*');
+      upcomingLines.push('🟡 *MENDEKATI DEADLINE:*');
       upcomingList.forEach(function (item, idx) {
         const whenLabel = item.diffDays === 0 ? 'HARI INI' : (item.diffDays === 1 ? 'Besok (H-1)' : '2 Hari Lagi (H-2)');
         const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
-        lines.push(`${idx + 1}. *${item.title}*${revTag} — *${whenLabel}* (${item.dueDate})`);
+        upcomingLines.push(`${idx + 1}. *${item.title}*${revTag} — *${whenLabel}* (${item.dueDate})`);
       });
-      lines.push('');
     }
 
-    lines.push('📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.');
-    if (mentor) {
-      const mentorWa = formatWaLocalGas(mentor.whatsapp_number);
-      lines.push(`👨‍🏫 Pembimbing: *${mentor.full_name}*${mentorWa !== '-' ? ` (WA: ${mentorWa})` : ''}`);
-    }
-    if (cfg.appUrl) {
-      lines.push(`🔗 Buka AniTrack: ${cfg.appUrl}`);
-    }
+    const overdueBlock = overdueLines.join('\n');
+    const upcomingBlock = upcomingLines.join('\n');
+    const combinedTasks = [overdueBlock, upcomingBlock].filter(Boolean).join('\n\n');
+    const mentorLine = mentor
+      ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWaLocalGas(mentor.whatsapp_number) !== '-' ? ` (WA: ${formatWaLocalGas(mentor.whatsapp_number)})` : ''}`
+      : '';
+    const appUrlLine = cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : '';
+
+    const messageText = renderWaTemplateGas(cfg.messageTemplate || '', {
+      nama: s.full_name || 'Siswa',
+      kelas: s.class_name || 'Siswa Animasi',
+      subkonsentrasi: s.sub_concentration || 'Animasi',
+      daftar_tugas: combinedTasks,
+      tugas_terlambat: overdueBlock,
+      tugas_mendekati: upcomingBlock,
+      pembimbing: mentorLine,
+      link_anitrack: appUrlLine
+    });
 
     const reminderType = (overdueList.length && upcomingList.length)
       ? 'mixed'
@@ -668,7 +719,7 @@ function executeDailyWaDeadlineReminder(forceRun) {
       .concat(upcomingList.map(function (x) { return `[H-${x.diffDays}] ${x.title}`; }))
       .join('; ');
 
-    const sendRes = sendWaMessageViaGateway(cfg, phone, lines.join('\n'));
+    const sendRes = sendWaMessageViaGateway(cfg, phone, messageText);
     if (sendRes.ok) sentCount++;
     else failedCount++;
 

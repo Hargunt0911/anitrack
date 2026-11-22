@@ -853,12 +853,12 @@
                     <div id="projectTasksContainer" class="space-y-4"></div>
                 </section>
 
-                <!-- ==================== TAB 3: PLOTTING PEMBIMBING (KHUSUS SUPERADMIN) ==================== -->
+                <!-- ==================== TAB 3: KELOLA AKUN & PLOTTING PEMBIMBING (KHUSUS SUPERADMIN) ==================== -->
                 <section id="tab-plotting" class="hidden space-y-5">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Guru Pembimbing &amp; Plotting Lintas Kelas</h2>
-                            <p class="text-xs text-slate-500 mt-0.5">Tambahkan akun guru pembimbing (wajib Nomor WA aktif) serta tetapkan plotting siswa secara manual atau Excel (.xlsx).</p>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Kelola Akun (Admin, Guru, Siswa) &amp; Plotting</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Tambahkan akun baru sesuai role (Superadmin, Guru Pembimbing, atau Siswa), ubah role/data akun, serta atur plotting lintas kelas.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
                             <button type="button" onclick="downloadPlottingTemplateXlsx()"
@@ -873,47 +873,138 @@
                         </div>
                     </div>
 
-                    <!-- Kelola Akun Guru Pembimbing (Tambah / Edit WA & Password / Hapus) -->
+                    <!-- Kelola Semua Akun Pengguna (Multi-Admin, Guru Pembimbing, Siswa) -->
                     <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div class="flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full bg-[#4CB6A7]"></span>
-                                <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#1E293B]">Kelola Akun Guru Pembimbing (Wajib Nomor WA)</h3>
+                                <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#1E293B]">Tambah &amp; Kelola Akun Pengguna (Multi-Role)</h3>
                             </div>
-                            <span id="mentorManageCount" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#E3F6F3] text-[#2F8F81] self-start sm:self-auto">0 guru</span>
+                            <div id="accountRoleCounts" class="flex flex-wrap items-center gap-1.5 text-[11px] font-bold"></div>
                         </div>
 
-                        <form id="addMentorForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
-                            <div class="lg:col-span-3">
-                                <label for="newMentorName" class="block text-[11px] font-semibold text-slate-500 mb-1">Nama Lengkap Guru <span class="text-[#F13B6E]">*</span></label>
-                                <input id="newMentorName" type="text" required placeholder="Contoh: Budi Santoso, S.Pd."
-                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                        <form id="addAccountForm" class="bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 space-y-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                                <div class="lg:col-span-2">
+                                    <label for="newAccRole" class="block text-[11px] font-semibold text-slate-600 mb-1">Role Akun <span class="text-[#F13B6E]">*</span></label>
+                                    <select id="newAccRole" onchange="onNewAccRoleChange()"
+                                        class="w-full px-3 py-2.5 bg-white border border-[#CBD5E1] rounded-xl text-sm sm:text-xs font-bold text-[#1E293B] focus:outline-none focus:border-[#0095FF]">
+                                        <option value="mentor">Guru Pembimbing</option>
+                                        <option value="student">Siswa</option>
+                                        <option value="superadmin">Admin / Superadmin</option>
+                                    </select>
+                                </div>
+                                <div class="lg:col-span-3">
+                                    <label for="newAccName" class="block text-[11px] font-semibold text-slate-600 mb-1">Nama Lengkap <span class="text-[#F13B6E]">*</span></label>
+                                    <input id="newAccName" type="text" required placeholder="Contoh: Budi Santoso, S.Pd."
+                                        class="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm sm:text-xs focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="lg:col-span-2">
+                                    <label for="newAccUsername" class="block text-[11px] font-semibold text-slate-600 mb-1">Username <span class="text-[#F13B6E]">*</span></label>
+                                    <input id="newAccUsername" type="text" required placeholder="budi.s"
+                                        class="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="lg:col-span-2">
+                                    <label for="newAccPassword" class="block text-[11px] font-semibold text-slate-600 mb-1">Password / PIN <span class="text-[#F13B6E]">*</span></label>
+                                    <input id="newAccPassword" type="text" required value="123456" placeholder="123456"
+                                        class="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="lg:col-span-3">
+                                    <label for="newAccWhatsapp" class="block text-[11px] font-semibold text-slate-600 mb-1">Nomor WA <span id="newAccWaReqStar" class="text-[#F13B6E]">*</span></label>
+                                    <input id="newAccWhatsapp" type="tel" placeholder="081234567890"
+                                        class="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
                             </div>
-                            <div class="lg:col-span-2">
-                                <label for="newMentorUsername" class="block text-[11px] font-semibold text-slate-500 mb-1">Username <span class="text-[#F13B6E]">*</span></label>
-                                <input id="newMentorUsername" type="text" required placeholder="guru3"
-                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+
+                            <!-- Field Tambahan Khusus Role Guru Pembimbing (Wali Kelas Opsional) -->
+                            <div id="newAccMentorFields" class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-[#DCEBFF]">
+                                <div>
+                                    <label for="newAccHomeroom" class="block text-[11px] font-semibold text-slate-600 mb-1">Wali Kelas (Opsional)</label>
+                                    <input id="newAccHomeroom" list="anitrackClassList" type="text" placeholder="Kosongkan jika bukan Wali Kelas (mis: X ANI A)"
+                                        class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="sm:col-span-2 flex items-center text-[11px] text-slate-500 pt-1 sm:pt-4">
+                                    Jika diisi (misal <strong>X ANI A</strong>), guru ini otomatis bisa beralih melihat <strong>seluruh siswa kelas perwaliannya</strong> di Portal Pembimbing.
+                                </div>
                             </div>
-                            <div class="lg:col-span-2">
-                                <label for="newMentorPassword" class="block text-[11px] font-semibold text-slate-500 mb-1">Password / PIN <span class="text-[#F13B6E]">*</span></label>
-                                <input id="newMentorPassword" type="text" required value="123456" placeholder="123456"
-                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+
+                            <!-- Field Tambahan Khusus Role Siswa -->
+                            <div id="newAccStudentFields" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-[#DCEBFF]">
+                                <div>
+                                    <label for="newAccClass" class="block text-[11px] font-semibold text-slate-600 mb-1">Kelas Siswa <span class="text-[#F13B6E]">*</span></label>
+                                    <input id="newAccClass" list="anitrackClassList" type="text" placeholder="Pilih atau ketik: X ANI A"
+                                        class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
+                                    <datalist id="anitrackClassList">
+                                        <option value="X ANI A"></option>
+                                        <option value="X ANI B"></option>
+                                        <option value="X ANI C"></option>
+                                        <option value="XI ANI A"></option>
+                                        <option value="XI ANI B"></option>
+                                        <option value="XI ANI C"></option>
+                                        <option value="XII ANI A"></option>
+                                        <option value="XII ANI B"></option>
+                                        <option value="XII ANI C"></option>
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label for="newAccSubconc" class="block text-[11px] font-semibold text-slate-600 mb-1">Sub-Konsentrasi (Opsional)</label>
+                                    <select id="newAccSubconc" class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
+                                        <option value="">-- Belum Dipilih --</option>
+                                        <option value="2D Animator">2D Animator</option>
+                                        <option value="2D Motion Graphic">2D Motion Graphic</option>
+                                        <option value="3D Animator">3D Animator</option>
+                                        <option value="3D Modeller">3D Modeller</option>
+                                        <option value="3D Motion Graphic">3D Motion Graphic</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="newAccMentor" class="block text-[11px] font-semibold text-slate-600 mb-1">Guru Pembimbing (Opsional)</label>
+                                    <select id="newAccMentor" class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
+                                        <option value="">-- Belum Di-plot --</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="lg:col-span-3">
-                                <label for="newMentorWhatsapp" class="block text-[11px] font-semibold text-slate-500 mb-1">Nomor WA Aktif <span class="text-[#F13B6E]">*</span></label>
-                                <input id="newMentorWhatsapp" type="tel" required placeholder="081234567890"
-                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                            </div>
-                            <div class="lg:col-span-2">
-                                <button id="addMentorBtn" type="submit"
-                                    class="w-full py-2.5 px-4 bg-[#4CB6A7] hover:bg-[#3FA496] text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer">
-                                    + Tambah Guru
+
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                                <span id="newAccRoleHint" class="text-[11px] text-slate-500">Akun Guru Pembimbing wajib mencantumkan Nomor WA aktif.</span>
+                                <button id="addAccountBtn" type="submit"
+                                    class="px-5 py-2.5 bg-[#4CB6A7] hover:bg-[#3FA496] text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer shrink-0">
+                                    + Tambah Akun
                                 </button>
                             </div>
                         </form>
-                        <div id="mentorManageFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+                        <div id="accountManageFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
 
-                        <div id="mentorsManageList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                        <!-- Filter Role & Pencarian Daftar Akun -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                            <div id="accountRoleFilterTabs" class="inline-flex flex-wrap p-1 bg-[#F3F6FB] rounded-xl gap-1">
+                                <button type="button" onclick="setAccountRoleFilter('staff')" data-acc-filter="staff"
+                                    class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0095FF] text-white transition cursor-pointer">
+                                    Admin &amp; Guru
+                                </button>
+                                <button type="button" onclick="setAccountRoleFilter('superadmin')" data-acc-filter="superadmin"
+                                    class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
+                                    Admin
+                                </button>
+                                <button type="button" onclick="setAccountRoleFilter('mentor')" data-acc-filter="mentor"
+                                    class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
+                                    Guru Pembimbing
+                                </button>
+                                <button type="button" onclick="setAccountRoleFilter('student')" data-acc-filter="student"
+                                    class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
+                                    Siswa
+                                </button>
+                                <button type="button" onclick="setAccountRoleFilter('all')" data-acc-filter="all"
+                                    class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
+                                    Semua
+                                </button>
+                            </div>
+                            <input id="accountManageSearch" type="text" oninput="renderAccountsManageList()"
+                                placeholder="Cari nama, username, kelas..."
+                                class="w-full sm:w-64 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                        </div>
+
+                        <div id="accountsManageList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
                     </div>
 
                     <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-3">
@@ -1097,13 +1188,50 @@
                                 </div>
                                 <div class="md:col-span-4">
                                     <label for="waAppUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Link Portal AniTrack (Opsional)</label>
-                                    <input id="waAppUrlInput" type="url" placeholder="https://anitrack.republikanimasi.my.id"
+                                    <input id="waAppUrlInput" type="url" oninput="updateWaTemplatePreview()" placeholder="https://anitrack.republikanimasi.my.id"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
                                 <div id="waCustomUrlWrap" class="hidden md:col-span-12">
                                     <label for="waCustomUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Endpoint URL Gateway (Khusus Wablas / Custom Webhook)</label>
                                     <input id="waCustomUrlInput" type="url" placeholder="https://pati.wablas.com/api/send-message"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+
+                                <!-- Editor Template Pesan WA Custom (Otomatis Sesuai Nama & Tugas Siswa) -->
+                                <div class="md:col-span-12 pt-2 border-t border-[#DCEBFF] space-y-2.5">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <label for="waMessageTemplateInput" class="block text-xs font-extrabold text-[#1E293B]">
+                                                ✏️ Template Pesan WA (Setting 1x di Awal — Sisanya Otomatis Diisi Sistem)
+                                            </label>
+                                            <p class="text-[11px] text-slate-500">Cukup atur kata-katanya sekali di awal (atau pakai bawaan). Saat dikirim otomatis setiap pagi, sistem otomatis mengganti <code class="font-mono">{nama}</code> dan melampirkan daftar tugas + pembimbing masing-masing siswa.</p>
+                                        </div>
+                                        <button type="button" onclick="resetWaTemplateDefault()"
+                                            class="px-3 py-1.5 rounded-lg bg-white hover:bg-[#FFF1F5] border border-[#CBD5E1] text-slate-600 hover:text-[#E11D48] text-[11px] font-bold transition cursor-pointer">
+                                            ↺ Reset Default
+                                        </button>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <button type="button" onclick="insertWaPlaceholder('{nama}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {nama}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{kelas}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {kelas}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{subkonsentrasi}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {subkonsentrasi}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{daftar_tugas}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {daftar_tugas}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{tugas_terlambat}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#FFF0F4] border border-[#FECDD6] text-[#E11D48] font-mono text-[11px] font-bold cursor-pointer">+ {tugas_terlambat}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{tugas_mendekati}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#FFF6D6] border border-[#FDE68A] text-[#B88600] font-mono text-[11px] font-bold cursor-pointer">+ {tugas_mendekati}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{pembimbing}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#E7F9EE] border border-[#BBF7D0] text-[#15803D] font-mono text-[11px] font-bold cursor-pointer">+ {pembimbing}</button>
+                                        <button type="button" onclick="insertWaPlaceholder('{link_anitrack}')" class="px-2 py-1 rounded-lg bg-white hover:bg-[#E7F9EE] border border-[#BBF7D0] text-[#15803D] font-mono text-[11px] font-bold cursor-pointer">+ {link_anitrack}</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                        <div>
+                                            <textarea id="waMessageTemplateInput" rows="7" oninput="updateWaTemplatePreview()"
+                                                placeholder="Tulis isi pesan WA custom di sini... gunakan {nama}, {kelas}, {daftar_tugas}, dll."
+                                                class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
+                                        </div>
+                                        <div class="rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] p-3.5 space-y-1.5">
+                                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#15803D]">👁 Pratinjau Pesan WA (Contoh)</div>
+                                            <pre id="waTemplatePreview" class="text-[11.5px] text-[#1E293B] font-sans whitespace-pre-wrap leading-relaxed max-h-44 overflow-y-auto"></pre>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1237,9 +1365,12 @@
             const A = window.AniTrack;
             const { supabase, SUBCONCS } = A;
 
+            let allAccountsList = [];
             let mentorsList = [];
+            let homeroomMap = {};
             let plottingStudentsCache = [];
-            let editingMentorId = null;
+            let editingAccountId = null;
+            let accountRoleFilter = 'staff'; // 'staff' | 'superadmin' | 'mentor' | 'student' | 'all'
 
             const portal = A.initStaffPortal({
                 role: 'superadmin',
@@ -1248,7 +1379,7 @@
                     materials: 'Materi Ajar',
                     tasks: 'Daily Task',
                     projects: 'Project Tracker',
-                    plotting: 'Guru & Plotting',
+                    plotting: 'Akun & Plotting',
                     storage: 'Drive & Notifikasi WA',
                     profile: 'Akun Saya'
                 },
@@ -1262,22 +1393,49 @@
             });
             if (!portal) return;
 
+            window.onNewAccRoleChange = function () {
+                const role = document.getElementById('newAccRole')?.value || 'mentor';
+                const studentBox = document.getElementById('newAccStudentFields');
+                const mentorBox = document.getElementById('newAccMentorFields');
+                const waStar = document.getElementById('newAccWaReqStar');
+                const hint = document.getElementById('newAccRoleHint');
+                const btn = document.getElementById('addAccountBtn');
+                studentBox?.classList.toggle('hidden', role !== 'student');
+                mentorBox?.classList.toggle('hidden', role !== 'mentor');
+                waStar?.classList.toggle('hidden', role !== 'mentor');
+                if (hint) {
+                    hint.textContent = role === 'superadmin'
+                        ? 'Admin / Superadmin punya akses penuh (termasuk kelola akun, plotting, project, dan notifikasi WA). Bisa lebih dari 1 admin.'
+                        : role === 'mentor'
+                            ? 'Akun Guru Pembimbing wajib mencantumkan Nomor WA aktif (bisa sekaligus ditugaskan sebagai Wali Kelas).'
+                            : 'Akun Siswa dapat langsung login; lengkapi Kelas (wajib), Sub-Konsentrasi & Pembimbing (opsional).';
+                }
+                if (btn) {
+                    btn.textContent = role === 'superadmin' ? '+ Tambah Admin' : (role === 'mentor' ? '+ Tambah Guru' : '+ Tambah Siswa');
+                }
+            };
+            window.onNewAccRoleChange();
+
             async function loadPlottingStudents() {
                 const cls = document.getElementById('plottingClassFilter').value;
-                const [{ data: mentors }, studRes, { data: allStudMentors }] = await Promise.all([
-                    supabase.from('profiles').select('id, full_name, username, whatsapp_number, avatar_url').eq('role', 'mentor').order('full_name'),
+                const [{ data: allProfiles }, studRes, loadedHomeroom] = await Promise.all([
+                    supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number, avatar_url, project_drive_url').order('full_name'),
                     (() => {
                         let q = supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name');
                         if (cls) q = q.eq('class_name', cls);
                         return q;
                     })(),
-                    supabase.from('profiles').select('mentor_id').eq('role', 'student').not('mentor_id', 'is', null)
+                    A.loadHomeroomMap()
                 ]);
 
-                mentorsList = mentors || [];
+                homeroomMap = loadedHomeroom || {};
+                allAccountsList = allProfiles || [];
+                mentorsList = allAccountsList.filter((p) => p.role === 'mentor');
                 const studentCountByMentor = {};
-                (allStudMentors || []).forEach((r) => {
-                    studentCountByMentor[r.mentor_id] = (studentCountByMentor[r.mentor_id] || 0) + 1;
+                allAccountsList.forEach((r) => {
+                    if (r.role === 'student' && r.mentor_id) {
+                        studentCountByMentor[r.mentor_id] = (studentCountByMentor[r.mentor_id] || 0) + 1;
+                    }
                 });
 
                 const sel = document.getElementById('targetMentorSelect');
@@ -1287,109 +1445,240 @@
                     : '<option value="">Belum ada akun mentor</option>';
                 if (prev) sel.value = prev;
 
-                renderMentorsManageList(studentCountByMentor);
+                const newAccMentorSel = document.getElementById('newAccMentor');
+                if (newAccMentorSel) {
+                    const prevM = newAccMentorSel.value;
+                    newAccMentorSel.innerHTML = '<option value="">-- Belum Di-plot --</option>' +
+                        mentorsList.map((m) => `<option value="${m.id}">${A.esc(m.full_name)} (@${A.esc(m.username)})</option>`).join('');
+                    if (prevM) newAccMentorSel.value = prevM;
+                }
+
+                // Update opsi filter kelas jika ada kelas baru
+                const knownClasses = [...new Set(['X ANI A', 'X ANI B', 'X ANI C', ...allAccountsList.filter((p) => p.role === 'student' && p.class_name).map((p) => p.class_name)])].sort();
+                const clsSel = document.getElementById('plottingClassFilter');
+                if (clsSel) {
+                    const curCls = clsSel.value;
+                    clsSel.innerHTML = '<option value="">Semua Kelas</option>' + knownClasses.map((c) => `<option value="${A.esc(c)}" ${curCls === c ? 'selected' : ''}>${A.esc(c)}</option>`).join('');
+                }
+
+                renderAccountsManageList(studentCountByMentor);
                 plottingStudentsCache = studRes.data || [];
                 renderPlottingTable();
             }
             window.loadPlottingStudents = loadPlottingStudents;
 
-            function setMentorFeedback(msg, isError = false) {
-                const el = document.getElementById('mentorManageFeedback');
+            function setAccountManageFeedback(msg, isError = false) {
+                const el = document.getElementById('accountManageFeedback');
                 if (!el) return;
                 el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#3FA496]'}`;
                 el.textContent = msg;
             }
 
-            function renderMentorsManageList(studentCountByMentor = {}) {
-                const wrap = document.getElementById('mentorsManageList');
-                const cntEl = document.getElementById('mentorManageCount');
-                if (cntEl) cntEl.textContent = `${mentorsList.length} guru`;
+            window.setAccountRoleFilter = function (filterVal) {
+                accountRoleFilter = filterVal || 'staff';
+                document.querySelectorAll('.acc-filter-btn').forEach((btn) => {
+                    const active = btn.dataset.accFilter === accountRoleFilter;
+                    btn.className = `acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${active ? 'bg-[#0095FF] text-white' : 'text-slate-500 hover:text-[#1E293B]'}`;
+                });
+                renderAccountsManageList();
+            };
+
+            function renderAccountsManageList(studentCountMapArg = null) {
+                const wrap = document.getElementById('accountsManageList');
+                const countsEl = document.getElementById('accountRoleCounts');
+                const me = A.getUser();
+                const adminCnt = allAccountsList.filter((p) => p.role === 'superadmin').length;
+                const mentorCnt = allAccountsList.filter((p) => p.role === 'mentor').length;
+                const studentCnt = allAccountsList.filter((p) => p.role === 'student').length;
+
+                if (countsEl) {
+                    countsEl.innerHTML = `
+                        <span class="px-2.5 py-0.5 rounded-full bg-[#FFF0F4] text-[#E11D48]">${adminCnt} Admin</span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-[#E3F6F3] text-[#2F8F81]">${mentorCnt} Guru</span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-[#EAF4FF] text-[#0082E6]">${studentCnt} Siswa</span>
+                    `;
+                }
                 if (!wrap) return;
 
-                if (!mentorsList.length) {
-                    wrap.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-slate-400 bg-[#FAFBFD] border border-dashed border-[#E2E8F0] rounded-xl">Belum ada akun guru pembimbing. Tambahkan guru pertama di form atas.</div>`;
+                const studentCountByMentor = studentCountMapArg || (() => {
+                    const m = {};
+                    allAccountsList.forEach((r) => {
+                        if (r.role === 'student' && r.mentor_id) m[r.mentor_id] = (m[r.mentor_id] || 0) + 1;
+                    });
+                    return m;
+                })();
+                const mentorNameMap = Object.fromEntries(mentorsList.map((m) => [m.id, m.full_name]));
+
+                const q = (document.getElementById('accountManageSearch')?.value || '').trim().toLowerCase();
+                let list = allAccountsList.filter((p) => {
+                    if (accountRoleFilter === 'staff' && p.role !== 'superadmin' && p.role !== 'mentor') return false;
+                    if (accountRoleFilter !== 'staff' && accountRoleFilter !== 'all' && p.role !== accountRoleFilter) return false;
+                    if (!q) return true;
+                    return (p.full_name || '').toLowerCase().includes(q) ||
+                        (p.username || '').toLowerCase().includes(q) ||
+                        (p.class_name || '').toLowerCase().includes(q) ||
+                        (p.sub_concentration || '').toLowerCase().includes(q);
+                });
+
+                const roleOrder = { superadmin: 1, mentor: 2, student: 3 };
+                list.sort((a, b) => (roleOrder[a.role] || 9) - (roleOrder[b.role] || 9) || (a.full_name || '').localeCompare(b.full_name || ''));
+
+                if (!list.length) {
+                    wrap.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-slate-400 bg-[#FAFBFD] border border-dashed border-[#E2E8F0] rounded-xl">Tidak ada akun yang cocok dengan filter ini.</div>`;
                     return;
                 }
 
-                wrap.innerHTML = mentorsList.map((m) => {
-                    const cnt = studentCountByMentor[m.id] || 0;
-                    const hasWa = Boolean(A.normalizeWhatsapp(m.whatsapp_number));
-                    const isEditing = editingMentorId === m.id;
-                    const waLocal = hasWa ? A.formatWhatsappDisplay(m.whatsapp_number).replaceAll('-', '') : '';
+                const maxShow = (accountRoleFilter === 'student' || accountRoleFilter === 'all') && !q ? 36 : list.length;
+                const visibleList = list.slice(0, maxShow);
+                const roleBadgeStyle = {
+                    superadmin: { label: 'ADMIN', cls: 'bg-[#FFF0F4] text-[#E11D48]', av: 'bg-[#FFE8EF] text-[#E11D48]' },
+                    mentor: { label: 'PEMBIMBING', cls: 'bg-[#E3F6F3] text-[#2F8F81]', av: 'bg-[#E3F6F3] text-[#2F8F81]' },
+                    student: { label: 'SISWA', cls: 'bg-[#EAF4FF] text-[#0082E6]', av: 'bg-[#EAF4FF] text-[#0095FF]' }
+                };
+
+                wrap.innerHTML = visibleList.map((u) => {
+                    const rb = roleBadgeStyle[u.role] || roleBadgeStyle.student;
+                    const hasWa = Boolean(A.normalizeWhatsapp(u.whatsapp_number));
+                    const isEditing = editingAccountId === u.id;
+                    const isSelf = me && me.id === u.id;
+                    const waLocal = hasWa ? A.formatWhatsappDisplay(u.whatsapp_number).replaceAll('-', '') : '';
+                    const subMeta = u.role === 'mentor'
+                        ? `@${u.username} • ${studentCountByMentor[u.id] || 0} siswa`
+                        : u.role === 'student'
+                            ? `@${u.username} • ${u.class_name || '-'}${u.sub_concentration ? ` • ${u.sub_concentration}` : ''}`
+                            : `@${u.username}${isSelf ? ' • Akun Anda' : ''}`;
 
                     return `
-                        <div class="rounded-xl border ${hasWa ? 'border-[#EDF1F7] bg-[#FAFBFD]' : 'border-[#FECDD6] bg-[#FFF8FA]'} p-3.5 space-y-2.5">
+                        <div class="rounded-xl border ${(u.role === 'mentor' && !hasWa) ? 'border-[#FECDD6] bg-[#FFF8FA]' : 'border-[#EDF1F7] bg-[#FAFBFD]'} p-3.5 space-y-2.5">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="flex items-center gap-2.5 min-w-0">
-                                    <div class="w-9 h-9 rounded-full bg-[#E3F6F3] text-[#2F8F81] font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
-                                        ${A.renderAvatarMarkup(m.avatar_url, m.full_name)}
+                                    <div class="w-9 h-9 rounded-full ${rb.av} font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                                        ${A.renderAvatarMarkup(u.avatar_url, u.full_name)}
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="font-bold text-xs text-[#1E293B] truncate">${A.esc(m.full_name)}</div>
-                                        <div class="text-[11px] font-mono text-slate-400 truncate">@${A.esc(m.username)} • ${cnt} siswa</div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="font-bold text-xs text-[#1E293B] truncate">${A.esc(u.full_name)}</span>
+                                            <span class="text-[9.5px] font-extrabold px-1.5 py-0.5 rounded ${rb.cls} shrink-0">${rb.label}</span>
+                                        </div>
+                                        <div class="text-[11px] font-mono text-slate-400 truncate">${A.esc(subMeta)}</div>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-1 shrink-0">
-                                    <button type="button" onclick="toggleEditMentor('${m.id}')"
+                                    <button type="button" onclick="toggleEditAccount('${u.id}')"
                                         class="px-2 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-[#0082E6] text-[10.5px] font-bold transition cursor-pointer">
                                         ${isEditing ? 'Tutup' : 'Edit'}
                                     </button>
-                                    <button type="button" onclick="deleteMentorAccount('${m.id}', '${A.esc(m.full_name)}')"
+                                    ${!isSelf ? `
+                                    <button type="button" onclick="deleteUserAccount('${u.id}', '${A.esc(u.full_name)}', '${A.esc(u.role)}')"
                                         class="px-2 py-1 rounded-lg bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-[10.5px] font-bold transition cursor-pointer">
                                         Hapus
-                                    </button>
+                                    </button>` : ''}
                                 </div>
                             </div>
 
                             <div class="flex flex-wrap items-center gap-1.5">
                                 ${hasWa
-                                    ? A.renderWhatsappLink(m.whatsapp_number, false)
-                                    : `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib diisi)</span>`}
+                                    ? A.renderWhatsappLink(u.whatsapp_number, false)
+                                    : (u.role === 'mentor'
+                                        ? `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib)</span>`
+                                        : `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400">WA belum diisi</span>`)}
+                                ${u.role === 'mentor' && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
+                                ${u.role === 'student' && u.mentor_id ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Pembimbing: ${A.esc(mentorNameMap[u.mentor_id] || 'Guru')}</span>` : ''}
                             </div>
 
                             ${isEditing ? `
-                            <div class="pt-2 border-t border-[#E2E8F0] space-y-2">
-                                <input id="editMentorName_${m.id}" type="text" value="${A.esc(m.full_name)}" placeholder="Nama Lengkap"
-                                    class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:border-[#0095FF]" />
-                                <input id="editMentorWa_${m.id}" type="tel" value="${A.esc(waLocal)}" placeholder="Nomor WA Aktif * (08...)"
+                            <div class="pt-2.5 border-t border-[#E2E8F0] space-y-2">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input id="editAccName_${u.id}" type="text" value="${A.esc(u.full_name)}" placeholder="Nama Lengkap"
+                                        class="col-span-2 px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:border-[#0095FF]" />
+                                    <select id="editAccRole_${u.id}" onchange="onEditAccRoleChange('${u.id}')" ${isSelf ? 'disabled' : ''}
+                                        class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-bold focus:outline-none focus:border-[#0095FF] disabled:bg-slate-100">
+                                        <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''}>Admin / Superadmin</option>
+                                        <option value="mentor" ${u.role === 'mentor' ? 'selected' : ''}>Guru Pembimbing</option>
+                                        <option value="student" ${u.role === 'student' ? 'selected' : ''}>Siswa</option>
+                                    </select>
+                                    <input id="editAccWa_${u.id}" type="tel" value="${A.esc(waLocal)}" placeholder="Nomor WA (08...)"
+                                        class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div id="editAccMentorWrap_${u.id}" class="${u.role === 'mentor' ? '' : 'hidden'}">
+                                    <input id="editAccHomeroom_${u.id}" list="anitrackClassList" type="text" value="${A.esc(homeroomMap[u.id] || '')}" placeholder="Wali Kelas (kosongkan jika bukan, mis: X ANI A)"
+                                        class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div id="editAccStudentWrap_${u.id}" class="${u.role === 'student' ? '' : 'hidden'} grid grid-cols-2 gap-2">
+                                    <input id="editAccClass_${u.id}" list="anitrackClassList" type="text" value="${A.esc(u.class_name || '')}" placeholder="Kelas (X ANI A)"
+                                        class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
+                                    <select id="editAccSubconc_${u.id}" class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
+                                        <option value="">-- Sub-Konsentrasi --</option>
+                                        ${SUBCONCS.map((sc) => `<option value="${sc}" ${u.sub_concentration === sc ? 'selected' : ''}>${sc}</option>`).join('')}
+                                    </select>
+                                    <select id="editAccMentor_${u.id}" class="col-span-2 px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
+                                        <option value="">-- Belum Di-plot Pembimbing --</option>
+                                        ${mentorsList.map((m) => `<option value="${m.id}" ${u.mentor_id === m.id ? 'selected' : ''}>Pembimbing: ${A.esc(m.full_name)}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <input id="editAccPass_${u.id}" type="text" placeholder="Password baru (kosongkan jika tetap)"
                                     class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
-                                <input id="editMentorPass_${m.id}" type="text" placeholder="Password baru (kosongkan jika tetap)"
-                                    class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
-                                <button type="button" onclick="saveEditMentor('${m.id}')"
+                                <button type="button" onclick="saveEditAccount('${u.id}')"
                                     class="w-full py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer">
-                                    Simpan Perubahan Guru
+                                    Simpan Perubahan Akun
                                 </button>
                             </div>` : ''}
                         </div>`;
-                }).join('');
+                }).join('') + (list.length > maxShow ? `<div class="col-span-full text-center text-[11px] text-slate-400 py-2">Menampilkan ${maxShow} dari ${list.length} akun. Gunakan kotak pencarian di atas untuk menemukan akun tertentu.</div>` : '');
             }
+            window.renderAccountsManageList = renderAccountsManageList;
 
-            window.toggleEditMentor = function (mentorId) {
-                editingMentorId = editingMentorId === mentorId ? null : mentorId;
-                loadPlottingStudents();
+            window.toggleEditAccount = function (accountId) {
+                editingAccountId = editingAccountId === accountId ? null : accountId;
+                renderAccountsManageList();
             };
 
-            document.getElementById('addMentorForm')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const name = document.getElementById('newMentorName').value.trim();
-                const username = document.getElementById('newMentorUsername').value.trim().toLowerCase();
-                const password = document.getElementById('newMentorPassword').value.trim();
-                const rawWa = document.getElementById('newMentorWhatsapp').value.trim();
-                const btn = document.getElementById('addMentorBtn');
+            window.onEditAccRoleChange = function (accountId) {
+                const role = document.getElementById(`editAccRole_${accountId}`)?.value || 'student';
+                document.getElementById(`editAccStudentWrap_${accountId}`)?.classList.toggle('hidden', role !== 'student');
+                document.getElementById(`editAccMentorWrap_${accountId}`)?.classList.toggle('hidden', role !== 'mentor');
+            };
 
-                if (!name) { setMentorFeedback('Nama lengkap guru wajib diisi.', true); return; }
+            document.getElementById('addAccountForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const role = document.getElementById('newAccRole').value;
+                const name = document.getElementById('newAccName').value.trim();
+                const username = document.getElementById('newAccUsername').value.trim().toLowerCase();
+                const password = document.getElementById('newAccPassword').value.trim();
+                const rawWa = document.getElementById('newAccWhatsapp').value.trim();
+                const className = document.getElementById('newAccClass')?.value.trim() || '';
+                const subconc = document.getElementById('newAccSubconc')?.value || '';
+                const mentorId = document.getElementById('newAccMentor')?.value || '';
+                const homeroomClass = document.getElementById('newAccHomeroom')?.value.trim() || '';
+                const btn = document.getElementById('addAccountBtn');
+
+                if (!name) { setAccountManageFeedback('Nama lengkap wajib diisi.', true); return; }
                 if (!/^[a-z0-9._]{3,24}$/.test(username)) {
-                    setMentorFeedback('Username harus 3–24 karakter (huruf kecil, angka, titik, atau underscore).', true);
+                    setAccountManageFeedback('Username harus 3–24 karakter (huruf kecil, angka, titik, atau underscore).', true);
                     return;
                 }
                 if (password.length < 4) {
-                    setMentorFeedback('Password / PIN minimal 4 karakter.', true);
+                    setAccountManageFeedback('Password / PIN minimal 4 karakter.', true);
                     return;
                 }
-                const cleanWa = A.normalizeWhatsapp(rawWa);
-                if (!cleanWa) {
-                    setMentorFeedback('Nomor WhatsApp aktif wajib diisi dengan format valid (08xxx / 628xxx, 10–15 digit).', true);
-                    document.getElementById('newMentorWhatsapp')?.focus();
+
+                let cleanWa = null;
+                if (rawWa) {
+                    cleanWa = A.normalizeWhatsapp(rawWa);
+                    if (!cleanWa) {
+                        setAccountManageFeedback('Format Nomor WA tidak valid (gunakan awalan 08 atau 628, 10–15 digit).', true);
+                        document.getElementById('newAccWhatsapp')?.focus();
+                        return;
+                    }
+                } else if (role === 'mentor') {
+                    setAccountManageFeedback('Nomor WhatsApp aktif wajib diisi untuk akun Guru Pembimbing.', true);
+                    document.getElementById('newAccWhatsapp')?.focus();
+                    return;
+                }
+
+                if (role === 'student' && !className) {
+                    setAccountManageFeedback('Kelas siswa wajib diisi (misal: X ANI A).', true);
+                    document.getElementById('newAccClass')?.focus();
                     return;
                 }
 
@@ -1399,71 +1688,162 @@
                 const { data: dup } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
                 if (dup) {
                     btn.disabled = false;
-                    btn.textContent = '+ Tambah Guru';
-                    setMentorFeedback(`Username "@${username}" sudah dipakai akun lain.`, true);
+                    window.onNewAccRoleChange();
+                    setAccountManageFeedback(`Username "@${username}" sudah dipakai akun lain.`, true);
                     return;
                 }
 
-                const { error } = await supabase.from('profiles').insert({
+                const insertPayload = {
                     full_name: name,
                     username,
                     pin_or_password: password,
-                    role: 'mentor',
-                    whatsapp_number: cleanWa
-                });
+                    role,
+                    whatsapp_number: cleanWa,
+                    class_name: role === 'student' ? className : (role === 'superadmin' ? 'All Classes' : null),
+                    sub_concentration: role === 'student' ? (subconc || null) : null,
+                    mentor_id: role === 'student' ? (mentorId || null) : null
+                };
+
+                const { data: insertedAcc, error } = await supabase.from('profiles').insert(insertPayload).select('id').single();
 
                 btn.disabled = false;
-                btn.textContent = '+ Tambah Guru';
+                window.onNewAccRoleChange();
                 if (error) {
-                    setMentorFeedback(`Gagal menambah guru: ${error.message}`, true);
+                    setAccountManageFeedback(`Gagal menambah akun: ${error.message}`, true);
                     return;
                 }
 
+                if (role === 'mentor' && homeroomClass && insertedAcc?.id) {
+                    homeroomMap[insertedAcc.id] = homeroomClass;
+                    await A.saveHomeroomMap(homeroomMap);
+                }
+
                 e.target.reset();
-                document.getElementById('newMentorPassword').value = '123456';
-                setMentorFeedback(`Guru "${name}" (@${username}) dengan WA ${A.formatWhatsappDisplay(cleanWa)} berhasil ditambahkan ✓`);
-                A.showToast(`Akun guru ${name} berhasil dibuat!`);
+                document.getElementById('newAccRole').value = role;
+                document.getElementById('newAccPassword').value = '123456';
+                window.onNewAccRoleChange();
+                const rLabel = A.roleLabel(role);
+                setAccountManageFeedback(`Akun ${rLabel} "${name}" (@${username}) berhasil ditambahkan ✓`);
+                A.showToast(`Akun ${rLabel} ${name} berhasil dibuat!`);
+                if (role === 'student' && accountRoleFilter === 'staff') window.setAccountRoleFilter('student');
                 await loadPlottingStudents();
                 portal.refreshMetrics();
             });
 
-            window.saveEditMentor = async function (mentorId) {
-                const name = document.getElementById(`editMentorName_${mentorId}`)?.value.trim() || '';
-                const rawWa = document.getElementById(`editMentorWa_${mentorId}`)?.value.trim() || '';
-                const newPass = document.getElementById(`editMentorPass_${mentorId}`)?.value.trim() || '';
+            window.saveEditAccount = async function (accountId) {
+                const target = allAccountsList.find((x) => x.id === accountId);
+                if (!target) return;
+                const me = A.getUser();
+                const name = document.getElementById(`editAccName_${accountId}`)?.value.trim() || '';
+                const role = document.getElementById(`editAccRole_${accountId}`)?.value || target.role;
+                const rawWa = document.getElementById(`editAccWa_${accountId}`)?.value.trim() || '';
+                const newPass = document.getElementById(`editAccPass_${accountId}`)?.value.trim() || '';
+                const className = document.getElementById(`editAccClass_${accountId}`)?.value.trim() || '';
+                const subconc = document.getElementById(`editAccSubconc_${accountId}`)?.value || '';
+                const mentorId = document.getElementById(`editAccMentor_${accountId}`)?.value || '';
+                const homeroomClass = document.getElementById(`editAccHomeroom_${accountId}`)?.value.trim() || '';
 
-                if (!name) { setMentorFeedback('Nama guru tidak boleh kosong.', true); return; }
-                const cleanWa = A.normalizeWhatsapp(rawWa);
-                if (!cleanWa) {
-                    setMentorFeedback('Setiap guru wajib memiliki Nomor WA aktif yang valid (awalan 08 atau 628).', true);
+                if (!name) { setAccountManageFeedback('Nama lengkap tidak boleh kosong.', true); return; }
+                if (me && me.id === accountId && role !== 'superadmin') {
+                    setAccountManageFeedback('Anda tidak dapat menurunkan role akun Admin yang sedang dipakai login.', true);
+                    return;
+                }
+                const adminCnt = allAccountsList.filter((x) => x.role === 'superadmin').length;
+                if (target.role === 'superadmin' && role !== 'superadmin' && adminCnt <= 1) {
+                    setAccountManageFeedback('Minimal harus ada 1 akun Admin aktif di sistem.', true);
                     return;
                 }
 
-                const payload = { full_name: name, whatsapp_number: cleanWa };
+                let cleanWa = null;
+                if (rawWa) {
+                    cleanWa = A.normalizeWhatsapp(rawWa);
+                    if (!cleanWa) {
+                        setAccountManageFeedback('Format Nomor WA tidak valid (awalan 08 atau 628).', true);
+                        return;
+                    }
+                } else if (role === 'mentor') {
+                    setAccountManageFeedback('Guru Pembimbing wajib memiliki Nomor WA aktif.', true);
+                    return;
+                }
+
+                if (role === 'student' && !className) {
+                    setAccountManageFeedback('Kelas siswa wajib diisi.', true);
+                    return;
+                }
+
+                const payload = {
+                    full_name: name,
+                    role,
+                    whatsapp_number: cleanWa,
+                    class_name: role === 'student' ? className : (role === 'superadmin' ? 'All Classes' : null),
+                    sub_concentration: role === 'student' ? (subconc || null) : null,
+                    mentor_id: role === 'student' ? (mentorId || null) : null
+                };
                 if (newPass) payload.pin_or_password = newPass;
 
-                const { error } = await supabase.from('profiles').update(payload).eq('id', mentorId);
+                // Jika dulunya mentor dan sekarang diubah ke role lain, lepas siswa yang di-plot ke dia
+                if (target.role === 'mentor' && role !== 'mentor') {
+                    await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', accountId);
+                }
+
+                const { error } = await supabase.from('profiles').update(payload).eq('id', accountId);
                 if (error) {
-                    setMentorFeedback(`Gagal memperbarui guru: ${error.message}`, true);
+                    setAccountManageFeedback(`Gagal memperbarui akun: ${error.message}`, true);
                     return;
                 }
-                editingMentorId = null;
-                setMentorFeedback(`Data guru "${name}" & Nomor WA berhasil diperbarui ✓`);
-                A.showToast('Data guru diperbarui ✓');
+                if (role === 'mentor' && homeroomClass) homeroomMap[accountId] = homeroomClass;
+                else delete homeroomMap[accountId];
+                await A.saveHomeroomMap(homeroomMap);
+
+                editingAccountId = null;
+                setAccountManageFeedback(`Akun "${name}" (${A.roleLabel(role)}) berhasil diperbarui ✓`);
+                A.showToast('Perubahan akun tersimpan ✓');
                 await loadPlottingStudents();
                 portal.refreshMetrics();
             };
 
-            window.deleteMentorAccount = async function (mentorId, mentorName) {
-                if (!confirm(`Hapus akun guru "${mentorName}"?\n\nSeluruh siswa yang sedang di-plot ke guru ini akan dilepas pembimbingnya (tidak menghapus akun siswa).`)) return;
-                await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', mentorId);
-                const { error } = await supabase.from('profiles').delete().eq('id', mentorId).eq('role', 'mentor');
-                if (error) {
-                    setMentorFeedback(`Gagal menghapus guru: ${error.message}`, true);
+            window.deleteUserAccount = async function (accountId, fullName, role) {
+                const me = A.getUser();
+                if (me && me.id === accountId) {
+                    setAccountManageFeedback('Tidak dapat menghapus akun Anda sendiri yang sedang login.', true);
                     return;
                 }
-                setMentorFeedback(`Akun guru "${mentorName}" berhasil dihapus.`);
-                A.showToast(`Akun guru ${mentorName} dihapus.`);
+                const adminCnt = allAccountsList.filter((x) => x.role === 'superadmin').length;
+                if (role === 'superadmin' && adminCnt <= 1) {
+                    setAccountManageFeedback('Tidak dapat menghapus Admin terakhir.', true);
+                    return;
+                }
+
+                const extraWarn = role === 'mentor'
+                    ? '\n\nSeluruh siswa yang di-plot ke guru ini akan dilepas pembimbingnya (akun siswa tidak terhapus).'
+                    : role === 'student'
+                        ? '\n\nSeluruh data progres, daily task, dan update mingguan siswa ini juga akan dihapus.'
+                        : '';
+                if (!confirm(`Hapus akun ${A.roleLabel(role)} "${fullName}" secara permanen?${extraWarn}`)) return;
+
+                if (role === 'mentor') {
+                    await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', accountId);
+                    if (homeroomMap[accountId]) {
+                        delete homeroomMap[accountId];
+                        await A.saveHomeroomMap(homeroomMap);
+                    }
+                } else if (role === 'student') {
+                    await Promise.all([
+                        supabase.from('student_progress').delete().eq('student_id', accountId),
+                        supabase.from('project_submissions').delete().eq('student_id', accountId),
+                        supabase.from('student_material_progress').delete().eq('student_id', accountId),
+                        supabase.from('app_settings').delete().like('key', `${A.PROJECT_WEEKLY_PREFIX}%::${accountId}`),
+                        supabase.from('app_settings').delete().eq('key', `${A.PROJECT_FB_LOG_PREFIX}${accountId}`)
+                    ]);
+                }
+
+                const { error } = await supabase.from('profiles').delete().eq('id', accountId);
+                if (error) {
+                    setAccountManageFeedback(`Gagal menghapus akun: ${error.message}`, true);
+                    return;
+                }
+                setAccountManageFeedback(`Akun "${fullName}" berhasil dihapus.`);
+                A.showToast(`Akun ${fullName} dihapus.`);
                 await loadPlottingStudents();
                 portal.refreshMetrics();
             };
@@ -1975,12 +2355,50 @@
                 document.getElementById('waCustomUrlWrap')?.classList.toggle('hidden', prov === 'fonnte');
             };
 
+            window.updateWaTemplatePreview = function () {
+                const pre = document.getElementById('waTemplatePreview');
+                if (!pre) return;
+                const tpl = document.getElementById('waMessageTemplateInput')?.value || A.DEFAULT_WA_TEMPLATE;
+                const appUrl = (document.getElementById('waAppUrlInput')?.value || '').trim();
+                const sampleLate = '🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*\n1. *Storyline, Treatment & Storyboard* — Terlambat *2 hari* (2026-11-20)';
+                const sampleSoon = '🟡 *MENDEKATI DEADLINE:*\n1. *Character Turnaround & Model Sheet* — *Besok (H-1)* (2026-11-23)';
+                pre.textContent = A.renderWaReminderMessage(tpl, {
+                    nama: 'Zahira Aulia Putri',
+                    kelas: 'X ANI A',
+                    subkonsentrasi: '3D Modeller',
+                    daftar_tugas: `${sampleLate}\n\n${sampleSoon}`,
+                    tugas_terlambat: sampleLate,
+                    tugas_mendekati: sampleSoon,
+                    pembimbing: '👨‍🏫 Pembimbing: *Guru Pembimbing* (WA: 0812-3456-7890)',
+                    link_anitrack: appUrl ? `🔗 Buka AniTrack: ${appUrl}` : ''
+                });
+            };
+
+            window.insertWaPlaceholder = function (token) {
+                const ta = document.getElementById('waMessageTemplateInput');
+                if (!ta) return;
+                const start = ta.selectionStart ?? ta.value.length;
+                const end = ta.selectionEnd ?? ta.value.length;
+                ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+                ta.focus();
+                ta.setSelectionRange(start + token.length, start + token.length);
+                window.updateWaTemplatePreview();
+            };
+
+            window.resetWaTemplateDefault = function () {
+                const ta = document.getElementById('waMessageTemplateInput');
+                if (ta) ta.value = A.DEFAULT_WA_TEMPLATE;
+                window.updateWaTemplatePreview();
+                A.showToast('Template pesan WA dikembalikan ke default.');
+            };
+
             function readWaConfigForm() {
                 return {
                     provider: document.getElementById('waProviderSelect')?.value || 'fonnte',
                     apiToken: (document.getElementById('waApiTokenInput')?.value || '').trim(),
                     customUrl: (document.getElementById('waCustomUrlInput')?.value || '').trim(),
                     appUrl: (document.getElementById('waAppUrlInput')?.value || '').trim(),
+                    messageTemplate: (document.getElementById('waMessageTemplateInput')?.value || '').trim(),
                     enabled: Boolean(document.getElementById('waScheduleEnabled')?.checked),
                     hour: 7
                 };
@@ -1992,6 +2410,8 @@
                 const logsListEl = document.getElementById('waLogsList');
                 const badgeEl = document.getElementById('waScheduleBadge');
                 if (!queueListEl || !logsListEl) return;
+
+                await A.loadSharedGasUrl();
 
                 const [
                     { data: cfgRow },
@@ -2008,13 +2428,17 @@
                 ]);
 
                 // Muat konfigurasi tersimpan
+                let loadedCfg = {};
                 if (cfgRow?.value) {
                     try {
                         const cfg = JSON.parse(cfgRow.value);
+                        loadedCfg = cfg || {};
                         if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
                         if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
                         if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
                         if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
+                        const tplEl = document.getElementById('waMessageTemplateInput');
+                        if (tplEl) tplEl.value = cfg.messageTemplate || A.DEFAULT_WA_TEMPLATE;
                         document.getElementById('waScheduleEnabled').checked = Boolean(cfg.enabled);
                         window.onWaProviderChange();
                         if (badgeEl) {
@@ -2023,13 +2447,17 @@
                             badgeEl.className = `inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${active ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-500'}`;
                         }
                     } catch { /* ignore */ }
+                } else {
+                    const tplEl = document.getElementById('waMessageTemplateInput');
+                    if (tplEl && !tplEl.value.trim()) tplEl.value = A.DEFAULT_WA_TEMPLATE;
                 }
+                window.updateWaTemplatePreview();
 
                 // Hitung antrean siswa hari ini (H-2/H-1/Hari-H & Lewat Deadline belum lapor selesai)
                 const allProf = profiles || [];
                 const students = allProf.filter((p) => p.role === 'student');
                 const mentors = allProf.filter((p) => p.role === 'mentor');
-                const queue = A.computeDeadlineReminderQueue(students, mentors, tasks || [], subs || []);
+                const queue = A.computeDeadlineReminderQueue(students, mentors, tasks || [], subs || [], loadedCfg);
 
                 const overdueCnt = queue.filter((q) => q.overdue.length > 0).length;
                 const upcomingCnt = queue.filter((q) => q.upcoming.length > 0 && q.overdue.length === 0).length;

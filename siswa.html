@@ -2006,6 +2006,9 @@
                 loadStudentProjects();
             };
 
+            const weeklyProofDrafts = {};
+            let studentWeeklyUpdatesCache = [];
+
             window.handleProjectProofPick = async function (projTaskId, inp) {
                 const file = inp.files?.[0];
                 if (!file) return;
@@ -2023,25 +2026,147 @@
                 }
             };
 
+            window.handleWeeklyProofPick = async function (projTaskId, inp) {
+                const file = inp.files?.[0];
+                if (!file) return;
+                const box = inp.closest('[data-weekly-task]');
+                const hint = box?.querySelector('.weekly-proof-hint');
+                if (hint) hint.textContent = 'Memproses screenshot WIP...';
+                try {
+                    const dataUrl = await A.compressProofImage(file, 720, 0.72);
+                    weeklyProofDrafts[projTaskId] = dataUrl;
+                    const img = box?.querySelector('.weekly-proof-img');
+                    if (img) { img.src = dataUrl; img.classList.remove('hidden'); }
+                    if (hint) hint.textContent = `Screenshot WIP siap dikirim: ${file.name} ✓`;
+                } catch (err) {
+                    if (hint) hint.textContent = err.message;
+                }
+            };
+
+            window.onWeeklyRangeInput = function (inp) {
+                const box = inp.closest('[data-weekly-task]');
+                const lbl = box?.querySelector('.weekly-pct-label');
+                if (lbl) lbl.textContent = `${inp.value}%`;
+            };
+
+            window.toggleWeeklyHistory = function (projTaskId) {
+                document.getElementById(`weeklyHistory_${projTaskId}`)?.classList.toggle('hidden');
+            };
+
+            window.saveStudentWeeklyUpdate = async function (projTaskId, btn) {
+                const box = btn.closest('[data-weekly-task]');
+                const pct = Math.min(100, Math.max(0, Number(box?.querySelector('.weekly-pct-range')?.value || 0)));
+                const summary = (box?.querySelector('.weekly-summary-inp')?.value || '').trim();
+                const blockers = (box?.querySelector('.weekly-blockers-inp')?.value || '').trim();
+
+                if (!summary) {
+                    A.showToast('Tuliskan ringkasan progres minggu ini terlebih dahulu.');
+                    box?.querySelector('.weekly-summary-inp')?.focus();
+                    return;
+                }
+
+                const weekKey = A.getWeekKey();
+                const key = A.makeWeeklyUpdateKey(weekKey, projTaskId, currentUser.id);
+                const prevExisting = studentWeeklyUpdatesCache.find((u) => u.key === key) || {};
+                const proofImg = weeklyProofDrafts[projTaskId] || prevExisting.proof_image || '';
+                const nowIso = new Date().toISOString();
+
+                const payloadObj = {
+                    week_key: weekKey,
+                    project_task_id: projTaskId,
+                    student_id: currentUser.id,
+                    progress_percent: pct,
+                    summary,
+                    blockers,
+                    proof_image: proofImg,
+                    proof_url: (currentUser?.project_drive_url || '').trim(),
+                    mentor_note: prevExisting.mentor_note || '',
+                    checked_by: prevExisting.checked_by || null,
+                    checked_by_name: prevExisting.checked_by_name || '',
+                    checked_at: prevExisting.checked_at || null,
+                    updated_at: nowIso
+                };
+
+                btn.disabled = true;
+                btn.textContent = 'Menyimpan update...';
+                const { error } = await supabase
+                    .from('app_settings')
+                    .upsert({ key, value: JSON.stringify(payloadObj), updated_at: nowIso }, { onConflict: 'key' });
+
+                if (!error) {
+                    // Jika status tugas masih belum_mulai, otomatis naikkan ke sedang_dikerjakan
+                    const card = btn.closest('[data-proj-id]');
+                    const curStatus = card?.dataset?.projStatus || 'belum_mulai';
+                    if (curStatus === 'belum_mulai') {
+                        await supabase.from('project_submissions').upsert({
+                            project_task_id: projTaskId,
+                            student_id: currentUser.id,
+                            status: 'sedang_dikerjakan',
+                            student_notes: summary,
+                            updated_at: nowIso
+                        }, { onConflict: 'project_task_id,student_id' });
+                    }
+                }
+
+                btn.disabled = false;
+                if (error) {
+                    btn.textContent = 'Gagal';
+                    A.showToast(`Gagal menyimpan update mingguan: ${error.message}`);
+                    return;
+                }
+                delete weeklyProofDrafts[projTaskId];
+                A.showToast(`Update mingguan (${A.getWeekRangeInfo(weekKey).weekKey}) tersimpan ✓`);
+                loadStudentProjects();
+            };
+
+            let studentFeedbackLogsCache = [];
+
+            window.openMyFeedbackHistory = function () {
+                A.openFeedbackHistoryModal(`${currentUser.full_name} (${currentUser.class_name || '-'})`, studentFeedbackLogsCache);
+            };
+
             async function loadStudentProjects() {
                 const listEl = document.getElementById('studentProjectList');
                 const bannerEl = document.getElementById('studentProjectBanner');
                 if (!listEl || !bannerEl) return;
 
-                const [{ data: projTasks }, { data: projSubs }] = await Promise.all([
+                const [{ data: projTasks }, { data: projSubs }, { data: weeklyRaw }, { data: fbLogRow }] = await Promise.all([
                     supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
-                    supabase.from('project_submissions').select('*').eq('student_id', currentUser.id)
+                    supabase.from('project_submissions').select('*').eq('student_id', currentUser.id),
+                    supabase.from('app_settings').select('key, value, updated_at').like('key', `${A.PROJECT_WEEKLY_PREFIX}%::${currentUser.id}`),
+                    supabase.from('app_settings').select('value').eq('key', `${A.PROJECT_FB_LOG_PREFIX}${currentUser.id}`).maybeSingle()
                 ]);
 
+                studentFeedbackLogsCache = [];
+                if (fbLogRow?.value) {
+                    try {
+                        const parsedLogs = JSON.parse(fbLogRow.value);
+                        if (Array.isArray(parsedLogs)) studentFeedbackLogsCache = parsedLogs;
+                    } catch { /* ignore */ }
+                }
+
+                studentWeeklyUpdatesCache = A.parseWeeklyUpdateRows(weeklyRaw || []);
+                const currentWeekKey = A.getWeekKey();
+                const currentWeekInfo = A.getWeekRangeInfo(currentWeekKey);
+                const weeklyByTask = {};
+                studentWeeklyUpdatesCache.forEach((u) => {
+                    if (!weeklyByTask[u.project_task_id]) weeklyByTask[u.project_task_id] = [];
+                    weeklyByTask[u.project_task_id].push(u);
+                });
+
                 const subMap = Object.fromEntries((projSubs || []).map((s) => [s.project_task_id, s]));
+                const subMapComposite = Object.fromEntries((projSubs || []).map((s) => [`${s.project_task_id}__${currentUser.id}`, s]));
                 const myTasks = A.sortMaterialsByPipeline(projTasks || []).filter((t) =>
                     !currentUser.sub_concentration || !t.sub_concentration || t.sub_concentration === currentUser.sub_concentration
                 );
 
+                const myIssueStats = A.computeStudentIssueStats(currentUser, myTasks, subMapComposite);
                 const total = myTasks.length;
                 const accCount = myTasks.filter((t) => subMap[t.id]?.status === 'selesai').length;
                 const revCount = myTasks.filter((t) => subMap[t.id]?.status === 'revisi').length;
                 const waitCount = myTasks.filter((t) => subMap[t.id]?.status === 'menunggu_review').length;
+                const activeForWeekly = myTasks.filter((t) => subMap[t.id]?.status !== 'selesai');
+                const updatedThisWeekCount = activeForWeekly.filter((t) => (weeklyByTask[t.id] || []).some((u) => u.week_key === currentWeekKey)).length;
                 const overdueCount = myTasks.filter((t) => {
                     const isDone = subMap[t.id]?.status === 'selesai';
                     return t.due_date && !isDone && A.getDeadlineMeta(t.due_date, false).overdue;
@@ -2057,12 +2182,17 @@
                 bannerEl.innerHTML = `
                     <div class="rounded-2xl bg-gradient-to-r from-[#45B1A2] via-[#4FB8AA] to-[#58C2B4] text-white p-5 sm:p-6 shadow-card space-y-4">
                         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                            <div class="space-y-1">
+                            <div class="space-y-1.5">
                                 <span class="inline-block text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20">
                                     PROJECT TRACKER • ${A.esc((currentUser.sub_concentration || 'ANIMASI').toUpperCase())}
                                 </span>
                                 <h2 class="text-xl sm:text-2xl font-extrabold">Progres Project Keseluruhan</h2>
-                                <p class="text-xs sm:text-sm text-white/90">Pantau deadline tiap tugas dari guru, unggah bukti saat selesai, dan segera perbaiki jika ada catatan revisi.</p>
+                                <p class="text-xs sm:text-sm text-white/90">Kumpulkan lebih awal dari deadline untuk meraih <strong>🌟 Lencana Emas</strong>, dan kirim <strong>Update Mingguan</strong> tiap minggu.</p>
+                                ${studentFeedbackLogsCache.length ? `
+                                <button type="button" onclick="openMyFeedbackHistory()"
+                                    class="inline-flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
+                                    📜 Lihat Semua Riwayat Catatan Guru (${studentFeedbackLogsCache.length})
+                                </button>` : ''}
                             </div>
                             <div class="w-full lg:w-72 bg-white/15 border border-white/20 rounded-2xl p-4 space-y-2 shrink-0 num-tabular">
                                 <div class="flex items-center justify-between text-xs font-bold">
@@ -2072,11 +2202,19 @@
                                 <div class="w-full h-2.5 rounded-full bg-white/25 overflow-hidden">
                                     <div class="h-full bg-[#F7C200] rounded-full transition-all duration-500" style="width:${overallPct}%"></div>
                                 </div>
-                                <div class="text-[11px] text-white/90">${accCount} / ${total} tugas sudah di-ACC guru</div>
+                                <div class="text-[11px] text-white/90">${accCount} / ${total} ACC • 🌟 ${myIssueStats.goldCount} Lencana Emas</div>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-3 gap-2.5 num-tabular">
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 num-tabular">
+                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                                <div class="text-[11px] text-white/85">🌟 Lencana Emas</div>
+                                <div class="text-lg font-extrabold text-[#FFF6D6]">${myIssueStats.goldCount}</div>
+                            </div>
+                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                                <div class="text-[11px] text-white/85">Update Minggu Ini</div>
+                                <div class="text-lg font-extrabold text-[#FFF6D6]">${updatedThisWeekCount}/${activeForWeekly.length}</div>
+                            </div>
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                                 <div class="text-[11px] text-white/85">Perlu Revisi</div>
                                 <div class="text-lg font-extrabold text-[#FFE4EC]">${revCount}</div>
@@ -2085,9 +2223,9 @@
                                 <div class="text-[11px] text-white/85">Menunggu Review</div>
                                 <div class="text-lg font-extrabold text-[#FFF6D6]">${waitCount}</div>
                             </div>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Lewat Deadline</div>
-                                <div class="text-lg font-extrabold text-[#FFE4EC]">${overdueCount}</div>
+                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5" title="${A.esc(myIssueStats.detailText)}">
+                                <div class="text-[11px] text-white/85">⚠️ Total Masalah</div>
+                                <div class="text-lg font-extrabold text-[#FFE4EC]">${myIssueStats.totalIssues}</div>
                             </div>
                         </div>
 
@@ -2149,22 +2287,109 @@
                     const dl = A.getDeadlineMeta(t.due_date, isAcc);
                     const proofSrc = projectProofDrafts[t.id] || ps.proof_image || '';
                     const naming = A.buildProjectFileNaming(t, currentUser);
+                    const taskWeeklyList = (weeklyByTask[t.id] || []).slice().sort((a, b) => String(b.week_key).localeCompare(String(a.week_key)));
+                    const thisWeekUpd = taskWeeklyList.find((u) => u.week_key === currentWeekKey) || null;
+                    const weeklyProofSrc = weeklyProofDrafts[t.id] || thisWeekUpd?.proof_image || '';
+                    const defaultPct = thisWeekUpd ? thisWeekUpd.progress_percent : (taskWeeklyList[0]?.progress_percent || (isAcc ? 100 : 25));
+                    const tm = A.evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
+                    const taskLogs = studentFeedbackLogsCache.filter((l) => l.task_id === t.id);
 
                     return `
-                        <div data-proj-id="${t.id}" data-has-proof="${ps.proof_image ? '1' : '0'}" class="bg-white border ${isRevision ? 'border-[#FECDD6] ring-2 ring-[#FFF0F4]' : 'border-[#EDF1F7]'} rounded-2xl shadow-card p-5 space-y-4">
+                        <div data-proj-id="${t.id}" data-proj-status="${stVal}" data-has-proof="${ps.proof_image ? '1' : '0'}" class="bg-white border ${isRevision ? 'border-[#FECDD6] ring-2 ring-[#FFF0F4]' : (isAcc && tm.tier === 'gold' ? 'border-[#F7C200] ring-1 ring-[#FFF6D6]' : 'border-[#EDF1F7]')} rounded-2xl shadow-card p-5 space-y-4">
                             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 pb-3.5 border-b border-[#F1F5F9]">
                                 <div class="space-y-1.5 min-w-0">
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         <span class="font-mono text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">${A.esc(t.pipeline_stage)}</span>
                                         <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md border ${dl.badgeClass}">📅 ${A.esc(dl.label)}</span>
+                                        ${!isAcc ? (thisWeekUpd
+                                            ? `<span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#E7F9EE] text-[#15803D] border border-[#BBF7D0]">✓ Update Minggu Ini (${thisWeekUpd.progress_percent}%)</span>`
+                                            : `<span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#FFF6D6] text-[#B88600] border border-[#FDE68A]">⏳ Belum Update Minggu Ini</span>`) : ''}
                                         ${revNum > 0 ? `<span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48] border border-[#FECDD6]">Revisi ke-${revNum}</span>` : ''}
+                                        ${taskLogs.length > 0 ? `<button type="button" onclick="openMyFeedbackHistory()" class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#F7FAFF] hover:bg-[#EAF4FF] text-[#0082E6] border border-[#DCEBFF] cursor-pointer">📜 Riwayat Catatan (${taskLogs.length})</button>` : ''}
                                     </div>
                                     <h3 class="text-base font-extrabold text-[#1E293B]">${A.esc(t.title)}</h3>
                                     ${t.description ? `<p class="text-xs text-slate-500 leading-relaxed">${A.esc(t.description)}</p>` : ''}
                                 </div>
-                                <span class="self-start text-xs font-bold px-3 py-1 rounded-full border shrink-0 ${stObj.badge}">
-                                    ${isAcc ? '✓ Selesai (ACC Guru)' : stObj.label}
+                                <span class="self-start text-xs font-bold px-3 py-1 rounded-full border shrink-0 ${isAcc ? tm.badgeClass : stObj.badge}">
+                                    ${isAcc ? A.esc(tm.label) : stObj.label}
                                 </span>
+                            </div>
+
+                            <!-- Project Update Mingguan Siswa (Terpantau Pembimbing & Admin Setiap Minggu) -->
+                            <div data-weekly-task="${t.id}" class="rounded-xl border ${thisWeekUpd ? 'border-[#BBF7D0] bg-[#F5FBF7]' : 'border-[#DCEBFF] bg-[#F7FAFF]'} p-4 space-y-3">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <div class="text-[11px] font-extrabold uppercase tracking-wider ${thisWeekUpd ? 'text-[#15803D]' : 'text-[#0082E6]'}">
+                                            📅 Project Update Mingguan • ${A.esc(currentWeekInfo.label)}
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">Laporkan perkembangan pengerjaan tugas ini setiap minggu agar guru pembimbing tahu progres &amp; kendalamu.</p>
+                                    </div>
+                                    ${taskWeeklyList.length ? `
+                                    <button type="button" onclick="toggleWeeklyHistory('${t.id}')"
+                                        class="px-2.5 py-1 rounded-lg bg-white border border-[#CBD5E1] hover:border-[#0095FF] text-[11px] font-bold text-slate-600 hover:text-[#0082E6] transition cursor-pointer">
+                                        📜 Riwayat (${taskWeeklyList.length} minggu)
+                                    </button>` : ''}
+                                </div>
+
+                                ${!isAcc ? `
+                                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                    <div class="md:col-span-3">
+                                        <div class="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                                            <span>Progres Tugas</span>
+                                            <span class="weekly-pct-label font-mono font-extrabold text-[#0082E6]">${defaultPct}%</span>
+                                        </div>
+                                        <input type="range" min="0" max="100" step="5" value="${defaultPct}" oninput="onWeeklyRangeInput(this)"
+                                            class="weekly-pct-range w-full h-2 cursor-pointer" />
+                                    </div>
+                                    <div class="md:col-span-5">
+                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Progres Minggu Ini <span class="text-[#F13B6E]">*</span></label>
+                                        <input type="text" value="${A.esc(thisWeekUpd?.summary || '')}" placeholder="Contoh: Selesai sketsa turnaround tampak depan & samping..."
+                                            class="weekly-summary-inp w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                                    </div>
+                                    <div class="md:col-span-4">
+                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Kendala (Opsional)</label>
+                                        <input type="text" value="${A.esc(thisWeekUpd?.blockers || '')}" placeholder="Kosongkan jika lancar..."
+                                            class="weekly-blockers-inp w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                                    </div>
+                                    <div class="md:col-span-8 flex flex-wrap items-center gap-2.5">
+                                        <img src="${A.esc(weeklyProofSrc)}" alt="WIP" onclick="openProofLightbox(this.src, 'Progres Mingguan — ${A.esc(t.title)}')"
+                                            class="weekly-proof-img ${weeklyProofSrc ? '' : 'hidden'} w-12 h-9 rounded-lg object-cover border border-[#CBD5E1] cursor-pointer shrink-0" />
+                                        <label class="px-3 py-1.5 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] text-[11px] font-bold transition cursor-pointer">
+                                            📷 ${weeklyProofSrc ? 'Ganti Screenshot WIP' : 'Lampirkan Screenshot WIP (Opsional)'}
+                                            <input type="file" accept="image/*" class="hidden" onchange="handleWeeklyProofPick('${t.id}', this)" />
+                                        </label>
+                                        <span class="weekly-proof-hint text-[11px] text-slate-500 truncate">${weeklyProofSrc ? 'Screenshot progres terlampir.' : 'Opsional: screenshot viewport / draft saat ini.'}</span>
+                                    </div>
+                                    <div class="md:col-span-4">
+                                        <button type="button" onclick="saveStudentWeeklyUpdate('${t.id}', this)"
+                                            class="w-full py-2 px-4 rounded-xl ${thisWeekUpd ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#0095FF] hover:bg-[#0082E6]'} text-white text-xs font-bold shadow-sm transition cursor-pointer">
+                                            ${thisWeekUpd ? '✓ Perbarui Update Minggu Ini' : '💾 Kirim Update Minggu Ini'}
+                                        </button>
+                                    </div>
+                                </div>` : ''}
+
+                                ${thisWeekUpd?.mentor_note || thisWeekUpd?.checked_at ? `
+                                <div class="rounded-lg bg-white border border-[#BBE9E2] px-3 py-2 text-[11px] text-[#1D5E55]">
+                                    <strong>✓ Dicek Pembimbing (${A.esc(thisWeekUpd.checked_by_name || 'Guru')}):</strong> ${A.esc(thisWeekUpd.mentor_note || 'Update minggu ini sudah diterima & dipantau.')}
+                                </div>` : ''}
+
+                                ${taskWeeklyList.length ? `
+                                <div id="weeklyHistory_${t.id}" class="hidden pt-2 border-t border-[#DCEBFF] space-y-2">
+                                    ${taskWeeklyList.map((u) => `
+                                        <div class="bg-white border border-[#EDF1F7] rounded-lg p-2.5 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div class="space-y-0.5 min-w-0">
+                                                <div class="flex flex-wrap items-center gap-1.5">
+                                                    <span class="font-bold text-[#1E293B]">${A.esc(A.getWeekRangeInfo(u.week_key).label)}</span>
+                                                    <span class="px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-mono font-bold">${u.progress_percent}%</span>
+                                                    ${u.checked_at ? `<span class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-bold">✓ Dicek</span>` : ''}
+                                                </div>
+                                                <div class="text-slate-600">${A.esc(u.summary)}</div>
+                                                ${u.blockers ? `<div class="text-[#E11D48]">Kendala: ${A.esc(u.blockers)}</div>` : ''}
+                                                ${u.mentor_note ? `<div class="text-[#1D5E55] font-semibold">Catatan Pembimbing: ${A.esc(u.mentor_note)}</div>` : ''}
+                                            </div>
+                                            ${u.proof_image ? `<img src="${A.esc(u.proof_image)}" onclick="openProofLightbox(this.src, '${A.esc(u.week_key)} — ${A.esc(t.title)}')" class="w-12 h-9 rounded object-cover border border-[#CBD5E1] cursor-pointer shrink-0" />` : ''}
+                                        </div>`).join('')}
+                                </div>` : ''}
                             </div>
 
                             <!-- Panduan & Contoh Penamaan File Otomatis Mengikuti Tugas -->

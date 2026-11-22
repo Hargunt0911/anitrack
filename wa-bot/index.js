@@ -114,6 +114,40 @@ async function sendWhatsAppMessage(rawPhone, text) {
   return phone;
 }
 
+const DEFAULT_WA_TEMPLATE = [
+  'Halo *{nama}* ({kelas}),',
+  'Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:',
+  '',
+  '{daftar_tugas}',
+  '📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
+  '{pembimbing}',
+  '{link_anitrack}'
+].join('\n');
+
+function renderWaTemplateBot(template, vars) {
+  const raw = (template && String(template).trim()) ? String(template) : DEFAULT_WA_TEMPLATE;
+  const map = {
+    nama: vars.nama || 'Siswa',
+    kelas: vars.kelas || 'Siswa Animasi',
+    subkonsentrasi: vars.subkonsentrasi || 'Animasi',
+    daftar_tugas: vars.daftar_tugas || '-',
+    tugas_terlambat: vars.tugas_terlambat || '',
+    tugas_mendekati: vars.tugas_mendekati || '',
+    pembimbing: vars.pembimbing || '',
+    link_anitrack: vars.link_anitrack || ''
+  };
+  const hasTaskToken = /\{(daftar_tugas|tugas_terlambat|tugas_mendekati)\}/i.test(raw);
+  const hasMentorToken = /\{pembimbing\}/i.test(raw);
+  const hasLinkToken = /\{link_anitrack\}/i.test(raw);
+  let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|pembimbing|link_anitrack)\}/gi, (_, k) => map[String(k).toLowerCase()] ?? '');
+  const autoExtra = [];
+  if (!hasTaskToken && map.daftar_tugas && map.daftar_tugas !== '-') autoExtra.push(map.daftar_tugas);
+  if (!hasMentorToken && map.pembimbing) autoExtra.push(map.pembimbing);
+  if (!hasLinkToken && map.link_anitrack) autoExtra.push(map.link_anitrack);
+  if (autoExtra.length) rendered = `${rendered.trim()}\n\n${autoExtra.join('\n')}`;
+  return rendered.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 async function runDeadlineReminderJob(source = 'cron') {
   if (isRunningJob) {
     return { ok: false, error: 'Proses pengiriman pengingat deadline masih berjalan.' };
@@ -133,11 +167,19 @@ async function runDeadlineReminderJob(source = 'cron') {
   let skippedNoWa = 0;
 
   try {
-    const [profiles, tasks, subs] = await Promise.all([
+    const [profiles, tasks, subs, cfgRows] = await Promise.all([
       fetchSupabase('profiles?select=id,full_name,username,class_name,sub_concentration,role,mentor_id,whatsapp_number'),
       fetchSupabase('project_tasks?select=id,title,pipeline_stage,sub_concentration,due_date'),
-      fetchSupabase('project_submissions?select=project_task_id,student_id,status')
+      fetchSupabase('project_submissions?select=project_task_id,student_id,status'),
+      fetchSupabase('app_settings?select=value&key=eq.wa_gateway_config').catch(() => [])
     ]);
+
+    let waCfg = {};
+    if (cfgRows && cfgRows.length && cfgRows[0].value) {
+      try { waCfg = JSON.parse(cfgRows[0].value); } catch { /* ignore */ }
+    }
+    const effectiveAppUrl = (waCfg.appUrl || APP_URL || '').trim();
+    const messageTemplate = (waCfg.messageTemplate || '').trim();
 
     const mentorMap = {};
     const students = [];
@@ -195,40 +237,44 @@ async function runDeadlineReminderJob(source = 'cron') {
       }
 
       const mentor = s.mentor_id ? mentorMap[s.mentor_id] : null;
-      const lines = [
-        `Halo *${s.full_name}* (${s.class_name || 'Siswa Animasi'}),`,
-        'Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:',
-        ''
-      ];
-
+      const overdueLines = [];
       if (overdueList.length) {
-        lines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
+        overdueLines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
         overdueList.forEach((item, idx) => {
           const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
-          lines.push(`${idx + 1}. *${item.title}*${revTag} — Terlambat *${item.lateDays} hari* (Deadline: ${item.dueDate})`);
+          overdueLines.push(`${idx + 1}. *${item.title}*${revTag} — Terlambat *${item.lateDays} hari* (Deadline: ${item.dueDate})`);
         });
-        lines.push('_Notifikasi ini akan terus dikirim setiap hari pukul 07:00 WIB sampai kamu melapor selesai di AniTrack._');
-        lines.push('');
+        overdueLines.push('_Notifikasi ini akan terus dikirim setiap hari pukul 07:00 WIB sampai kamu melapor selesai di AniTrack._');
       }
 
+      const upcomingLines = [];
       if (upcomingList.length) {
-        lines.push('🟡 *MENDEKATI DEADLINE:*');
+        upcomingLines.push('🟡 *MENDEKATI DEADLINE:*');
         upcomingList.forEach((item, idx) => {
           const whenLabel = item.diffDays === 0 ? 'HARI INI' : (item.diffDays === 1 ? 'Besok (H-1)' : '2 Hari Lagi (H-2)');
           const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
-          lines.push(`${idx + 1}. *${item.title}*${revTag} — *${whenLabel}* (${item.dueDate})`);
+          upcomingLines.push(`${idx + 1}. *${item.title}*${revTag} — *${whenLabel}* (${item.dueDate})`);
         });
-        lines.push('');
       }
 
-      lines.push('📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.');
-      if (mentor) {
-        const mentorWa = formatWaLocal(mentor.whatsapp_number);
-        lines.push(`👨‍🏫 Pembimbing: *${mentor.full_name}*${mentorWa !== '-' ? ` (WA: ${mentorWa})` : ''}`);
-      }
-      if (APP_URL) {
-        lines.push(`🔗 Buka AniTrack: ${APP_URL}`);
-      }
+      const overdueBlock = overdueLines.join('\n');
+      const upcomingBlock = upcomingLines.join('\n');
+      const combinedTasks = [overdueBlock, upcomingBlock].filter(Boolean).join('\n\n');
+      const mentorLine = mentor
+        ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWaLocal(mentor.whatsapp_number) !== '-' ? ` (WA: ${formatWaLocal(mentor.whatsapp_number)})` : ''}`
+        : '';
+      const appUrlLine = effectiveAppUrl ? `🔗 Buka AniTrack: ${effectiveAppUrl}` : '';
+
+      const messageText = renderWaTemplateBot(messageTemplate, {
+        nama: s.full_name || 'Siswa',
+        kelas: s.class_name || 'Siswa Animasi',
+        subkonsentrasi: s.sub_concentration || 'Animasi',
+        daftar_tugas: combinedTasks,
+        tugas_terlambat: overdueBlock,
+        tugas_mendekati: upcomingBlock,
+        pembimbing: mentorLine,
+        link_anitrack: appUrlLine
+      });
 
       const reminderType = (overdueList.length && upcomingList.length)
         ? 'mixed'
@@ -239,7 +285,7 @@ async function runDeadlineReminderJob(source = 'cron') {
       ].join('; ').slice(0, 400);
 
       try {
-        await sendWhatsAppMessage(phone, lines.join('\n'));
+        await sendWhatsAppMessage(phone, messageText);
         sentCount++;
         console.log(`  [TERKIRIM] ${s.full_name} (${phone}) — ${reminderType}`);
         await insertWaLog({

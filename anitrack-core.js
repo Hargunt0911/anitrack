@@ -277,7 +277,346 @@
         copyTextToClipboard(name, `Contoh nama file disalin: ${name}`);
     };
 
-    function computeDeadlineReminderQueue(students, mentors, tasks, submissions) {
+    const DEFAULT_WA_TEMPLATE = [
+        'Halo *{nama}* ({kelas}),',
+        'Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:',
+        '',
+        '{daftar_tugas}',
+        '📌 Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
+        '{pembimbing}',
+        '{link_anitrack}'
+    ].join('\n');
+
+    function renderWaReminderMessage(template, vars = {}) {
+        const raw = (template && String(template).trim()) ? String(template) : DEFAULT_WA_TEMPLATE;
+        const map = {
+            nama: vars.nama || 'Siswa',
+            kelas: vars.kelas || 'Siswa Animasi',
+            subkonsentrasi: vars.subkonsentrasi || 'Animasi',
+            daftar_tugas: vars.daftar_tugas || '-',
+            tugas_terlambat: vars.tugas_terlambat || '',
+            tugas_mendekati: vars.tugas_mendekati || '',
+            pembimbing: vars.pembimbing || '',
+            link_anitrack: vars.link_anitrack || ''
+        };
+        const hasTaskToken = /\{(daftar_tugas|tugas_terlambat|tugas_mendekati)\}/i.test(raw);
+        const hasMentorToken = /\{pembimbing\}/i.test(raw);
+        const hasLinkToken = /\{link_anitrack\}/i.test(raw);
+        let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|pembimbing|link_anitrack)\}/gi, (_, k) => {
+            return map[String(k).toLowerCase()] ?? '';
+        });
+        // Jika admin hanya menulis kalimat pembuka/salam tanpa placeholder tugas, sistem otomatis melampirkan rinciannya
+        const autoExtra = [];
+        if (!hasTaskToken && map.daftar_tugas && map.daftar_tugas !== '-') autoExtra.push(map.daftar_tugas);
+        if (!hasMentorToken && map.pembimbing) autoExtra.push(map.pembimbing);
+        if (!hasLinkToken && map.link_anitrack) autoExtra.push(map.link_anitrack);
+        if (autoExtra.length) rendered = `${rendered.trim()}\n\n${autoExtra.join('\n')}`;
+        return rendered.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    // ==================== WEEKLY PROJECT UPDATE HELPERS ====================
+    const PROJECT_WEEKLY_PREFIX = 'proj_weekly::';
+
+    function getWeekKey(dateInput = new Date()) {
+        const d = dateInput instanceof Date ? new Date(dateInput.getTime()) : new Date(dateInput);
+        const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        const dayNum = target.getUTCDay() || 7;
+        target.setUTCDate(target.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+        const weekNum = Math.ceil((((target - yearStart) / 86400000) + 1) / 7);
+        return `${target.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+    }
+
+    function getWeekRangeInfo(weekKey) {
+        const m = String(weekKey || '').match(/^(\d{4})-W(\d{2})$/);
+        if (!m) return getWeekRangeInfo(getWeekKey());
+        const year = Number(m[1]);
+        const weekNum = Number(m[2]);
+        const jan4 = new Date(Date.UTC(year, 0, 4));
+        const jan4Day = jan4.getUTCDay() || 7;
+        const monday = new Date(jan4.getTime() + ((weekNum - 1) * 7 - (jan4Day - 1)) * 86400000);
+        const sunday = new Date(monday.getTime() + 6 * 86400000);
+        const fmtShort = (dt) => new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(dt);
+        const startYmd = monday.toISOString().slice(0, 10);
+        const endYmd = sunday.toISOString().slice(0, 10);
+        const isCurrent = getWeekKey() === `${year}-W${String(weekNum).padStart(2, '0')}`;
+        const label = `Minggu ${weekNum} (${fmtShort(monday)} – ${fmtShort(sunday)} ${sunday.getUTCFullYear()})${isCurrent ? ' • Minggu Ini' : ''}`;
+        return { weekKey: `${year}-W${String(weekNum).padStart(2, '0')}`, weekNum, year, startDate: startYmd, endDate: endYmd, isCurrent, label };
+    }
+
+    function getRecentWeekKeys(count = 8, extraKeys = []) {
+        const set = new Set();
+        const now = new Date();
+        for (let i = 0; i < count; i++) {
+            const dt = new Date(now.getTime() - i * 7 * 86400000);
+            set.add(getWeekKey(dt));
+        }
+        (extraKeys || []).forEach((k) => {
+            if (/^\d{4}-W\d{2}$/.test(String(k || ''))) set.add(String(k));
+        });
+        return [...set].sort((a, b) => b.localeCompare(a));
+    }
+
+    function makeWeeklyUpdateKey(weekKey, projectTaskId, studentId) {
+        return `${PROJECT_WEEKLY_PREFIX}${weekKey}::${projectTaskId}::${studentId}`;
+    }
+
+    function parseWeeklyUpdateRows(rows = []) {
+        const list = [];
+        (rows || []).forEach((r) => {
+            if (!r?.key || !String(r.key).startsWith(PROJECT_WEEKLY_PREFIX)) return;
+            try {
+                const parsed = JSON.parse(r.value || '{}');
+                const parts = String(r.key).split('::');
+                list.push({
+                    key: r.key,
+                    week_key: parsed.week_key || parts[1] || '',
+                    project_task_id: parsed.project_task_id || parts[2] || '',
+                    student_id: parsed.student_id || parts[3] || '',
+                    progress_percent: Math.min(100, Math.max(0, Number(parsed.progress_percent || 0))),
+                    summary: parsed.summary || '',
+                    blockers: parsed.blockers || '',
+                    proof_image: parsed.proof_image || '',
+                    proof_url: parsed.proof_url || '',
+                    mentor_note: parsed.mentor_note || '',
+                    checked_by: parsed.checked_by || null,
+                    checked_by_name: parsed.checked_by_name || '',
+                    checked_at: parsed.checked_at || null,
+                    updated_at: parsed.updated_at || r.updated_at || null
+                });
+            } catch { /* ignore malformed entry */ }
+        });
+        list.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+        return list;
+    }
+
+    // ==================== LENCANA EMAS, KETEPATAN, RIWAYAT CATATAN, WALI KELAS & ARSIP ====================
+    const PROJECT_FB_LOG_PREFIX = 'proj_fb_log::';
+    const PROJECT_ARCHIVE_PREFIX = 'proj_archive::';
+    const HOMEROOM_MAP_KEY = 'homeroom_teachers_map';
+
+    function getJakartaYmd(dateInput = new Date()) {
+        try {
+            const dt = dateInput instanceof Date ? dateInput : new Date(dateInput);
+            if (isNaN(dt.getTime())) return '';
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Jakarta',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).format(dt);
+        } catch {
+            return '';
+        }
+    }
+
+    function parseYmdUtcMs(ymd) {
+        if (!ymd) return null;
+        const parts = String(ymd).slice(0, 10).split('-').map(Number);
+        if (parts.length !== 3 || parts.some(isNaN)) return null;
+        return Date.UTC(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function evaluateSubmissionTimeliness(dueDate, updatedAt, status) {
+        const dueMs = parseYmdUtcMs(dueDate);
+        if (status === 'selesai') {
+            if (dueMs === null) {
+                return { tier: 'ontime', label: 'Tuntas ✓', shortLabel: 'Tuntas', icon: '✓', badgeClass: 'bg-[#E3F6F3] text-[#1D5E55] border-[#BBE9E2]', lateDays: 0, earlyDays: 0 };
+            }
+            const refYmd = getJakartaYmd(updatedAt || new Date());
+            const refMs = parseYmdUtcMs(refYmd);
+            if (refMs === null) {
+                return { tier: 'ontime', label: 'Tuntas ✓', shortLabel: 'Tuntas', icon: '✓', badgeClass: 'bg-[#E3F6F3] text-[#1D5E55] border-[#BBE9E2]', lateDays: 0, earlyDays: 0 };
+            }
+            const diffDays = Math.round((dueMs - refMs) / 86400000);
+            if (diffDays >= 1) {
+                return {
+                    tier: 'gold',
+                    label: `Tuntas (🌟 Lencana Emas • H-${diffDays})`,
+                    shortLabel: '🌟 Lencana Emas',
+                    icon: '🌟',
+                    badgeClass: 'bg-[#FFF6D6] text-[#9A6F00] border-[#F7C200]',
+                    lateDays: 0,
+                    earlyDays: diffDays
+                };
+            }
+            if (diffDays === 0) {
+                return { tier: 'ontime', label: 'Tuntas Tepat Waktu ✓', shortLabel: 'Tuntas', icon: '✓', badgeClass: 'bg-[#E3F6F3] text-[#1D5E55] border-[#BBE9E2]', lateDays: 0, earlyDays: 0 };
+            }
+            const lateDays = Math.abs(diffDays);
+            return {
+                tier: 'late',
+                label: `Tuntas (Terlambat ${lateDays}h)`,
+                shortLabel: 'Terlambat',
+                icon: '⏱',
+                badgeClass: 'bg-[#FFF1EB] text-[#C2410C] border-[#FDBA74]',
+                lateDays,
+                earlyDays: 0
+            };
+        }
+        if (dueMs !== null) {
+            const todayMs = parseYmdUtcMs(getJakartaYmd(new Date()));
+            if (todayMs !== null && todayMs > dueMs) {
+                const lateDays = Math.round((todayMs - dueMs) / 86400000);
+                return {
+                    tier: 'overdue',
+                    label: `Terlambat ${lateDays} hari`,
+                    shortLabel: `Telat ${lateDays}h`,
+                    icon: '!',
+                    badgeClass: 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]',
+                    lateDays,
+                    earlyDays: 0
+                };
+            }
+        }
+        return { tier: 'normal', label: '', shortLabel: '', icon: '', badgeClass: '', lateDays: 0, earlyDays: 0 };
+    }
+
+    function computeStudentIssueStats(student, tasks = [], subMap = {}) {
+        let eligibleCount = 0;
+        let accCount = 0;
+        let goldCount = 0;
+        let lateAccCount = 0;
+        let overdueCount = 0;
+        let totalRevisions = 0;
+
+        (tasks || []).forEach((t) => {
+            if (t.sub_concentration && student.sub_concentration !== t.sub_concentration) return;
+            eligibleCount++;
+            const ps = subMap[`${t.id}__${student.id}`] || {};
+            const st = ps.status || 'belum_mulai';
+            const revNum = Number(ps.revision_count || 0);
+            totalRevisions += revNum;
+            const tm = evaluateSubmissionTimeliness(t.due_date, ps.updated_at, st);
+            if (st === 'selesai') {
+                accCount++;
+                if (tm.tier === 'gold') goldCount++;
+                else if (tm.tier === 'late') lateAccCount++;
+            } else if (tm.tier === 'overdue') {
+                overdueCount++;
+            }
+        });
+
+        const totalIssues = overdueCount + lateAccCount + totalRevisions;
+        const detailText = `${totalIssues} masalah (${overdueCount} lewat deadline, ${lateAccCount} tuntas terlambat, ${totalRevisions} revisi)`;
+        return { eligibleCount, accCount, goldCount, lateAccCount, overdueCount, totalRevisions, totalIssues, detailText };
+    }
+
+    function parseFeedbackLogMap(rows = []) {
+        const map = {};
+        (rows || []).forEach((r) => {
+            if (!r?.key || !String(r.key).startsWith(PROJECT_FB_LOG_PREFIX)) return;
+            const studentId = String(r.key).slice(PROJECT_FB_LOG_PREFIX.length);
+            try {
+                const arr = JSON.parse(r.value || '[]');
+                if (Array.isArray(arr)) map[studentId] = arr;
+            } catch { /* ignore */ }
+        });
+        return map;
+    }
+
+    async function appendFeedbackLogEntry(studentId, entry) {
+        if (!supabase || !studentId || !entry) return;
+        const key = `${PROJECT_FB_LOG_PREFIX}${studentId}`;
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', key).maybeSingle();
+            let arr = [];
+            if (data?.value) {
+                try {
+                    const parsed = JSON.parse(data.value);
+                    if (Array.isArray(parsed)) arr = parsed;
+                } catch { /* ignore */ }
+            }
+            arr.unshift({
+                at: entry.at || new Date().toISOString(),
+                task_id: entry.task_id || '',
+                task_title: entry.task_title || 'Tugas Project',
+                status: entry.status || '',
+                revision_no: Number(entry.revision_no || 0),
+                feedback: String(entry.feedback || '').trim(),
+                reviewer_name: entry.reviewer_name || 'Guru'
+            });
+            await supabase.from('app_settings').upsert({
+                key,
+                value: JSON.stringify(arr.slice(0, 80)),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+        } catch { /* silent */ }
+    }
+
+    async function loadHomeroomMap() {
+        if (!supabase) return {};
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', HOMEROOM_MAP_KEY).maybeSingle();
+            if (data?.value) {
+                const parsed = JSON.parse(data.value);
+                if (parsed && typeof parsed === 'object') return parsed;
+            }
+        } catch { /* silent */ }
+        return {};
+    }
+
+    async function saveHomeroomMap(mapObj) {
+        if (!supabase) return { error: null };
+        return supabase.from('app_settings').upsert({
+            key: HOMEROOM_MAP_KEY,
+            value: JSON.stringify(mapObj || {}),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    }
+
+    function openFeedbackHistoryModal(studentName, entries = []) {
+        let modal = document.getElementById('anitrackFbHistoryModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackFbHistoryModal';
+            modal.className = 'fixed inset-0 z-[80] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            modal.innerHTML = `
+                <div class="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                    <div class="px-5 py-3.5 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">Audit Log Revisi &amp; Evaluasi</div>
+                            <div id="fbHistModalTitle" class="text-sm font-extrabold text-[#1E293B]">Riwayat Catatan Guru</div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('anitrackFbHistoryModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer">✕</button>
+                    </div>
+                    <div id="fbHistModalBody" class="p-4 max-h-[72vh] overflow-y-auto space-y-2.5 text-xs"></div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+        document.getElementById('fbHistModalTitle').textContent = `Riwayat Catatan Guru — ${studentName || 'Siswa'}`;
+        const body = document.getElementById('fbHistModalBody');
+        if (!entries.length) {
+            body.innerHTML = `<div class="p-8 text-center text-slate-400">Belum ada riwayat catatan / revisi guru untuk siswa ini.</div>`;
+        } else {
+            body.innerHTML = entries.map((e) => {
+                const isRev = e.status === 'revisi';
+                const isAcc = e.status === 'selesai';
+                const tag = isRev
+                    ? `<span class="px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48] font-bold">Revisi ke-${e.revision_no || 1}</span>`
+                    : isAcc
+                        ? `<span class="px-2 py-0.5 rounded bg-[#E3F6F3] text-[#1D5E55] font-bold">✓ ACC Selesai</span>`
+                        : `<span class="px-2 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-bold">${esc(e.status || 'Catatan')}</span>`;
+                return `
+                    <div class="rounded-xl border ${isRev ? 'border-[#FECDD6] bg-[#FFF8FA]' : 'border-[#EDF1F7] bg-[#FAFBFD]'} p-3.5 space-y-1.5">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${tag}
+                                <span class="font-extrabold text-[#1E293B]">${esc(e.task_title || 'Tugas Project')}</span>
+                            </div>
+                            <span class="font-mono text-[10.5px] text-slate-400">${esc(formatDateTime(e.at))}</span>
+                        </div>
+                        <p class="text-slate-700 leading-relaxed">${esc(e.feedback || '(Tanpa catatan tambahan)')}</p>
+                        <div class="text-[10.5px] text-slate-400">Oleh: <strong class="text-slate-600">${esc(e.reviewer_name || 'Guru')}</strong></div>
+                    </div>`;
+            }).join('');
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function computeDeadlineReminderQueue(students, mentors, tasks, submissions, waConfig = {}) {
         const now = new Date();
         const todayMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
         const mentorMap = Object.fromEntries((mentors || []).map((m) => [m.id, m]));
@@ -286,6 +625,8 @@
             subMap[`${ps.project_task_id}__${ps.student_id}`] = ps;
         });
 
+        const template = waConfig?.messageTemplate || '';
+        const appUrl = (waConfig?.appUrl || '').trim();
         const queue = [];
         (students || []).forEach((s) => {
             const overdue = [];
@@ -312,30 +653,41 @@
 
             if (!overdue.length && !upcoming.length) return;
             const mentor = s.mentor_id ? mentorMap[s.mentor_id] : null;
-            const lines = [];
-            lines.push(`Halo *${s.full_name}* (${s.class_name || 'Siswa Animasi'}),`);
-            lines.push('Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:');
-            lines.push('');
+            const overdueLines = [];
             if (overdue.length) {
-                lines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
+                overdueLines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
                 overdue.forEach((item, idx) => {
-                    lines.push(`${idx + 1}. *${item.task.title}* — Terlambat *${item.lateDays} hari* (${String(item.task.due_date).slice(0, 10)})`);
+                    const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
+                    overdueLines.push(`${idx + 1}. *${item.task.title}*${revTag} — Terlambat *${item.lateDays} hari* (${String(item.task.due_date).slice(0, 10)})`);
                 });
-                lines.push('');
             }
+            const upcomingLines = [];
             if (upcoming.length) {
-                lines.push('🟡 *MENDEKATI DEADLINE:*');
+                upcomingLines.push('🟡 *MENDEKATI DEADLINE:*');
                 upcoming.forEach((item, idx) => {
                     const label = item.diffDays === 0 ? 'HARI INI' : (item.diffDays === 1 ? 'Besok (H-1)' : '2 Hari Lagi (H-2)');
-                    lines.push(`${idx + 1}. *${item.task.title}* — *${label}* (${String(item.task.due_date).slice(0, 10)})`);
+                    const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
+                    upcomingLines.push(`${idx + 1}. *${item.task.title}*${revTag} — *${label}* (${String(item.task.due_date).slice(0, 10)})`);
                 });
-                lines.push('');
             }
-            lines.push('📌 Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.');
-            if (mentor) {
-                const mWa = formatWhatsappDisplay(mentor.whatsapp_number);
-                lines.push(`👨‍🏫 Pembimbing: *${mentor.full_name}*${mWa ? ` (WA: ${mWa})` : ''}`);
-            }
+            const overdueBlock = overdueLines.join('\n');
+            const upcomingBlock = upcomingLines.join('\n');
+            const combinedTasks = [overdueBlock, upcomingBlock].filter(Boolean).join('\n\n');
+            const mentorLine = mentor
+                ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWhatsappDisplay(mentor.whatsapp_number) ? ` (WA: ${formatWhatsappDisplay(mentor.whatsapp_number)})` : ''}`
+                : '';
+            const appUrlLine = appUrl ? `🔗 Buka AniTrack: ${appUrl}` : '';
+
+            const message = renderWaReminderMessage(template, {
+                nama: s.full_name || 'Siswa',
+                kelas: s.class_name || 'Siswa Animasi',
+                subkonsentrasi: s.sub_concentration || 'Animasi',
+                daftar_tugas: combinedTasks,
+                tugas_terlambat: overdueBlock,
+                tugas_mendekati: upcomingBlock,
+                pembimbing: mentorLine,
+                link_anitrack: appUrlLine
+            });
 
             queue.push({
                 student: s,
@@ -344,7 +696,7 @@
                 upcoming,
                 type: (overdue.length && upcoming.length) ? 'mixed' : (overdue.length ? 'overdue' : 'h_minus_2'),
                 hasWa: Boolean(normalizeWhatsapp(s.whatsapp_number)),
-                message: lines.join('\n')
+                message
             });
         });
 
@@ -1140,13 +1492,15 @@
     async function buildExportWorkbooks() {
         if (typeof global.XLSX === 'undefined') throw new Error('Library Excel (.xlsx) belum termuat.');
 
-        const [{ data: profiles }, { data: materials }, { data: tasks }, { data: progress }, { data: projTasks }, { data: projSubs }] = await Promise.all([
-            supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id').order('role').order('full_name'),
+        const [{ data: profiles }, { data: materials }, { data: tasks }, { data: progress }, { data: projTasks }, { data: projSubs }, { data: weeklyRaw }, { data: fbLogRaw }] = await Promise.all([
+            supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number, project_drive_url').order('role').order('full_name'),
             supabase.from('learning_materials').select('*').order('id', { ascending: false }),
             supabase.from('daily_tasks').select('*').order('id', { ascending: false }),
             supabase.from('student_progress').select('*').order('updated_at', { ascending: false }),
             supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
-            supabase.from('project_submissions').select('*').order('updated_at', { ascending: false })
+            supabase.from('project_submissions').select('*').order('updated_at', { ascending: false }),
+            supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_WEEKLY_PREFIX}%`),
+            supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`)
         ]);
 
         const pList = profiles || [];
@@ -1193,17 +1547,30 @@
             };
         });
 
-        const profileRows = pList.map((p, i) => ({
-            No: i + 1,
-            'Nama Lengkap': p.full_name || '-',
-            Username: `@${p.username || '-'}`,
-            Peran: roleLabel(p.role),
-            Kelas: p.class_name || '-',
-            'Sub-Konsentrasi': p.sub_concentration || '-',
-            Pembimbing: (p.mentor_id && pMap[p.mentor_id]?.full_name) || '-',
-            'Nomor WA': formatWhatsappDisplay(p.whatsapp_number) || '-',
-            'Folder Drive Project': p.project_drive_url || '-'
-        }));
+        const ptList = projTasks || [];
+        const psList = projSubs || [];
+        const fbLogMap = parseFeedbackLogMap(fbLogRaw || []);
+        const subMapExport = {};
+        psList.forEach((ps) => { subMapExport[`${ps.project_task_id}__${ps.student_id}`] = ps; });
+
+        const profileRows = pList.map((p, i) => {
+            const stStats = p.role === 'student' ? computeStudentIssueStats(p, ptList, subMapExport) : null;
+            const histLogs = (fbLogMap[p.id] || []).map((l) => `[${formatDateTime(l.at)}] ${l.task_title} | ${l.status === 'revisi' ? `Revisi ke-${l.revision_no || 1}` : l.status}: ${l.feedback}`).join('\n');
+            return {
+                No: i + 1,
+                'Nama Lengkap': p.full_name || '-',
+                Username: `@${p.username || '-'}`,
+                Peran: roleLabel(p.role),
+                Kelas: p.class_name || '-',
+                'Sub-Konsentrasi': p.sub_concentration || '-',
+                Pembimbing: (p.mentor_id && pMap[p.mentor_id]?.full_name) || '-',
+                'Nomor WA': formatWhatsappDisplay(p.whatsapp_number) || '-',
+                'Folder Drive Project': p.project_drive_url || '-',
+                'Lencana Emas': stStats ? stStats.goldCount : '-',
+                'Total Masalah': stStats ? stStats.totalIssues : '-',
+                'Riwayat Catatan Guru': histLogs || '-'
+            };
+        });
 
         const completedTasksCount = prList.filter((r) => r.status === 'selesai').length;
         const summaryRows = [
@@ -1216,12 +1583,11 @@
             { Keterangan: 'Daily Task Selesai', Nilai: completedTasksCount }
         ];
 
-        const ptList = projTasks || [];
-        const psList = projSubs || [];
         const ptMap = Object.fromEntries(ptList.map((pt) => [pt.id, pt]));
         const projectRows = psList.map((ps, i) => {
             const s = pMap[ps.student_id] || {};
             const pt = ptMap[ps.project_task_id] || {};
+            const tm = evaluateSubmissionTimeliness(pt.due_date, ps.updated_at, ps.status);
             return {
                 No: i + 1,
                 'Tugas Project': pt.title || '-',
@@ -1230,7 +1596,7 @@
                 'Nama Siswa': s.full_name || '-',
                 Kelas: s.class_name || '-',
                 'Sub-Konsentrasi': s.sub_concentration || '-',
-                Status: statusLabels[ps.status] || ps.status || '-',
+                Status: ps.status === 'selesai' ? tm.label : (statusLabels[ps.status] || ps.status || '-'),
                 'Jumlah Revisi': Number(ps.revision_count || 0),
                 'Bukti Foto': ps.proof_image ? 'Ada Bukti Foto' : '-',
                 'Folder Drive Project': s.project_drive_url || ps.proof_url || '-',
@@ -1240,10 +1606,34 @@
             };
         });
 
+        const weeklyList = parseWeeklyUpdateRows(weeklyRaw || []);
+        const weeklyRows = weeklyList.map((u, i) => {
+            const s = pMap[u.student_id] || {};
+            const pt = ptMap[u.project_task_id] || {};
+            const mentor = s.mentor_id ? pMap[s.mentor_id] : null;
+            return {
+                No: i + 1,
+                Minggu: getWeekRangeInfo(u.week_key).label,
+                'Nama Siswa': s.full_name || '-',
+                Kelas: s.class_name || '-',
+                'Sub-Konsentrasi': s.sub_concentration || '-',
+                Pembimbing: mentor?.full_name || '-',
+                'Tugas Project': pt.title || '-',
+                'Progres (%)': `${u.progress_percent}%`,
+                'Ringkasan Progres Mingguan': u.summary || '-',
+                Kendala: u.blockers || '-',
+                'Bukti WIP': u.proof_image ? 'Ada Screenshot' : '-',
+                'Catatan Pembimbing': u.mentor_note || '-',
+                'Status Cek Pembimbing': u.checked_at ? `Dicek (${u.checked_by_name || 'Guru'})` : 'Belum Dicek',
+                'Diperbarui': formatDateTime(u.updated_at)
+            };
+        });
+
         const taskCols = [5, 18, 24, 16, 10, 20, 22, 30, 18, 34, 34, 32];
         const matCols = [5, 32, 16, 20, 16, 40, 38, 38, 30, 22];
         const profCols = [5, 26, 18, 12, 10, 20, 24, 18, 38];
         const projCols = [5, 30, 16, 16, 24, 10, 20, 18, 12, 16, 30, 32, 34, 18];
+        const weeklyCols = [5, 28, 24, 10, 20, 22, 28, 12, 36, 28, 14, 30, 20, 18];
         const sumCols = [28, 48];
 
         const tasksWb = global.XLSX.utils.book_new();
@@ -1256,6 +1646,7 @@
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(summaryRows, sumCols), 'Ringkasan');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(taskRows, taskCols), 'Rekap Daily Task');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(projectRows, projCols), 'Project Tracker');
+        global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(weeklyRows, weeklyCols), 'Update Mingguan');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(materialRows, matCols), 'Daftar Materi Ajar');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(profileRows, profCols), 'Siswa & Mentor');
 
@@ -1945,7 +2336,10 @@
                 .eq('role', 'student')
                 .order('class_name')
                 .order('full_name');
-            if (expectedRole === 'mentor') sq = sq.eq('mentor_id', currentUser.id);
+            if (expectedRole === 'mentor') {
+                if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
+                else sq = sq.eq('mentor_id', currentUser.id);
+            }
 
             const [{ data: students }, { data: progressRows }, { data: tasks }] = await Promise.all([
                 sq,
@@ -2197,6 +2591,12 @@
             if (delProject) {
                 const { error: e3 } = await supabase.from('project_submissions').delete().in('student_id', targetIds);
                 if (e3) errors.push(`Project submissions: ${e3.message}`);
+                await Promise.all(
+                    targetIds.flatMap((sid) => [
+                        supabase.from('app_settings').delete().like('key', `${PROJECT_WEEKLY_PREFIX}%::${sid}`),
+                        supabase.from('app_settings').delete().eq('key', `${PROJECT_FB_LOG_PREFIX}${sid}`)
+                    ])
+                );
             }
             if (delMaterial) {
                 const { error: e4 } = await supabase.from('student_material_progress').delete().in('student_id', targetIds);
@@ -2218,18 +2618,27 @@
             await Promise.all([refreshMetrics(), loadDailyTaskFeed(), loadProjectTracker()]);
         };
 
-        // ==================== STAFF PROJECT TRACKER (RINGKAS, CEPAT & MATRIX) ====================
+        // ==================== STAFF PROJECT TRACKER (RINGKAS, CEPAT, MATRIX, UPDATE MINGGUAN & ARSIP) ====================
         let expandedProjectIds = new Set();
-        let projectViewMode = 'tasks'; // 'tasks' | 'matrix'
-        let projectDataCache = { allTasks: [], subMap: {}, studentList: [] };
+        let projectViewMode = 'tasks'; // 'tasks' | 'weekly' | 'matrix'
+        let projectDataCache = { allTasks: [], subMap: {}, studentList: [], weeklyUpdates: [], mentorsList: [], fbLogMap: {}, archives: [], homeroomMap: {} };
         let projectReviewState = { status: 'active', className: '', search: '', page: 1 };
-        let projectMatrixState = { className: '', search: '', page: 1 };
+        let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
+        let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
+        let myHomeroomClass = '';
+        let staffScopeMode = 'mentees'; // 'mentees' | 'homeroom'
+
+        global.setStaffScopeMode = function (mode) {
+            staffScopeMode = (mode === 'homeroom' && myHomeroomClass) ? 'homeroom' : 'mentees';
+            loadProjectTracker();
+            loadDailyTaskFeed();
+        };
 
         function renderProjectTrackerBody() {
             const container = document.getElementById('projectTasksContainer');
             if (!container) return;
 
-            const { allTasks, subMap, studentList } = projectDataCache;
+            const { allTasks, subMap, studentList, weeklyUpdates = [], mentorsList = [] } = projectDataCache;
             const stageF = document.getElementById('filterProjectStage')?.value || '';
             const subF = document.getElementById('filterProjectSubconc')?.value || '';
             const filteredTasks = allTasks.filter((t) => {
@@ -2247,12 +2656,35 @@
             }
 
             const classes = [...new Set(studentList.map((s) => s.class_name).filter(Boolean))].sort();
+            const currentWeekKey = getWeekKey();
+            const weeklyByKey = {};
+            weeklyUpdates.forEach((u) => {
+                weeklyByKey[`${u.week_key}__${u.project_task_id}__${u.student_id}`] = u;
+            });
+
+            // Hitung siswa yang belum update minggu ini untuk badge tombol tab
+            let missingWeeklyCount = 0;
+            studentList.forEach((s) => {
+                const activeTasks = allTasks.filter((t) => {
+                    if (t.sub_concentration && s.sub_concentration !== t.sub_concentration) return false;
+                    return (subMap[`${t.id}__${s.id}`]?.status || 'belum_mulai') !== 'selesai';
+                });
+                if (!activeTasks.length) return;
+                const hasAnyThisWeek = activeTasks.some((t) => Boolean(weeklyByKey[`${currentWeekKey}__${t.id}__${s.id}`]));
+                if (!hasAnyThisWeek) missingWeeklyCount++;
+            });
+
             const modeSwitcherHtml = `
                 <div class="flex flex-wrap items-center justify-between gap-2.5 bg-white border border-[#EDF1F7] rounded-2xl shadow-card px-4 py-2.5">
-                    <div class="inline-flex p-1 bg-[#F3F6FB] rounded-xl">
+                    <div class="inline-flex flex-wrap p-1 bg-[#F3F6FB] rounded-xl gap-1">
                         <button type="button" onclick="setProjectViewMode('tasks')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'tasks' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             📋 Daftar Tugas &amp; Review (${filteredTasks.length})
+                        </button>
+                        <button type="button" onclick="setProjectViewMode('weekly')"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'weekly' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            <span>📅 Update Mingguan</span>
+                            ${missingWeeklyCount > 0 ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${projectViewMode === 'weekly' ? 'bg-white/25 text-white' : 'bg-[#FFF0F4] text-[#E11D48]'} num-tabular">${missingWeeklyCount} belum</span>` : ''}
                         </button>
                         <button type="button" onclick="setProjectViewMode('matrix')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'matrix' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
@@ -2260,22 +2692,324 @@
                         </button>
                     </div>
                     <span class="text-[11px] text-slate-400 hidden sm:inline">
-                        ${projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'}
+                        ${projectViewMode === 'weekly'
+                            ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi (khusus pembimbing &amp; admin).'
+                            : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.')}
                     </span>
                 </div>`;
+
+            // ==================== MODE 3: PROJECT UPDATE MINGGUAN (PER MINGGU × TUGAS × SISWA) ====================
+            if (projectViewMode === 'weekly') {
+                const selectedWeek = projectWeeklyState.weekKey || currentWeekKey;
+                const weekInfo = getWeekRangeInfo(selectedWeek);
+                const weekOptions = getRecentWeekKeys(8, weeklyUpdates.map((u) => u.week_key));
+                const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
+                const wStatus = projectWeeklyState.status || 'all';
+                const wCls = projectWeeklyState.className || '';
+                const wTask = projectWeeklyState.taskId || '';
+                const wMentor = projectWeeklyState.mentorId || '';
+                const wSearch = (projectWeeklyState.search || '').trim().toLowerCase();
+
+                const scopedTasksForWeekly = wTask ? filteredTasks.filter((t) => t.id === wTask) : filteredTasks;
+
+                const studentWeeklyRows = studentList
+                    .filter((s) => {
+                        if (wCls && s.class_name !== wCls) return false;
+                        if (subF && s.sub_concentration !== subF) return false;
+                        if (expectedRole === 'superadmin' && wMentor && s.mentor_id !== wMentor) return false;
+                        if (!wSearch) return true;
+                        return (s.full_name || '').toLowerCase().includes(wSearch) ||
+                            (s.username || '').toLowerCase().includes(wSearch) ||
+                            (s.sub_concentration || '').toLowerCase().includes(wSearch) ||
+                            (s.class_name || '').toLowerCase().includes(wSearch);
+                    })
+                    .map((s) => {
+                        const relevantTasks = scopedTasksForWeekly.filter((t) => !t.sub_concentration || s.sub_concentration === t.sub_concentration);
+                        const taskEntries = relevantTasks.map((t) => {
+                            const ps = subMap[`${t.id}__${s.id}`] || {};
+                            const stVal = ps.status || 'belum_mulai';
+                            const upd = weeklyByKey[`${selectedWeek}__${t.id}__${s.id}`] || null;
+                            return { task: t, submission: ps, status: stVal, isAcc: stVal === 'selesai', update: upd };
+                        });
+                        const activeEntries = taskEntries.filter((e) => !e.isAcc);
+                        const updatedCount = taskEntries.filter((e) => Boolean(e.update)).length;
+                        const activeUpdatedCount = activeEntries.filter((e) => Boolean(e.update)).length;
+                        const uncheckedCount = taskEntries.filter((e) => e.update && !e.update.checked_at).length;
+
+                        let overallState = 'belum'; // 'sudah' | 'sebagian' | 'belum' | 'all_acc' | 'no_task'
+                        if (!taskEntries.length) overallState = 'no_task';
+                        else if (!activeEntries.length) overallState = 'all_acc';
+                        else if (activeUpdatedCount === activeEntries.length) overallState = 'sudah';
+                        else if (activeUpdatedCount > 0) overallState = 'sebagian';
+                        else overallState = 'belum';
+
+                        return {
+                            student: s,
+                            mentor: s.mentor_id ? mentorMap[s.mentor_id] : null,
+                            taskEntries,
+                            activeCount: activeEntries.length,
+                            updatedCount,
+                            activeUpdatedCount,
+                            uncheckedCount,
+                            overallState
+                        };
+                    });
+
+                const kpiTotal = studentWeeklyRows.filter((r) => r.overallState !== 'no_task').length;
+                const kpiSudah = studentWeeklyRows.filter((r) => r.overallState === 'sudah' || r.overallState === 'all_acc').length;
+                const kpiSebagian = studentWeeklyRows.filter((r) => r.overallState === 'sebagian').length;
+                const kpiBelum = studentWeeklyRows.filter((r) => r.overallState === 'belum').length;
+                const kpiUnchecked = studentWeeklyRows.reduce((sum, r) => sum + r.uncheckedCount, 0);
+
+                const displayRows = studentWeeklyRows.filter((r) => {
+                    if (r.overallState === 'no_task') return false;
+                    if (wStatus === 'belum') return r.overallState === 'belum' || r.overallState === 'sebagian';
+                    if (wStatus === 'sudah') return r.overallState === 'sudah' || r.overallState === 'all_acc';
+                    if (wStatus === 'unchecked') return r.uncheckedCount > 0;
+                    return true;
+                });
+
+                const perPage = 15;
+                const totalPages = Math.max(1, Math.ceil(displayRows.length / perPage));
+                if (projectWeeklyState.page > totalPages) projectWeeklyState.page = totalPages;
+                const startIdx = (projectWeeklyState.page - 1) * perPage;
+                const pageRows = displayRows.slice(startIdx, startIdx + perPage);
+
+                container.innerHTML = `
+                    ${modeSwitcherHtml}
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                        <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] space-y-4">
+                            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#EAF4FF] text-[#0082E6]">Pantauan Mingguan Pembimbing &amp; Admin</span>
+                                        <span class="text-[11px] font-bold text-slate-500">${esc(weekInfo.label)}</span>
+                                    </div>
+                                    <h3 class="text-base font-extrabold text-[#1E293B] mt-1">📅 Project Update Mingguan Siswa (Lintas Sub-Konsentrasi)</h3>
+                                    <p class="text-xs text-slate-500 mt-0.5">Memudahkan pembimbing memantau apakah tiap siswa bimbingan sudah memberi update progres minggu ini pada masing-masing tugas, walau pembimbing bukan PJ sub-konsentrasi.</p>
+                                </div>
+                                <div class="shrink-0">
+                                    <select onchange="setProjectWeeklyWeek(this.value)"
+                                        class="w-full sm:w-auto px-3.5 py-2.5 bg-white border-2 border-[#0095FF] rounded-xl text-xs font-bold text-[#1E293B] focus:outline-none">
+                                        ${weekOptions.map((wk) => `<option value="${esc(wk)}" ${wk === selectedWeek ? 'selected' : ''}>${esc(getWeekRangeInfo(wk).label)}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- 4 KPI Ringkasan Mingguan -->
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 num-tabular">
+                                <div class="bg-white border border-[#EDF1F7] rounded-xl px-3.5 py-2.5">
+                                    <div class="text-[11px] font-semibold text-slate-400">Siswa Dipantau</div>
+                                    <div class="text-lg font-extrabold text-[#1E293B]">${kpiTotal}</div>
+                                </div>
+                                <div class="bg-[#E7F9EE] border border-[#BBF7D0] rounded-xl px-3.5 py-2.5">
+                                    <div class="text-[11px] font-semibold text-[#15803D]">Sudah Update Lengkap</div>
+                                    <div class="text-lg font-extrabold text-[#15803D]">${kpiSudah}${kpiSebagian ? ` <span class="text-xs font-bold text-[#B88600]">(+${kpiSebagian} sebagian)</span>` : ''}</div>
+                                </div>
+                                <div class="bg-[#FFF0F4] border border-[#FECDD6] rounded-xl px-3.5 py-2.5">
+                                    <div class="text-[11px] font-semibold text-[#E11D48]">Belum Update Minggu Ini</div>
+                                    <div class="text-lg font-extrabold text-[#E11D48]">${kpiBelum}</div>
+                                </div>
+                                <div class="bg-[#FFFDF5] border border-[#FDE68A] rounded-xl px-3.5 py-2.5">
+                                    <div class="text-[11px] font-semibold text-[#B88600]">Update Belum Dicek Guru</div>
+                                    <div class="text-lg font-extrabold text-[#B88600]">${kpiUnchecked}</div>
+                                </div>
+                            </div>
+
+                            <!-- Toolbar Filter -->
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="inline-flex p-1 bg-white border border-[#E2E8F0] rounded-xl gap-1">
+                                    ${[
+                                        { k: 'all', l: `Semua (${kpiTotal})` },
+                                        { k: 'belum', l: `Belum / Sebagian (${kpiBelum + kpiSebagian})` },
+                                        { k: 'sudah', l: `Sudah Update (${kpiSudah})` },
+                                        { k: 'unchecked', l: `Perlu Dicek (${kpiUnchecked})` }
+                                    ].map((t) => `
+                                        <button type="button" onclick="setProjectWeeklyStatus('${t.k}')"
+                                            class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${wStatus === t.k ? 'bg-[#0095FF] text-white' : 'text-slate-600 hover:bg-[#F4F8FF]'}">
+                                            ${t.l}
+                                        </button>`).join('')}
+                                </div>
+                                <select onchange="setProjectWeeklyClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Kelas</option>
+                                    ${classes.map((c) => `<option value="${esc(c)}" ${wCls === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+                                </select>
+                                <select onchange="setProjectWeeklyTask(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 max-w-[220px] focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Tugas Project</option>
+                                    ${filteredTasks.map((t) => `<option value="${esc(t.id)}" ${wTask === t.id ? 'selected' : ''}>${esc(t.title)}</option>`).join('')}
+                                </select>
+                                ${expectedRole === 'superadmin' ? `
+                                <select onchange="setProjectWeeklyMentor(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Pembimbing</option>
+                                    ${mentorsList.map((m) => `<option value="${esc(m.id)}" ${wMentor === m.id ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}
+                                </select>` : ''}
+                                <input id="projWeeklySearchInp" type="text" value="${esc(projectWeeklyState.search)}" oninput="setProjectWeeklySearch(this.value)"
+                                    placeholder="Cari nama siswa / sub-konsentrasi..."
+                                    class="flex-1 min-w-[180px] px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                        </div>
+
+                        <!-- Daftar Siswa & Detail Update Mingguan Tiap Tugas -->
+                        <div class="divide-y divide-[#EDF1F7]">
+                            ${pageRows.length ? pageRows.map((row) => {
+                                const s = row.student;
+                                const stateBadge = row.overallState === 'all_acc'
+                                    ? `<span class="px-2.5 py-1 rounded-full bg-[#E3F6F3] text-[#1D5E55] text-[11px] font-extrabold">✓ Semua Tugas ACC</span>`
+                                    : row.overallState === 'sudah'
+                                        ? `<span class="px-2.5 py-1 rounded-full bg-[#E7F9EE] text-[#15803D] text-[11px] font-extrabold">✓ Sudah Update (${row.activeUpdatedCount}/${row.activeCount})</span>`
+                                        : row.overallState === 'sebagian'
+                                            ? `<span class="px-2.5 py-1 rounded-full bg-[#FFF6D6] text-[#B88600] text-[11px] font-extrabold">⚠️ Update Sebagian (${row.activeUpdatedCount}/${row.activeCount})</span>`
+                                            : `<span class="px-2.5 py-1 rounded-full bg-[#FFF0F4] text-[#E11D48] text-[11px] font-extrabold">✕ Belum Update Minggu Ini</span>`;
+
+                                const missingTaskTitles = row.taskEntries.filter((e) => !e.isAcc && !e.update).map((e) => e.task.title);
+                                const waReminderText = missingTaskTitles.length
+                                    ? `Halo ${s.full_name}, tolong segera isi Project Update Mingguan (${weekInfo.label}) di AniTrack untuk tugas: ${missingTaskTitles.join(', ')}. Terima kasih.`
+                                    : `Halo ${s.full_name}, terima kasih sudah mengisi Project Update Mingguan di AniTrack.`;
+
+                                return `
+                                    <div class="p-4 sm:p-5 space-y-3 hover:bg-[#FAFBFD]/70 transition">
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                            <div class="flex items-center gap-3 min-w-0">
+                                                <div class="w-10 h-10 rounded-full bg-[#EAF4FF] text-[#0095FF] font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                                                    ${renderAvatarMarkup(s.avatar_url, s.full_name)}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="flex flex-wrap items-center gap-1.5">
+                                                        <span class="font-extrabold text-sm text-[#1E293B] truncate">${esc(s.full_name)}</span>
+                                                        <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600">${esc(s.class_name || '-')}</span>
+                                                        <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">${esc(s.sub_concentration || 'Umum')}</span>
+                                                        ${(() => {
+                                                            const st = computeStudentIssueStats(s, allTasks, subMap);
+                                                            const logsCnt = (projectDataCache.fbLogMap?.[s.id] || []).length;
+                                                            return `${st.goldCount > 0 ? `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🌟 ${st.goldCount} Emas</span>` : ''}${st.totalIssues > 0 ? `<span title="${esc(st.detailText)}" class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ ${st.totalIssues} Masalah</span>` : ''}${logsCnt > 0 ? `<button type="button" onclick="openStudentFeedbackHistory('${s.id}')" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-slate-600 hover:text-[#0082E6] cursor-pointer">📜 Catatan (${logsCnt})</button>` : ''}`;
+                                                        })()}
+                                                    </div>
+                                                    <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
+                                                        <span class="font-mono">@${esc(s.username)}</span>
+                                                        ${row.mentor ? `<span>• Pembimbing: <strong class="text-slate-600">${esc(row.mentor.full_name)}</strong></span>` : ''}
+                                                        ${renderWhatsappLink(s.whatsapp_number, false, waReminderText)}
+                                                        ${s.project_drive_url ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition">📁 Drive ↗</a>` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="self-start sm:self-center shrink-0">${stateBadge}</div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 pl-0 sm:pl-13">
+                                            ${row.taskEntries.map((entry) => {
+                                                const t = entry.task;
+                                                const u = entry.update;
+                                                const stObj = STATUS_OPTIONS.find((o) => o.value === entry.status) || STATUS_OPTIONS[0];
+                                                if (entry.isAcc && !u) {
+                                                    return `
+                                                        <div class="rounded-xl border border-[#BBE9E2] bg-[#F2FBF9] p-3 flex items-center justify-between gap-2 text-xs">
+                                                            <div class="min-w-0">
+                                                                <div class="font-bold text-[#1D5E55] truncate">${esc(t.title)}</div>
+                                                                <div class="text-[10.5px] text-[#2F8F81]">${esc(t.pipeline_stage)} • Sudah Selesai (ACC)</div>
+                                                            </div>
+                                                            <span class="px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#1D5E55] text-[10.5px] font-bold shrink-0">✓ ACC</span>
+                                                        </div>`;
+                                                }
+                                                if (!u) {
+                                                    return `
+                                                        <div class="rounded-xl border border-[#FECDD6] bg-[#FFF8FA] p-3 flex items-center justify-between gap-2 text-xs">
+                                                            <div class="min-w-0">
+                                                                <div class="font-bold text-[#1E293B] truncate">${esc(t.title)}</div>
+                                                                <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10.5px] text-slate-500">
+                                                                    <span>${esc(t.pipeline_stage)}</span>
+                                                                    <span>•</span>
+                                                                    <span class="px-1.5 py-0.5 rounded border ${stObj.badge} font-semibold">${esc(stObj.label)}</span>
+                                                                    ${t.due_date ? `<span>• DL ${esc(formatDateOnly(t.due_date))}</span>` : ''}
+                                                                </div>
+                                                                <div class="text-[11px] font-bold text-[#E11D48] mt-1">✕ Belum mengisi update minggu ini</div>
+                                                            </div>
+                                                            <button type="button" onclick="jumpToStudentProjectReview('${t.id}', '${esc(s.username || s.full_name)}')"
+                                                                class="shrink-0 px-2.5 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-[#0082E6] text-[10.5px] font-bold cursor-pointer">
+                                                                Detail
+                                                            </button>
+                                                        </div>`;
+                                                }
+                                                const checkKey = encodeURIComponent(u.key);
+                                                return `
+                                                    <div data-weekly-key="${esc(u.key)}" class="rounded-xl border ${u.checked_at ? 'border-[#BBE9E2] bg-white' : 'border-[#CBE5FF] bg-[#F8FBFF]'} p-3.5 space-y-2.5 text-xs">
+                                                        <div class="flex items-start justify-between gap-2">
+                                                            <div class="min-w-0">
+                                                                <div class="font-extrabold text-[#1E293B] truncate">${esc(t.title)}</div>
+                                                                <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10.5px] text-slate-400">
+                                                                    <span>${esc(t.pipeline_stage)}</span>
+                                                                    <span>•</span>
+                                                                    <span class="px-1.5 py-0.5 rounded border ${stObj.badge} font-semibold">${esc(stObj.label)}</span>
+                                                                    <span>• Update ${esc(formatDateTime(u.updated_at))}</span>
+                                                                </div>
+                                                            </div>
+                                                            <span class="px-2 py-0.5 rounded-lg bg-[#EAF4FF] text-[#0082E6] font-mono font-extrabold text-[11px] shrink-0">${u.progress_percent}%</span>
+                                                        </div>
+                                                        <div class="w-full h-1.5 rounded-full bg-[#E2E8F0] overflow-hidden">
+                                                            <div class="h-full bg-[#0095FF] rounded-full" style="width:${u.progress_percent}%"></div>
+                                                        </div>
+                                                        <div class="flex items-start gap-2.5">
+                                                            ${u.proof_image ? `
+                                                                <img src="${esc(u.proof_image)}" alt="Bukti Mingguan" onclick="openProofLightbox(this.src, 'Update ${esc(weekInfo.weekKey)} — ${esc(t.title)} (${esc(s.full_name)})')"
+                                                                    class="w-14 h-11 rounded-lg object-cover border border-[#CBD5E1] cursor-pointer hover:opacity-85 shrink-0" title="Klik perbesar bukti progres mingguan" />` : ''}
+                                                            <div class="min-w-0 space-y-1 flex-1">
+                                                                <div class="text-slate-700 leading-relaxed"><strong>Progres:</strong> ${esc(u.summary || '-')}</div>
+                                                                ${u.blockers ? `<div class="text-[#BE123C] bg-[#FFF0F4] border border-[#FECDD6] rounded-lg px-2 py-1 text-[11px]"><strong>Kendala:</strong> ${esc(u.blockers)}</div>` : ''}
+                                                            </div>
+                                                        </div>
+                                                        <div class="pt-2 border-t border-[#EDF1F7] flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
+                                                            <input type="text" value="${esc(u.mentor_note || '')}" placeholder="Tulis catatan pembimbing / tindak lanjut..."
+                                                                class="weekly-mentor-note flex-1 px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-[11px] focus:outline-none focus:border-[#0095FF]" />
+                                                            <button type="button" onclick="saveWeeklyUpdateCheck('${checkKey}', this)"
+                                                                class="px-3 py-1.5 rounded-lg ${u.checked_at ? 'bg-[#E3F6F3] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white' : 'bg-[#16A34A] hover:bg-[#15803D] text-white'} text-[11px] font-bold transition cursor-pointer shrink-0">
+                                                                ${u.checked_at ? '✓ Sudah Dicek (Simpan)' : '✓ Tandai Dicek'}
+                                                            </button>
+                                                        </div>
+                                                        ${u.checked_at ? `<div class="text-[10px] text-[#2F8F81] font-semibold">Dicek oleh ${esc(u.checked_by_name || 'Pembimbing')} • ${esc(formatDateTime(u.checked_at))}</div>` : ''}
+                                                    </div>`;
+                                            }).join('')}
+                                        </div>
+                                    </div>`;
+                            }).join('') : `<div class="p-10 text-center text-xs text-slate-400">Tidak ada data siswa untuk filter minggu ini.</div>`}
+                        </div>
+
+                        ${displayRows.length > perPage ? `
+                        <div class="px-4 py-3 bg-[#FAFBFD] border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-xs">
+                            <span class="text-slate-500 num-tabular">Menampilkan ${startIdx + 1}–${Math.min(startIdx + perPage, displayRows.length)} dari ${displayRows.length} siswa</span>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" onclick="setProjectWeeklyPage(${projectWeeklyState.page - 1})" ${projectWeeklyState.page <= 1 ? 'disabled' : ''}
+                                    class="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] disabled:opacity-40 font-semibold cursor-pointer">← Prev</button>
+                                <span class="px-2 font-bold text-[#1E293B] num-tabular">${projectWeeklyState.page} / ${totalPages}</span>
+                                <button type="button" onclick="setProjectWeeklyPage(${projectWeeklyState.page + 1})" ${projectWeeklyState.page >= totalPages ? 'disabled' : ''}
+                                    class="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] disabled:opacity-40 font-semibold cursor-pointer">Next →</button>
+                            </div>
+                        </div>` : ''}
+                    </div>`;
+                return;
+            }
 
             // ==================== MODE 2: MATRIX SISWA × TUGAS ====================
             if (projectViewMode === 'matrix') {
                 const mCls = projectMatrixState.className;
                 const mSearch = (projectMatrixState.search || '').trim().toLowerCase();
+                const mOnlyIssues = Boolean(projectMatrixState.onlyIssues);
+                const fbLogMap = projectDataCache.fbLogMap || {};
+                const studentStatsMap = {};
+                studentList.forEach((s) => {
+                    studentStatsMap[s.id] = computeStudentIssueStats(s, allTasks, subMap);
+                });
+
                 const filteredStudents = studentList.filter((s) => {
                     if (mCls && s.class_name !== mCls) return false;
                     if (subF && s.sub_concentration !== subF) return false;
+                    if (mOnlyIssues && (studentStatsMap[s.id]?.totalIssues || 0) === 0) return false;
                     if (!mSearch) return true;
                     return (s.full_name || '').toLowerCase().includes(mSearch) ||
                         (s.username || '').toLowerCase().includes(mSearch) ||
                         (s.sub_concentration || '').toLowerCase().includes(mSearch);
                 });
+                if (mOnlyIssues) {
+                    filteredStudents.sort((a, b) => (studentStatsMap[b.id]?.totalIssues || 0) - (studentStatsMap[a.id]?.totalIssues || 0));
+                }
 
                 const perPage = 20;
                 const totalPages = Math.max(1, Math.ceil(filteredStudents.length / perPage));
@@ -2284,7 +3018,9 @@
                 const pageStudents = filteredStudents.slice(startIdx, startIdx + perPage);
 
                 const statusPillMap = {
-                    selesai: { icon: '✓', cls: 'bg-[#E3F6F3] text-[#228B7D] border-[#BBE9E2]', title: 'Selesai (ACC)' },
+                    gold: { icon: '🌟', cls: 'bg-[#FFF6D6] text-[#9A6F00] border-[#F7C200]', title: 'Tuntas (Lencana Emas — Lebih Cepat dari Deadline)' },
+                    selesai: { icon: '✓', cls: 'bg-[#E3F6F3] text-[#228B7D] border-[#BBE9E2]', title: 'Tuntas Tepat Waktu (ACC)' },
+                    selesai_late: { icon: '⏱', cls: 'bg-[#FFF1EB] text-[#C2410C] border-[#FDBA74]', title: 'Tuntas (Terlambat)' },
                     menunggu_review: { icon: '●', cls: 'bg-[#FFF6D6] text-[#B88600] border-[#FDE68A]', title: 'Menunggu Review' },
                     revisi: { icon: '!', cls: 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]', title: 'Revisi' },
                     sedang_dikerjakan: { icon: '⋯', cls: 'bg-[#EAF4FF] text-[#0082E6] border-[#CBE5FF]', title: 'Sedang Dikerjakan' },
@@ -2303,13 +3039,18 @@
                                 <input type="text" value="${esc(projectMatrixState.search)}" oninput="setProjectMatrixSearch(this.value)"
                                     placeholder="Cari nama / username siswa..."
                                     class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs w-52 focus:outline-none focus:border-[#0095FF]" />
+                                <button type="button" onclick="toggleProjectMatrixOnlyIssues()"
+                                    class="px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${mOnlyIssues ? 'bg-[#F13B6E] text-white border-[#F13B6E]' : 'bg-white text-[#E11D48] border-[#FECDD6] hover:bg-[#FFF0F4]'}">
+                                    ⚠️ ${mOnlyIssues ? 'Tampilkan Semua' : 'Bermasalah Saja'}
+                                </button>
                             </div>
-                            <div class="flex flex-wrap items-center gap-2 text-[10.5px] font-bold">
-                                <span class="px-2 py-0.5 rounded bg-[#E3F6F3] text-[#228B7D]">✓ ACC</span>
+                            <div class="flex flex-wrap items-center gap-1.5 text-[10.5px] font-bold">
+                                <span class="px-2 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00]">🌟 Emas</span>
+                                <span class="px-2 py-0.5 rounded bg-[#E3F6F3] text-[#228B7D]">✓ Tuntas</span>
+                                <span class="px-2 py-0.5 rounded bg-[#FFF1EB] text-[#C2410C]">⏱ Telat</span>
                                 <span class="px-2 py-0.5 rounded bg-[#FFF6D6] text-[#B88600]">● Review</span>
                                 <span class="px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">! Revisi</span>
                                 <span class="px-2 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6]">⋯ Proses</span>
-                                <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-400">– Belum</span>
                             </div>
                         </div>
 
@@ -2317,19 +3058,24 @@
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr class="border-b border-[#EDF1F7] bg-[#F7FAFF] text-[10.5px] font-bold text-slate-500">
-                                        <th class="py-3 px-4 sticky left-0 bg-[#F7FAFF] z-10 min-w-[210px] border-r border-[#EDF1F7]">Siswa</th>
-                                        <th class="py-3 px-3 text-center w-20">Tuntas</th>
+                                        <th class="py-3 px-4 sticky left-0 bg-[#F7FAFF] z-10 min-w-[220px] border-r border-[#EDF1F7]">Siswa</th>
+                                        <th class="py-3 px-2.5 text-center w-16">Tuntas</th>
+                                        <th class="py-3 px-2 text-center w-14" title="Jumlah Lencana Emas (kumpul sebelum tenggat)">🌟</th>
+                                        <th class="py-3 px-2 text-center w-16" title="Total Masalah (terlambat + revisi)">Masalah</th>
                                         ${filteredTasks.map((t, idx) => `
                                             <th class="py-2.5 px-2.5 text-center min-w-[110px] max-w-[140px]" title="${esc(t.title)} (${esc(t.pipeline_stage)})">
                                                 <div class="truncate text-[#1E293B]">${idx + 1}. ${esc(t.title)}</div>
                                                 <div class="text-[9.5px] font-mono text-slate-400 mt-0.5">${t.due_date ? formatDateOnly(t.due_date) : t.pipeline_stage}</div>
                                             </th>`).join('')}
+                                        <th class="py-3 px-3 text-center min-w-[100px]">Catatan Guru</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-[#F1F5F9]">
                                     ${pageStudents.length ? pageStudents.map((s) => {
                                         let eligibleCount = 0;
                                         let doneCount = 0;
+                                        const stInfo = studentStatsMap[s.id] || { totalIssues: 0, goldCount: 0, detailText: '' };
+                                        const logsCnt = (fbLogMap[s.id] || []).length;
                                         const cells = filteredTasks.map((t) => {
                                             const isEligible = !t.sub_concentration || s.sub_concentration === t.sub_concentration;
                                             if (!isEligible) return `<td class="py-2 px-2 text-center text-slate-200">·</td>`;
@@ -2337,11 +3083,16 @@
                                             const ps = subMap[`${t.id}__${s.id}`];
                                             const stVal = ps?.status || 'belum_mulai';
                                             if (stVal === 'selesai') doneCount++;
-                                            const pill = statusPillMap[stVal] || statusPillMap.belum_mulai;
+                                            const tm = evaluateSubmissionTimeliness(t.due_date, ps?.updated_at, stVal);
+                                            const pillKey = stVal === 'selesai'
+                                                ? (tm.tier === 'gold' ? 'gold' : (tm.tier === 'late' ? 'selesai_late' : 'selesai'))
+                                                : stVal;
+                                            const pill = statusPillMap[pillKey] || statusPillMap.belum_mulai;
+                                            const tip = `${s.full_name} — ${t.title}: ${stVal === 'selesai' ? tm.label : pill.title}${ps?.updated_at ? ` (${formatDateTime(ps.updated_at)})` : ''}`;
                                             return `
                                                 <td class="py-2 px-2 text-center">
                                                     <button type="button" onclick="jumpToStudentProjectReview('${t.id}', '${esc(s.username || s.full_name)}')"
-                                                        title="${esc(s.full_name)} — ${esc(t.title)}: ${pill.title}"
+                                                        title="${esc(tip)}"
                                                         class="w-7 h-7 rounded-lg border ${pill.cls} font-extrabold text-xs inline-flex items-center justify-center hover:scale-110 transition cursor-pointer">
                                                         ${pill.icon}
                                                     </button>
@@ -2350,17 +3101,28 @@
                                         return `
                                             <tr class="hover:bg-[#F8FBFF]">
                                                 <td class="py-2.5 px-4 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                                    <div class="font-bold text-[#1E293B] truncate max-w-[190px]">${esc(s.full_name)}</div>
+                                                    <div class="font-bold text-[#1E293B] truncate max-w-[200px]">${esc(s.full_name)}</div>
                                                     <div class="text-[10.5px] text-slate-400 truncate">${esc(s.class_name || '-')} • ${esc(s.sub_concentration || 'Umum')}</div>
                                                     <div class="flex flex-wrap items-center gap-1 mt-1">
                                                         ${renderWhatsappLink(s.whatsapp_number, true)}
                                                         ${s.project_drive_url ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive Project Siswa" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition">📁 Drive ↗</a>` : `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">Drive -</span>`}
                                                     </div>
                                                 </td>
-                                                <td class="py-2.5 px-3 text-center font-mono font-bold text-[#0082E6] num-tabular">${doneCount}/${eligibleCount}</td>
+                                                <td class="py-2.5 px-2.5 text-center font-mono font-bold text-[#0082E6] num-tabular">${doneCount}/${eligibleCount}</td>
+                                                <td class="py-2.5 px-2 text-center font-mono font-extrabold num-tabular ${stInfo.goldCount > 0 ? 'text-[#B88600]' : 'text-slate-300'}">${stInfo.goldCount}</td>
+                                                <td class="py-2.5 px-2 text-center num-tabular" title="${esc(stInfo.detailText)}">
+                                                    ${stInfo.totalIssues > 0
+                                                        ? `<span class="inline-block px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48] font-mono font-extrabold">${stInfo.totalIssues}</span>`
+                                                        : `<span class="text-slate-300 font-mono">0</span>`}
+                                                </td>
                                                 ${cells}
+                                                <td class="py-2.5 px-3 text-center">
+                                                    ${logsCnt > 0
+                                                        ? `<button type="button" onclick="openStudentFeedbackHistory('${s.id}')" class="px-2.5 py-1 rounded-lg bg-[#F7FAFF] hover:bg-[#EAF4FF] border border-[#DCEBFF] text-[#0082E6] text-[10.5px] font-bold cursor-pointer">📜 ${logsCnt} Log</button>`
+                                                        : `<span class="text-slate-300">-</span>`}
+                                                </td>
                                             </tr>`;
-                                    }).join('') : `<tr><td colspan="${filteredTasks.length + 2}" class="p-8 text-center text-slate-400">Tidak ada siswa ditemukan.</td></tr>`}
+                                    }).join('') : `<tr><td colspan="${filteredTasks.length + 5}" class="p-8 text-center text-slate-400">Tidak ada siswa ditemukan.</td></tr>`}
                                 </tbody>
                             </table>
                         </div>
@@ -2387,6 +3149,7 @@
                 const revCount = eligible.filter((s) => subMap[`${t.id}__${s.id}`]?.status === 'revisi').length;
                 const activeCount = eligible.filter((s) => (subMap[`${t.id}__${s.id}`]?.status || 'belum_mulai') !== 'belum_mulai').length;
                 const belumCount = eligible.length - activeCount;
+                const weeklyThisTaskCount = eligible.filter((s) => Boolean(weeklyByKey[`${currentWeekKey}__${t.id}__${s.id}`])).length;
                 const pct = eligible.length ? Math.round((accCount / eligible.length) * 100) : 0;
                 const allAcc = eligible.length > 0 && accCount === eligible.length;
                 const dl = getDeadlineMeta(t.due_date, allAcc);
@@ -2508,7 +3271,17 @@
                                                             <select class="proj-status w-full px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-[11px] font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
                                                                 ${STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.value === 'selesai' ? 'Selesai (ACC)' : o.label}</option>`).join('')}
                                                             </select>
-                                                            ${revNum > 0 ? `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">Revisi ke-${revNum}</span>` : ''}
+                                                            <div class="flex flex-wrap items-center gap-1">
+                                                                ${(() => {
+                                                                    const tm = evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
+                                                                    if (stVal === 'selesai' && (tm.tier === 'gold' || tm.tier === 'late')) {
+                                                                        return `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded border ${tm.badgeClass}">${esc(tm.shortLabel)}</span>`;
+                                                                    }
+                                                                    return '';
+                                                                })()}
+                                                                ${revNum > 0 ? `<span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">Revisi ke-${revNum}</span>` : ''}
+                                                                ${(projectDataCache.fbLogMap?.[s.id] || []).length > 0 ? `<button type="button" onclick="openStudentFeedbackHistory('${s.id}')" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F7FAFF] border border-[#DCEBFF] text-[#0082E6] hover:bg-[#EAF4FF] cursor-pointer">📜 Log (${(projectDataCache.fbLogMap[s.id] || []).length})</button>` : ''}
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td class="py-2.5 px-3">
@@ -2575,6 +3348,11 @@
                                             <div class="h-full bg-[#4CB6A7] rounded-full" style="width:${pct}%"></div>
                                         </div>
                                         <span class="text-[#228B7D]">${accCount}/${eligible.length} ACC (${pct}%)</span>
+                                        <button type="button" onclick="setProjectWeeklyTask('${t.id}'); setProjectViewMode('weekly');"
+                                            class="px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition cursor-pointer"
+                                            title="Lihat rekap Update Mingguan khusus tugas ini">
+                                            📅 Update Minggu Ini: ${weeklyThisTaskCount}/${eligible.length}
+                                        </button>
                                         ${waitCount > 0 ? `<span class="px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#B88600]">🔔 ${waitCount} Review</span>` : ''}
                                         ${revCount > 0 ? `<span class="px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ ${revCount} Revisi</span>` : ''}
                                         <span class="text-slate-400 font-medium">${belumCount} belum</span>
@@ -2607,18 +3385,29 @@
             const container = document.getElementById('projectTasksContainer');
             if (!container) return;
 
+            const homeroomMap = await loadHomeroomMap();
+            myHomeroomClass = (expectedRole === 'mentor' && homeroomMap[currentUser.id]) ? String(homeroomMap[currentUser.id]) : '';
+            if (!myHomeroomClass) staffScopeMode = 'mentees';
+
             let sq = supabase
                 .from('profiles')
                 .select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url')
                 .eq('role', 'student')
                 .order('class_name')
                 .order('full_name');
-            if (expectedRole === 'mentor') sq = sq.eq('mentor_id', currentUser.id);
+            if (expectedRole === 'mentor') {
+                if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
+                else sq = sq.eq('mentor_id', currentUser.id);
+            }
 
-            const [{ data: projTasks }, { data: projSubs }, { data: students }] = await Promise.all([
+            const [{ data: projTasks }, { data: projSubs }, { data: students }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }] = await Promise.all([
                 supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
                 supabase.from('project_submissions').select('*'),
-                sq
+                sq,
+                supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_WEEKLY_PREFIX}%`),
+                supabase.from('profiles').select('id, full_name, username, whatsapp_number').eq('role', 'mentor').order('full_name'),
+                supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`),
+                supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_ARCHIVE_PREFIX}%`)
             ]);
 
             const studentList = students || [];
@@ -2629,15 +3418,32 @@
                 if (!studentIds.has(ps.student_id)) return;
                 subMap[`${ps.project_task_id}__${ps.student_id}`] = ps;
             });
+            const weeklyUpdates = parseWeeklyUpdateRows(weeklyRaw || []).filter((u) => studentIds.has(u.student_id));
+            const fbLogMap = parseFeedbackLogMap(fbLogRaw || []);
+            const archives = (archivesRaw || []).map((r) => {
+                try {
+                    const parsed = JSON.parse(r.value || '{}');
+                    return { key: r.key, updated_at: r.updated_at, ...parsed };
+                } catch {
+                    return null;
+                }
+            }).filter(Boolean).sort((a, b) => String(b.created_at || b.updated_at || '').localeCompare(String(a.created_at || a.updated_at || '')));
 
-            projectDataCache = { allTasks, subMap, studentList };
+            projectDataCache = { allTasks, subMap, studentList, weeklyUpdates, mentorsList: mentors || [], fbLogMap, archives, homeroomMap };
 
-            // Overall Project Progress Summary
+            // Overall Project Progress Summary + Lencana Emas & Total Masalah
             let totalAssignments = 0;
             let doneAssignments = 0;
+            let goldAssignments = 0;
             let reviewAssignments = 0;
             let revisionAssignments = 0;
             let overdueTasksCount = 0;
+            let problemStudentsCount = 0;
+
+            studentList.forEach((s) => {
+                const st = computeStudentIssueStats(s, allTasks, subMap);
+                if (st.totalIssues > 0) problemStudentsCount++;
+            });
 
             const stageStats = ['Pre-Production', 'Production', 'Post-Production'].map((st) => {
                 let sTotal = 0;
@@ -2650,8 +3456,11 @@
                         totalAssignments++;
                         const ps = subMap[`${t.id}__${s.id}`];
                         const status = ps?.status || 'belum_mulai';
-                        if (status === 'selesai') { sDone++; doneAssignments++; }
-                        else {
+                        if (status === 'selesai') {
+                            sDone++;
+                            doneAssignments++;
+                            if (evaluateSubmissionTimeliness(t.due_date, ps?.updated_at, status).tier === 'gold') goldAssignments++;
+                        } else {
                             anyIncomplete = true;
                             if (status === 'menunggu_review') reviewAssignments++;
                             if (status === 'revisi') revisionAssignments++;
@@ -2667,30 +3476,65 @@
             const overallPct = totalAssignments ? Math.round((doneAssignments / totalAssignments) * 100) : 0;
             const summaryEl = document.getElementById('staffProjectSummary');
             if (summaryEl) {
+                const homeroomSwitcherHtml = (expectedRole === 'mentor' && myHomeroomClass) ? `
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                        <span class="text-[11px] font-bold text-white/90">Cakupan Tampilan:</span>
+                        <div class="inline-flex p-0.5 rounded-xl bg-white/15 border border-white/25 gap-1">
+                            <button type="button" onclick="setStaffScopeMode('mentees')"
+                                class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'mentees' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
+                                👥 Siswa Bimbingan Saya
+                            </button>
+                            <button type="button" onclick="setStaffScopeMode('homeroom')"
+                                class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'homeroom' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
+                                🏫 Wali Kelas ${esc(myHomeroomClass)}
+                            </button>
+                        </div>
+                    </div>` : '';
+
                 summaryEl.innerHTML = `
                     <div class="rounded-2xl bg-gradient-to-r from-[#45B1A2] via-[#4FB8AA] to-[#58C2B4] text-white p-5 sm:p-6 shadow-card space-y-4">
                         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                            <div class="space-y-1">
-                                <span class="inline-block text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20">Project Tracker Keseluruhan</span>
+                            <div class="space-y-1.5">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span class="inline-block text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20">Project Tracker Keseluruhan</span>
+                                    ${myHomeroomClass ? `<span class="inline-block text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${esc(myHomeroomClass)}</span>` : ''}
+                                </div>
                                 <h3 class="text-lg sm:text-xl font-extrabold">Progres Total Project Animasi</h3>
-                                <p class="text-xs text-white/90">Pantau deadline tugas, review bukti upload siswa, berikan catatan revisi, hingga ACC selesai.</p>
+                                <p class="text-xs text-white/90">Pantau deadline, Lencana Emas, update mingguan, audit log catatan guru, hingga arsip snapshot.</p>
+                                ${homeroomSwitcherHtml}
                             </div>
-                            <div class="w-full lg:w-72 bg-white/15 border border-white/20 rounded-2xl p-4 space-y-2 shrink-0 num-tabular">
-                                <div class="flex items-center justify-between text-xs font-bold">
-                                    <span>Ketuntasan Project (ACC)</span>
-                                    <span class="text-lg font-extrabold text-[#FFF6D6]">${overallPct}%</span>
+                            <div class="w-full lg:w-80 space-y-2.5 shrink-0">
+                                <div class="bg-white/15 border border-white/20 rounded-2xl p-4 space-y-2 num-tabular">
+                                    <div class="flex items-center justify-between text-xs font-bold">
+                                        <span>Ketuntasan Project (ACC)</span>
+                                        <span class="text-lg font-extrabold text-[#FFF6D6]">${overallPct}%</span>
+                                    </div>
+                                    <div class="w-full h-2.5 rounded-full bg-white/25 overflow-hidden">
+                                        <div class="h-full bg-[#F7C200] rounded-full transition-all duration-500" style="width:${overallPct}%"></div>
+                                    </div>
+                                    <div class="text-[11px] text-white/90">${doneAssignments} / ${totalAssignments} penugasan ACC • 🌟 ${goldAssignments} Lencana Emas</div>
                                 </div>
-                                <div class="w-full h-2.5 rounded-full bg-white/25 overflow-hidden">
-                                    <div class="h-full bg-[#F7C200] rounded-full transition-all duration-500" style="width:${overallPct}%"></div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" onclick="saveProjectArchiveSnapshot(this)"
+                                        class="flex-1 px-3 py-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
+                                        📦 Simpan Arsip Snapshot
+                                    </button>
+                                    <button type="button" onclick="openProjectArchivesModal()"
+                                        class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/25 transition cursor-pointer shrink-0">
+                                        🗂️ Arsip (${archives.length})
+                                    </button>
                                 </div>
-                                <div class="text-[11px] text-white/90">${doneAssignments} / ${totalAssignments} penugasan siswa selesai (ACC)</div>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 num-tabular">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 num-tabular">
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Total Tugas Project</div>
+                                <div class="text-[11px] text-white/85">Total Tugas</div>
                                 <div class="text-lg font-extrabold">${allTasks.length}</div>
+                            </div>
+                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                                <div class="text-[11px] text-white/85">🌟 Lencana Emas</div>
+                                <div class="text-lg font-extrabold text-[#FFF6D6]">${goldAssignments}</div>
                             </div>
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                                 <div class="text-[11px] text-white/85">Menunggu Review</div>
@@ -2703,6 +3547,10 @@
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                                 <div class="text-[11px] text-white/85">Lewat Deadline</div>
                                 <div class="text-lg font-extrabold text-[#FFE4EC]">${overdueTasksCount}</div>
+                            </div>
+                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                                <div class="text-[11px] text-white/85">⚠️ Siswa Bermasalah</div>
+                                <div class="text-lg font-extrabold text-[#FFE4EC]">${problemStudentsCount}</div>
                             </div>
                         </div>
 
@@ -2772,6 +3620,246 @@
             renderProjectTrackerBody();
         };
 
+        global.toggleProjectMatrixOnlyIssues = function () {
+            projectMatrixState.onlyIssues = !projectMatrixState.onlyIssues;
+            projectMatrixState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.openStudentFeedbackHistory = function (studentId) {
+            const stu = (projectDataCache.studentList || []).find((s) => s.id === studentId);
+            const logs = (projectDataCache.fbLogMap || {})[studentId] || [];
+            openFeedbackHistoryModal(stu ? `${stu.full_name} (${stu.class_name || '-'})` : 'Siswa', logs);
+        };
+
+        global.saveProjectArchiveSnapshot = async function (btn) {
+            const { allTasks, subMap, studentList, fbLogMap } = projectDataCache;
+            if (!studentList.length) { showToast('Belum ada data siswa untuk diarsipkan.'); return; }
+            const todayYmd = getJakartaYmd(new Date());
+            const stampLabel = formatDateTime(new Date().toISOString());
+            if (!confirm(`Simpan Arsip Snapshot Project Tracker saat ini (${stampLabel})?\n\nKondisi seluruh siswa (${studentList.length} siswa × ${allTasks.length} tugas) akan disimpan permanen dan dapat dibuka / diunduh ke Excel kapan saja.`)) return;
+
+            if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan arsip...'; }
+            const rows = studentList.map((s) => {
+                const st = computeStudentIssueStats(s, allTasks, subMap);
+                const statuses = {};
+                allTasks.forEach((t) => {
+                    if (t.sub_concentration && s.sub_concentration !== t.sub_concentration) return;
+                    const ps = subMap[`${t.id}__${s.id}`];
+                    const stVal = ps?.status || 'belum_mulai';
+                    const tm = evaluateSubmissionTimeliness(t.due_date, ps?.updated_at, stVal);
+                    statuses[t.id] = stVal === 'selesai' ? tm.label : (STATUS_OPTIONS.find((o) => o.value === stVal)?.label || stVal);
+                });
+                return {
+                    id: s.id,
+                    name: s.full_name,
+                    class_name: s.class_name || '-',
+                    sub_concentration: s.sub_concentration || 'Umum',
+                    acc: st.accCount,
+                    eligible: st.eligibleCount,
+                    gold: st.goldCount,
+                    issues: st.totalIssues,
+                    logsCount: (fbLogMap[s.id] || []).length,
+                    statuses
+                };
+            });
+
+            const archiveObj = {
+                title: `Arsip_${todayYmd.split('-').reverse().join('-')}`,
+                created_at: new Date().toISOString(),
+                created_by: currentUser.full_name || currentUser.username || 'Staff',
+                scope: staffScopeMode === 'homeroom' && myHomeroomClass ? `Wali Kelas ${myHomeroomClass}` : (expectedRole === 'superadmin' ? 'Semua Siswa' : 'Siswa Bimbingan'),
+                totalStudents: rows.length,
+                totalTasks: allTasks.length,
+                totalGold: rows.reduce((a, r) => a + r.gold, 0),
+                totalProblemStudents: rows.filter((r) => r.issues > 0).length,
+                tasks: allTasks.map((t) => ({ id: t.id, title: t.title, due_date: t.due_date || '' })),
+                rows
+            };
+            const archiveKey = `${PROJECT_ARCHIVE_PREFIX}${todayYmd}_${Date.now().toString().slice(-4)}`;
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({ key: archiveKey, value: JSON.stringify(archiveObj), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+            if (btn) { btn.disabled = false; btn.textContent = '📦 Simpan Arsip Snapshot'; }
+            if (error) { showToast(`Gagal menyimpan arsip: ${error.message}`); return; }
+            showToast(`Arsip "${archiveObj.title}" berhasil disimpan ✓`);
+            loadProjectTracker();
+        };
+
+        global.exportArchiveSnapshotXlsx = function (encodedKey) {
+            const key = decodeURIComponent(encodedKey || '');
+            const arc = (projectDataCache.archives || []).find((a) => a.key === key);
+            if (!arc) { showToast('Arsip tidak ditemukan.'); return; }
+            if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
+            const excelRows = (arc.rows || []).map((r, idx) => {
+                const obj = {
+                    No: idx + 1,
+                    'Nama Siswa': r.name,
+                    Kelas: r.class_name,
+                    'Sub-Konsentrasi': r.sub_concentration,
+                    Tuntas: `${r.acc}/${r.eligible}`,
+                    'Lencana Emas': r.gold,
+                    'Total Masalah': r.issues
+                };
+                (arc.tasks || []).forEach((t, ti) => {
+                    obj[`T${ti + 1}. ${t.title}`] = r.statuses?.[t.id] || '-';
+                });
+                return obj;
+            });
+            const wb = global.XLSX.utils.book_new();
+            global.XLSX.utils.book_append_sheet(wb, makeWorksheet(excelRows), (arc.title || 'Arsip').slice(0, 31));
+            global.XLSX.writeFile(wb, `${arc.title || 'Arsip-AniTrack'}.xlsx`);
+            showToast(`Arsip ${arc.title}.xlsx diunduh ✓`);
+        };
+
+        global.deleteProjectArchive = async function (encodedKey) {
+            const key = decodeURIComponent(encodedKey || '');
+            if (!confirm('Hapus arsip snapshot ini secara permanen?')) return;
+            await supabase.from('app_settings').delete().eq('key', key);
+            showToast('Arsip snapshot dihapus.');
+            await loadProjectTracker();
+            global.openProjectArchivesModal();
+        };
+
+        global.openProjectArchivesModal = function () {
+            const archives = projectDataCache.archives || [];
+            let modal = document.getElementById('anitrackArchivesModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'anitrackArchivesModal';
+                modal.className = 'fixed inset-0 z-[80] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4';
+                modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+                modal.innerHTML = `
+                    <div class="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                        <div class="px-5 py-3.5 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">Snapshot Mingguan Permanen</div>
+                                <div class="text-sm font-extrabold text-[#1E293B]">🗂️ Daftar Arsip Project Tracker</div>
+                            </div>
+                            <button type="button" onclick="document.getElementById('anitrackArchivesModal').classList.add('hidden')"
+                                class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer">✕</button>
+                        </div>
+                        <div id="archivesModalBody" class="p-4 max-h-[72vh] overflow-y-auto space-y-2.5 text-xs"></div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+            const body = document.getElementById('archivesModalBody');
+            if (!archives.length) {
+                body.innerHTML = `<div class="p-8 text-center text-slate-400">Belum ada Arsip Snapshot tersimpan. Klik <strong>📦 Simpan Arsip Snapshot</strong> untuk merekam kondisi progres mingguan saat ini.</div>`;
+            } else {
+                body.innerHTML = archives.map((a) => `
+                    <div class="rounded-xl border border-[#EDF1F7] bg-[#FAFBFD] p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="font-extrabold text-[#1E293B]">${esc(a.title || 'Arsip')}</span>
+                                <span class="px-2 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-bold text-[10.5px]">${esc(a.scope || 'Semua')}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500">
+                                Disimpan ${esc(formatDateTime(a.created_at))} oleh <strong>${esc(a.created_by || 'Staff')}</strong>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 text-[10.5px] font-bold">
+                                <span class="text-slate-600">${a.totalStudents || 0} siswa • ${a.totalTasks || 0} tugas</span>
+                                <span class="text-[#B88600]">🌟 ${a.totalGold || 0} Emas</span>
+                                <span class="text-[#E11D48]">⚠️ ${a.totalProblemStudents || 0} siswa bermasalah</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onclick="exportArchiveSnapshotXlsx('${encodeURIComponent(a.key)}')"
+                                class="px-3 py-1.5 rounded-lg bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-[11px] font-bold transition cursor-pointer">
+                                📥 Export .xlsx
+                            </button>
+                            <button type="button" onclick="deleteProjectArchive('${encodeURIComponent(a.key)}')"
+                                class="px-2.5 py-1.5 rounded-lg bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-[11px] font-bold transition cursor-pointer">
+                                Hapus
+                            </button>
+                        </div>
+                    </div>`).join('');
+            }
+            modal.classList.remove('hidden');
+        };
+
+        global.setProjectWeeklyWeek = function (wk) {
+            projectWeeklyState.weekKey = wk || getWeekKey();
+            projectWeeklyState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.setProjectWeeklyStatus = function (st) {
+            projectWeeklyState.status = st || 'all';
+            projectWeeklyState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.setProjectWeeklyClass = function (cls) {
+            projectWeeklyState.className = cls || '';
+            projectWeeklyState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.setProjectWeeklyTask = function (taskId) {
+            projectWeeklyState.taskId = taskId || '';
+            projectWeeklyState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.setProjectWeeklyMentor = function (mentorId) {
+            projectWeeklyState.mentorId = mentorId || '';
+            projectWeeklyState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.setProjectWeeklySearch = function (q) {
+            projectWeeklyState.search = q || '';
+            projectWeeklyState.page = 1;
+            renderProjectTrackerBody();
+            const inp = document.getElementById('projWeeklySearchInp');
+            if (inp) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
+        };
+
+        global.setProjectWeeklyPage = function (p) {
+            projectWeeklyState.page = Math.max(1, p);
+            renderProjectTrackerBody();
+        };
+
+        global.saveWeeklyUpdateCheck = async function (encodedKey, btn) {
+            const key = decodeURIComponent(encodedKey || '');
+            const existing = (projectDataCache.weeklyUpdates || []).find((u) => u.key === key);
+            if (!existing) { showToast('Data update mingguan tidak ditemukan.'); return; }
+            const card = btn.closest('[data-weekly-key]');
+            const note = card?.querySelector('.weekly-mentor-note')?.value.trim() || '';
+
+            const nextObj = {
+                week_key: existing.week_key,
+                project_task_id: existing.project_task_id,
+                student_id: existing.student_id,
+                progress_percent: existing.progress_percent,
+                summary: existing.summary,
+                blockers: existing.blockers,
+                proof_image: existing.proof_image,
+                proof_url: existing.proof_url,
+                mentor_note: note,
+                checked_by: currentUser.id,
+                checked_by_name: currentUser.full_name || currentUser.username || 'Pembimbing',
+                checked_at: new Date().toISOString(),
+                updated_at: existing.updated_at || new Date().toISOString()
+            };
+
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({ key, value: JSON.stringify(nextObj), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+            btn.disabled = false;
+
+            if (error) {
+                btn.textContent = 'Gagal';
+                showToast(`Gagal menyimpan catatan mingguan: ${error.message}`);
+                return;
+            }
+            showToast('Update mingguan siswa ditandai sudah dicek ✓');
+            loadProjectTracker();
+        };
+
         global.jumpToStudentProjectReview = function (taskId, studentQuery) {
             projectViewMode = 'tasks';
             expandedProjectIds.clear();
@@ -2837,6 +3925,7 @@
             const fbVal = row.querySelector('.proj-fb').value.trim();
             const prevRev = Number(row.dataset.revCount || 0);
             const nextRev = stVal === 'revisi' ? prevRev + 1 : prevRev;
+            const nowIso = new Date().toISOString();
 
             btn.disabled = true;
             btn.textContent = 'Menyimpan...';
@@ -2847,13 +3936,26 @@
                 mentor_feedback: fbVal || null,
                 revision_count: nextRev,
                 reviewed_by: currentUser.id,
-                updated_at: new Date().toISOString()
+                updated_at: nowIso
             }, { onConflict: 'project_task_id,student_id' });
+
+            if (!error && (fbVal || stVal === 'revisi' || stVal === 'selesai')) {
+                const taskObj = (projectDataCache.allTasks || []).find((t) => t.id === taskId);
+                await appendFeedbackLogEntry(studentId, {
+                    at: nowIso,
+                    task_id: taskId,
+                    task_title: taskObj?.title || 'Tugas Project',
+                    status: stVal,
+                    revision_no: nextRev,
+                    feedback: fbVal || (stVal === 'selesai' ? 'Tugas disetujui (ACC Selesai).' : 'Diminta revisi oleh pembimbing.'),
+                    reviewer_name: currentUser.full_name || currentUser.username || 'Guru'
+                });
+            }
 
             btn.disabled = false;
             btn.textContent = error ? 'Gagal' : 'Tersimpan ✓';
             if (!error) {
-                showToast(stVal === 'revisi' ? `Status Revisi ke-${nextRev} dikirim ke siswa.` : 'Review project tersimpan ✓');
+                showToast(stVal === 'revisi' ? `Status Revisi ke-${nextRev} dicatat di Riwayat & dikirim ke siswa.` : 'Review project & log catatan tersimpan ✓');
                 loadProjectTracker();
             } else {
                 showToast(`Gagal menyimpan review: ${error.message}`);
@@ -3168,6 +4270,25 @@
         renderWhatsappLink,
         buildProjectFileNaming,
         copyTextToClipboard,
+        DEFAULT_WA_TEMPLATE,
+        renderWaReminderMessage,
+        PROJECT_WEEKLY_PREFIX,
+        PROJECT_FB_LOG_PREFIX,
+        PROJECT_ARCHIVE_PREFIX,
+        HOMEROOM_MAP_KEY,
+        getJakartaYmd,
+        evaluateSubmissionTimeliness,
+        computeStudentIssueStats,
+        parseFeedbackLogMap,
+        appendFeedbackLogEntry,
+        loadHomeroomMap,
+        saveHomeroomMap,
+        openFeedbackHistoryModal,
+        getWeekKey,
+        getWeekRangeInfo,
+        getRecentWeekKeys,
+        makeWeeklyUpdateKey,
+        parseWeeklyUpdateRows,
         computeDeadlineReminderQueue,
         renderAvatarMarkup,
         setAvatarEl,
@@ -3189,6 +4310,7 @@
         initProfileController,
         getGasUrl,
         setGasUrl,
+        loadSharedGasUrl,
         readFileAsBase64,
         postToGas,
         syncDailyTaskToDrive,
