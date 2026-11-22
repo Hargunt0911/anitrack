@@ -1261,7 +1261,7 @@
                 const [{ data: matRows }, { data: prog }, { data: mentors }] = await Promise.all([
                     supabase.from('learning_materials').select('*').order('id', { ascending: false }),
                     supabase.from('student_progress').select('student_id, status, updated_at').eq('student_id', currentUser.id),
-                    supabase.from('profiles').select('id, full_name, username, avatar_url, whatsapp_number').eq('role', 'mentor').order('full_name')
+                    supabase.from('profiles').select('id, full_name, username, avatar_url, whatsapp_number').in('role', ['mentor', 'superadmin']).order('full_name')
                 ]);
 
                 allMaterialsCache = matRows || [];

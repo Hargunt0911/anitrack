@@ -1401,7 +1401,7 @@
                 const hint = document.getElementById('newAccRoleHint');
                 const btn = document.getElementById('addAccountBtn');
                 studentBox?.classList.toggle('hidden', role !== 'student');
-                mentorBox?.classList.toggle('hidden', role !== 'mentor');
+                mentorBox?.classList.toggle('hidden', role !== 'mentor' && role !== 'superadmin');
                 waStar?.classList.toggle('hidden', role !== 'mentor');
                 if (hint) {
                     hint.textContent = role === 'superadmin'
@@ -1430,7 +1430,8 @@
 
                 homeroomMap = loadedHomeroom || {};
                 allAccountsList = allProfiles || [];
-                mentorsList = allAccountsList.filter((p) => p.role === 'mentor');
+                // Superadmin juga dapat merangkap sebagai Guru Pembimbing
+                mentorsList = allAccountsList.filter((p) => p.role === 'mentor' || p.role === 'superadmin');
                 const studentCountByMentor = {};
                 allAccountsList.forEach((r) => {
                     if (r.role === 'student' && r.mentor_id) {
@@ -1544,9 +1545,9 @@
                     const waLocal = hasWa ? A.formatWhatsappDisplay(u.whatsapp_number).replaceAll('-', '') : '';
                     const subMeta = u.role === 'mentor'
                         ? `@${u.username} • ${studentCountByMentor[u.id] || 0} siswa`
-                        : u.role === 'student'
-                            ? `@${u.username} • ${u.class_name || '-'}${u.sub_concentration ? ` • ${u.sub_concentration}` : ''}`
-                            : `@${u.username}${isSelf ? ' • Akun Anda' : ''}`;
+                        : u.role === 'superadmin'
+                            ? `@${u.username} • ${studentCountByMentor[u.id] || 0} siswa${isSelf ? ' • Akun Anda' : ''}`
+                            : `@${u.username} • ${u.class_name || '-'}${u.sub_concentration ? ` • ${u.sub_concentration}` : ''}`;
 
                     return `
                         <div class="rounded-xl border ${(u.role === 'mentor' && !hasWa) ? 'border-[#FECDD6] bg-[#FFF8FA]' : 'border-[#EDF1F7] bg-[#FAFBFD]'} p-3.5 space-y-2.5">
@@ -1582,7 +1583,8 @@
                                     : (u.role === 'mentor'
                                         ? `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib)</span>`
                                         : `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400">WA belum diisi</span>`)}
-                                ${u.role === 'mentor' && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
+                                ${(u.role === 'mentor' || u.role === 'superadmin') && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
+                                ${u.role === 'superadmin' ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Merangkap Pembimbing</span>` : ''}
                                 ${u.role === 'student' && u.mentor_id ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Pembimbing: ${A.esc(mentorNameMap[u.mentor_id] || 'Guru')}</span>` : ''}
                             </div>
 
@@ -1600,7 +1602,7 @@
                                     <input id="editAccWa_${u.id}" type="tel" value="${A.esc(waLocal)}" placeholder="Nomor WA (08...)"
                                         class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div id="editAccMentorWrap_${u.id}" class="${u.role === 'mentor' ? '' : 'hidden'}">
+                                <div id="editAccMentorWrap_${u.id}" class="${(u.role === 'mentor' || u.role === 'superadmin') ? '' : 'hidden'}">
                                     <input id="editAccHomeroom_${u.id}" list="anitrackClassList" type="text" value="${A.esc(homeroomMap[u.id] || '')}" placeholder="Wali Kelas (kosongkan jika bukan, mis: X ANI A)"
                                         class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
                                 </div>
@@ -1636,7 +1638,7 @@
             window.onEditAccRoleChange = function (accountId) {
                 const role = document.getElementById(`editAccRole_${accountId}`)?.value || 'student';
                 document.getElementById(`editAccStudentWrap_${accountId}`)?.classList.toggle('hidden', role !== 'student');
-                document.getElementById(`editAccMentorWrap_${accountId}`)?.classList.toggle('hidden', role !== 'mentor');
+                document.getElementById(`editAccMentorWrap_${accountId}`)?.classList.toggle('hidden', role !== 'mentor' && role !== 'superadmin');
             };
 
             document.getElementById('addAccountForm')?.addEventListener('submit', async (e) => {
@@ -1713,7 +1715,7 @@
                     return;
                 }
 
-                if (role === 'mentor' && homeroomClass && insertedAcc?.id) {
+                if ((role === 'mentor' || role === 'superadmin') && homeroomClass && insertedAcc?.id) {
                     homeroomMap[insertedAcc.id] = homeroomClass;
                     await A.saveHomeroomMap(homeroomMap);
                 }
@@ -1781,8 +1783,8 @@
                 };
                 if (newPass) payload.pin_or_password = newPass;
 
-                // Jika dulunya mentor dan sekarang diubah ke role lain, lepas siswa yang di-plot ke dia
-                if (target.role === 'mentor' && role !== 'mentor') {
+                // Jika diubah ke student, lepas siswa yang dulunya di-plot ke dia (mentor <-> superadmin tetap pertahankan bimbingan)
+                if ((target.role === 'mentor' || target.role === 'superadmin') && role === 'student') {
                     await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', accountId);
                 }
 
@@ -1791,7 +1793,7 @@
                     setAccountManageFeedback(`Gagal memperbarui akun: ${error.message}`, true);
                     return;
                 }
-                if (role === 'mentor' && homeroomClass) homeroomMap[accountId] = homeroomClass;
+                if ((role === 'mentor' || role === 'superadmin') && homeroomClass) homeroomMap[accountId] = homeroomClass;
                 else delete homeroomMap[accountId];
                 await A.saveHomeroomMap(homeroomMap);
 
@@ -1821,7 +1823,7 @@
                         : '';
                 if (!confirm(`Hapus akun ${A.roleLabel(role)} "${fullName}" secara permanen?${extraWarn}`)) return;
 
-                if (role === 'mentor') {
+                if (role === 'mentor' || role === 'superadmin') {
                     await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', accountId);
                     if (homeroomMap[accountId]) {
                         delete homeroomMap[accountId];
@@ -2042,7 +2044,7 @@
                 }
                 setPlottingStatus('Menyiapkan template Excel berisi seluruh siswa...');
                 const [{ data: mentors, error: mErr }, { data: allStudents, error: sErr }] = await Promise.all([
-                    supabase.from('profiles').select('id, full_name, username').eq('role', 'mentor').order('full_name'),
+                    supabase.from('profiles').select('id, full_name, username').in('role', ['mentor', 'superadmin']).order('full_name'),
                     supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id').eq('role', 'student').order('class_name').order('full_name')
                 ]);
 
@@ -2123,7 +2125,7 @@
                 try {
                     const [buf, mentorsRes, studentsRes] = await Promise.all([
                         file.arrayBuffer(),
-                        supabase.from('profiles').select('id, full_name, username').eq('role', 'mentor').order('full_name'),
+                        supabase.from('profiles').select('id, full_name, username').in('role', ['mentor', 'superadmin']).order('full_name'),
                         supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id').eq('role', 'student').order('class_name').order('full_name')
                     ]);
 
@@ -2456,7 +2458,7 @@
                 // Hitung antrean siswa hari ini (H-2/H-1/Hari-H & Lewat Deadline belum lapor selesai)
                 const allProf = profiles || [];
                 const students = allProf.filter((p) => p.role === 'student');
-                const mentors = allProf.filter((p) => p.role === 'mentor');
+                const mentors = allProf.filter((p) => p.role === 'mentor' || p.role === 'superadmin');
                 const queue = A.computeDeadlineReminderQueue(students, mentors, tasks || [], subs || [], loadedCfg);
 
                 const overdueCnt = queue.filter((q) => q.overdue.length > 0).length;

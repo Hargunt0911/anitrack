@@ -613,7 +613,7 @@ function executeDailyWaDeadlineReminder(forceRun) {
   const mentorMap = {};
   const students = [];
   profiles.forEach(function (p) {
-    if (p.role === 'mentor') mentorMap[p.id] = p;
+    if (p.role === 'mentor' || p.role === 'superadmin') mentorMap[p.id] = p;
     else if (p.role === 'student') students.push(p);
   });
 

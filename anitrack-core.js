@@ -1577,7 +1577,7 @@
             { Keterangan: 'Tanggal Export', Nilai: formatDateTime(new Date().toISOString()) },
             { Keterangan: 'Folder Google Drive Pusat', Nilai: GOOGLE_DRIVE_FOLDER_URL },
             { Keterangan: 'Total Siswa', Nilai: pList.filter((p) => p.role === 'student').length },
-            { Keterangan: 'Total Pembimbing', Nilai: pList.filter((p) => p.role === 'mentor').length },
+            { Keterangan: 'Total Pembimbing', Nilai: pList.filter((p) => p.role === 'mentor' || p.role === 'superadmin').length },
             { Keterangan: 'Total Materi Ajar', Nilai: mList.length },
             { Keterangan: 'Total Entri Daily Task', Nilai: prList.length },
             { Keterangan: 'Daily Task Selesai', Nilai: completedTasksCount }
@@ -1946,7 +1946,7 @@
                 supabase.from('learning_materials').select('*', { count: 'exact' }).order('id', { ascending: false }),
                 sq,
                 supabase.from('student_progress').select('student_id, status, updated_at'),
-                supabase.from('profiles').select('id, full_name, username, avatar_url, whatsapp_number').eq('role', 'mentor').order('full_name')
+                supabase.from('profiles').select('id, full_name, username, avatar_url, whatsapp_number').in('role', ['mentor', 'superadmin']).order('full_name')
             ]);
 
             allMaterialsCache = matRows || [];
@@ -2339,6 +2339,9 @@
             if (expectedRole === 'mentor') {
                 if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
                 else sq = sq.eq('mentor_id', currentUser.id);
+            } else if (expectedRole === 'superadmin') {
+                if (staffScopeMode === 'mentees') sq = sq.eq('mentor_id', currentUser.id);
+                else if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
             }
 
             const [{ data: students }, { data: progressRows }, { data: tasks }] = await Promise.all([
@@ -2626,10 +2629,13 @@
         let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
         let myHomeroomClass = '';
-        let staffScopeMode = 'mentees'; // 'mentees' | 'homeroom'
+        let staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees'; // 'all' | 'mentees' | 'homeroom'
 
         global.setStaffScopeMode = function (mode) {
-            staffScopeMode = (mode === 'homeroom' && myHomeroomClass) ? 'homeroom' : 'mentees';
+            if (mode === 'homeroom' && myHomeroomClass) staffScopeMode = 'homeroom';
+            else if (mode === 'mentees') staffScopeMode = 'mentees';
+            else if (mode === 'all' && expectedRole === 'superadmin') staffScopeMode = 'all';
+            else staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees';
             loadProjectTracker();
             loadDailyTaskFeed();
         };
@@ -3386,8 +3392,10 @@
             if (!container) return;
 
             const homeroomMap = await loadHomeroomMap();
-            myHomeroomClass = (expectedRole === 'mentor' && homeroomMap[currentUser.id]) ? String(homeroomMap[currentUser.id]) : '';
-            if (!myHomeroomClass) staffScopeMode = 'mentees';
+            myHomeroomClass = homeroomMap[currentUser.id] ? String(homeroomMap[currentUser.id]) : '';
+            if (!myHomeroomClass && staffScopeMode === 'homeroom') {
+                staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees';
+            }
 
             let sq = supabase
                 .from('profiles')
@@ -3398,6 +3406,9 @@
             if (expectedRole === 'mentor') {
                 if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
                 else sq = sq.eq('mentor_id', currentUser.id);
+            } else if (expectedRole === 'superadmin') {
+                if (staffScopeMode === 'mentees') sq = sq.eq('mentor_id', currentUser.id);
+                else if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
             }
 
             const [{ data: projTasks }, { data: projSubs }, { data: students }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }] = await Promise.all([
@@ -3405,7 +3416,7 @@
                 supabase.from('project_submissions').select('*'),
                 sq,
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_WEEKLY_PREFIX}%`),
-                supabase.from('profiles').select('id, full_name, username, whatsapp_number').eq('role', 'mentor').order('full_name'),
+                supabase.from('profiles').select('id, full_name, username, whatsapp_number').in('role', ['mentor', 'superadmin']).order('full_name'),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_ARCHIVE_PREFIX}%`)
             ]);
@@ -3476,18 +3487,25 @@
             const overallPct = totalAssignments ? Math.round((doneAssignments / totalAssignments) * 100) : 0;
             const summaryEl = document.getElementById('staffProjectSummary');
             if (summaryEl) {
-                const homeroomSwitcherHtml = (expectedRole === 'mentor' && myHomeroomClass) ? `
+                const showScopeSwitcher = expectedRole === 'superadmin' || Boolean(myHomeroomClass);
+                const homeroomSwitcherHtml = showScopeSwitcher ? `
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <span class="text-[11px] font-bold text-white/90">Cakupan Tampilan:</span>
-                        <div class="inline-flex p-0.5 rounded-xl bg-white/15 border border-white/25 gap-1">
+                        <div class="inline-flex flex-wrap p-0.5 rounded-xl bg-white/15 border border-white/25 gap-1">
+                            ${expectedRole === 'superadmin' ? `
+                            <button type="button" onclick="setStaffScopeMode('all')"
+                                class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'all' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
+                                🌐 Semua Siswa
+                            </button>` : ''}
                             <button type="button" onclick="setStaffScopeMode('mentees')"
                                 class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'mentees' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
                                 👥 Siswa Bimbingan Saya
                             </button>
+                            ${myHomeroomClass ? `
                             <button type="button" onclick="setStaffScopeMode('homeroom')"
                                 class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'homeroom' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
                                 🏫 Wali Kelas ${esc(myHomeroomClass)}
-                            </button>
+                            </button>` : ''}
                         </div>
                     </div>` : '';
 

@@ -184,7 +184,7 @@ async function runDeadlineReminderJob(source = 'cron') {
     const mentorMap = {};
     const students = [];
     for (const p of profiles) {
-      if (p.role === 'mentor') mentorMap[p.id] = p;
+      if (p.role === 'mentor' || p.role === 'superadmin') mentorMap[p.id] = p;
       else if (p.role === 'student') students.push(p);
     }
 
