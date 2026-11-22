@@ -107,6 +107,10 @@
         return Boolean(user && user.role !== 'superadmin' && user.is_operational_admin);
     }
 
+    function isAnyAdmin(user) {
+        return isTrueSuperadmin(user) || isOperationalAdmin(user);
+    }
+
     function getRolePage(roleOrUser) {
         if (roleOrUser && typeof roleOrUser === 'object') {
             if (roleOrUser.role === 'superadmin' || roleOrUser.is_operational_admin) return './admin.html';
@@ -2686,16 +2690,16 @@
         }
 
         global.toggleResetInputsBox = function () {
-            if (!isTrueSuperadmin(currentUser)) {
-                showToast('Fitur reset input siswa hanya dapat diakses oleh Superadmin.');
+            if (!isAnyAdmin(currentUser)) {
+                showToast('Fitur reset input siswa hanya dapat diakses oleh Admin / Superadmin.');
                 return;
             }
             document.getElementById('resetInputsBox')?.classList.toggle('hidden');
         };
 
         global.executeResetStudentInputs = async function () {
-            if (!isTrueSuperadmin(currentUser)) {
-                showToast('Fitur reset input siswa hanya dapat diakses oleh Superadmin.');
+            if (!isAnyAdmin(currentUser)) {
+                showToast('Fitur reset input siswa hanya dapat diakses oleh Admin / Superadmin.');
                 return;
             }
             const sel = document.getElementById('resetTargetStudentSelect');
@@ -2880,8 +2884,8 @@
                     projectChecklistState.subconc = activeSc;
                 }
 
-                const isSuper = isTrueSuperadmin(currentUser);
-                const canEditActiveSc = isSuper || (activeSc && myPjSubconcs.includes(activeSc));
+                const isAdminStaff = isAnyAdmin(currentUser);
+                const canEditActiveSc = isAdminStaff || (activeSc && myPjSubconcs.includes(activeSc));
                 // Daftar nama PJ untuk subkon aktif
                 const pjNamesForActiveSc = activeSc
                     ? mentorsList.filter((m) => Array.isArray(pjMap[m.id]) && pjMap[m.id].includes(activeSc)).map((m) => m.full_name)
@@ -3057,7 +3061,7 @@
                                     ${filteredRows.length ? filteredRows.map((s, idx) => {
                                         const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
                                         const stuSubconc = s.sub_concentration || '';
-                                        const stuCanEdit = isSuper || (stuSubconc && myPjSubconcs.includes(stuSubconc));
+                                        const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
                                         const stuColsSet = new Set(stuSubconc ? (checklistColsMap[stuSubconc] || DEFAULT_CHECKLIST_COLS) : activeCols);
                                         const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
                                         const notDoneList = activeCols.filter((c) => stuColsSet.has(c) && rowData.items?.[c] !== 'done');
@@ -3795,7 +3799,7 @@
                                         class="px-3.5 py-2 rounded-xl ${isOpen ? 'bg-[#1E293B] text-white' : 'bg-[#0095FF] hover:bg-[#0082E6] text-white shadow-blueGlow'} text-xs font-bold transition cursor-pointer">
                                         ${isOpen ? 'Tutup Panel' : (waitCount > 0 ? `Review (${waitCount})` : 'Review Siswa')}
                                     </button>
-                                    ${isTrueSuperadmin(currentUser) ? `
+                                    ${isAnyAdmin(currentUser) ? `
                                     <button type="button" onclick="deleteProjectTask('${t.id}')"
                                         class="px-3 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">
                                         Hapus
@@ -4156,8 +4160,8 @@
         };
 
         global.deleteProjectArchive = async function (encodedKey) {
-            if (!isTrueSuperadmin(currentUser)) {
-                showToast('Hanya Superadmin yang dapat menghapus arsip snapshot.');
+            if (!isAnyAdmin(currentUser)) {
+                showToast('Hanya Admin / Superadmin yang dapat menghapus arsip snapshot.');
                 return;
             }
             const key = decodeURIComponent(encodedKey || '');
@@ -4215,7 +4219,7 @@
                                 class="px-3 py-1.5 rounded-lg bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-[11px] font-bold transition cursor-pointer">
                                 📥 Export .xlsx
                             </button>
-                            ${isTrueSuperadmin(currentUser) ? `
+                            ${isAnyAdmin(currentUser) ? `
                             <button type="button" onclick="deleteProjectArchive('${encodeURIComponent(a.key)}')"
                                 class="px-2.5 py-1.5 rounded-lg bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-[11px] font-bold transition cursor-pointer">
                                 Hapus
@@ -4521,8 +4525,8 @@
         };
 
         global.deleteProjectTask = async function (taskId) {
-            if (!isTrueSuperadmin(currentUser)) {
-                showToast('Hanya Superadmin yang dapat menghapus tugas project.');
+            if (!isAnyAdmin(currentUser)) {
+                showToast('Hanya Admin / Superadmin yang dapat menghapus tugas project.');
                 return;
             }
             if (!confirm('Hapus tugas project ini beserta seluruh data pengumpulannya?')) return;
@@ -4904,6 +4908,7 @@
         saveAdminRoleIds,
         isTrueSuperadmin,
         isOperationalAdmin,
+        isAnyAdmin,
         getRolePage,
         redirectToRole,
         requireRole,
