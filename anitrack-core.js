@@ -1623,7 +1623,7 @@
         if (hint) {
             hint.textContent = connected
                 ? 'Terhubung ke Google Drive! File yang dipilih akan otomatis diunggah ke folder pusat & menghasilkan link.'
-                : 'Opsional: hubungkan URL Apps Script di menu Drive & Backup agar file langsung terunggah otomatis ke Google Drive.';
+                : 'Opsional: unggah file otomatis aktif bila koneksi Apps Script sudah diatur oleh Superadmin, atau tempel link manual.';
         }
     }
 
@@ -1849,6 +1849,10 @@
         };
 
         global.syncAllDataToDrive = async function () {
+            if (!isAnyAdmin(getUser())) {
+                showToast('Menu Drive & Backup hanya tersedia untuk Admin dan Superadmin.');
+                return;
+            }
             const fb = document.getElementById('syncNowFeedback');
             const btn = document.getElementById('syncDriveNowBtn');
             if (!getGasUrl()) {
@@ -1882,6 +1886,10 @@
         };
 
         global.exportLocal = async function (kind) {
+            if (!isAnyAdmin(getUser())) {
+                showToast('Menu Drive & Export hanya tersedia untuk Admin dan Superadmin.');
+                return;
+            }
             try {
                 const { tasksWb, materialsWb, fullWb } = await buildExportWorkbooks();
                 const stamp = new Date().toISOString().slice(0, 10);
