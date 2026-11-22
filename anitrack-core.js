@@ -394,6 +394,17 @@
     const PROJECT_FB_LOG_PREFIX = 'proj_fb_log::';
     const PROJECT_ARCHIVE_PREFIX = 'proj_archive::';
     const HOMEROOM_MAP_KEY = 'homeroom_teachers_map';
+    const SUBCONC_PJ_MAP_KEY = 'subconc_pj_map';
+    const CHECKLIST_COLS_KEY = 'proj_checklist_cols';
+    const CHECKLIST_ROW_PREFIX = 'proj_checklist_row::';
+
+    const DEFAULT_CHECKLIST_COLS = ['Compose & Audio Video', 'Grading', 'Final Film + Credit Title'];
+    const CHECKLIST_STATUS_OPTIONS = [
+        { value: 'belum', label: 'Belum', short: '– Belum', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+        { value: 'proses', label: 'Proses', short: '⋯ Proses', cls: 'bg-[#EAF4FF] text-[#0082E6] border-[#CBE5FF]' },
+        { value: 'revisi', label: 'Revisi', short: '! Revisi', cls: 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]' },
+        { value: 'done', label: 'Done', short: '✓ Done', cls: 'bg-[#E7F9EE] text-[#15803D] border-[#BBF7D0]' }
+    ];
 
     function getJakartaYmd(dateInput = new Date()) {
         try {
@@ -563,6 +574,73 @@
             value: JSON.stringify(mapObj || {}),
             updated_at: new Date().toISOString()
         }, { onConflict: 'key' });
+    }
+
+    async function loadSubconcPjMap() {
+        if (!supabase) return {};
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', SUBCONC_PJ_MAP_KEY).maybeSingle();
+            if (data?.value) {
+                const parsed = JSON.parse(data.value);
+                if (parsed && typeof parsed === 'object') return parsed;
+            }
+        } catch { /* silent */ }
+        return {};
+    }
+
+    async function saveSubconcPjMap(mapObj) {
+        if (!supabase) return { error: null };
+        return supabase.from('app_settings').upsert({
+            key: SUBCONC_PJ_MAP_KEY,
+            value: JSON.stringify(mapObj || {}),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    }
+
+    async function loadChecklistColsMap() {
+        const base = {};
+        SUBCONCS.forEach((sc) => { base[sc] = [...DEFAULT_CHECKLIST_COLS]; });
+        if (!supabase) return base;
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', CHECKLIST_COLS_KEY).maybeSingle();
+            if (data?.value) {
+                const parsed = JSON.parse(data.value);
+                if (parsed && typeof parsed === 'object') {
+                    SUBCONCS.forEach((sc) => {
+                        if (Array.isArray(parsed[sc]) && parsed[sc].length) base[sc] = parsed[sc];
+                    });
+                }
+            }
+        } catch { /* silent */ }
+        return base;
+    }
+
+    async function saveChecklistColsMap(colsMap) {
+        if (!supabase) return { error: null };
+        return supabase.from('app_settings').upsert({
+            key: CHECKLIST_COLS_KEY,
+            value: JSON.stringify(colsMap || {}),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    }
+
+    function parseChecklistRowMap(rows = []) {
+        const map = {};
+        (rows || []).forEach((r) => {
+            if (!r?.key || !String(r.key).startsWith(CHECKLIST_ROW_PREFIX)) return;
+            const sid = String(r.key).slice(CHECKLIST_ROW_PREFIX.length);
+            try {
+                const parsed = JSON.parse(r.value || '{}');
+                map[sid] = {
+                    student_id: sid,
+                    items: (parsed.items && typeof parsed.items === 'object') ? parsed.items : {},
+                    notes: parsed.notes || '',
+                    updated_by: parsed.updated_by || '',
+                    updated_at: parsed.updated_at || r.updated_at || null
+                };
+            } catch { /* ignore */ }
+        });
+        return map;
     }
 
     function openFeedbackHistoryModal(studentName, entries = []) {
@@ -2621,14 +2699,16 @@
             await Promise.all([refreshMetrics(), loadDailyTaskFeed(), loadProjectTracker()]);
         };
 
-        // ==================== STAFF PROJECT TRACKER (RINGKAS, CEPAT, MATRIX, UPDATE MINGGUAN & ARSIP) ====================
+        // ==================== STAFF PROJECT TRACKER (RINGKAS, CHECKLIST PJ SUBKON, MATRIX, UPDATE MINGGUAN & ARSIP) ====================
         let expandedProjectIds = new Set();
-        let projectViewMode = 'tasks'; // 'tasks' | 'weekly' | 'matrix'
-        let projectDataCache = { allTasks: [], subMap: {}, studentList: [], weeklyUpdates: [], mentorsList: [], fbLogMap: {}, archives: [], homeroomMap: {} };
+        let projectViewMode = 'tasks'; // 'tasks' | 'checklist' | 'weekly' | 'matrix'
+        let projectDataCache = { allTasks: [], subMap: {}, studentList: [], allStudentsList: [], weeklyUpdates: [], mentorsList: [], fbLogMap: {}, archives: [], homeroomMap: {}, pjMap: {}, checklistColsMap: {}, checklistRowMap: {} };
         let projectReviewState = { status: 'active', className: '', search: '', page: 1 };
         let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
+        let projectChecklistState = { subconc: '', className: '', statusFilter: 'all', search: '' };
         let myHomeroomClass = '';
+        let myPjSubconcs = [];
         let staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees'; // 'all' | 'mentees' | 'homeroom'
 
         global.setStaffScopeMode = function (mode) {
@@ -2687,6 +2767,11 @@
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'tasks' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             📋 Daftar Tugas &amp; Review (${filteredTasks.length})
                         </button>
+                        <button type="button" onclick="setProjectViewMode('checklist')"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'checklist' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            <span>✅ Checklist PJ Subkon</span>
+                            ${myPjSubconcs.length ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${projectViewMode === 'checklist' ? 'bg-white/25 text-white' : 'bg-[#E7F9EE] text-[#15803D]'}">PJ</span>` : ''}
+                        </button>
                         <button type="button" onclick="setProjectViewMode('weekly')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'weekly' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             <span>📅 Update Mingguan</span>
@@ -2698,11 +2783,267 @@
                         </button>
                     </div>
                     <span class="text-[11px] text-slate-400 hidden sm:inline">
-                        ${projectViewMode === 'weekly'
-                            ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi (khusus pembimbing &amp; admin).'
-                            : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.')}
+                        ${projectViewMode === 'checklist'
+                            ? 'Diisi oleh Guru PJ Sub-Konsentrasi (Done / Proses / Revisi + Notes) dan langsung terpantau Pembimbing masing-masing.'
+                            : (projectViewMode === 'weekly'
+                                ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
+                                : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'))}
                     </span>
                 </div>`;
+
+            // ==================== MODE 4: CHECKLIST PJ SUB-KONSENTRASI (DIISI PJ SUBKON -> DIBACA PEMBIMBING) ====================
+            if (projectViewMode === 'checklist') {
+                const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {}, pjMap = {} } = projectDataCache;
+                const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
+                // Tentukan default subkon: jika PJ subkon -> pilih subkon PJ pertamanya; jika superadmin -> pilih subkon pertama; jika pembimbing biasa -> '' (semua siswa bimbingan)
+                let activeSc = projectChecklistState.subconc;
+                if (!activeSc && (expectedRole === 'superadmin' || myPjSubconcs.length > 0)) {
+                    activeSc = myPjSubconcs[0] || SUBCONCS[0];
+                    projectChecklistState.subconc = activeSc;
+                }
+
+                const canEditActiveSc = expectedRole === 'superadmin' || (activeSc && myPjSubconcs.includes(activeSc));
+                // Daftar nama PJ untuk subkon aktif
+                const pjNamesForActiveSc = activeSc
+                    ? mentorsList.filter((m) => Array.isArray(pjMap[m.id]) && pjMap[m.id].includes(activeSc)).map((m) => m.full_name)
+                    : [];
+
+                // Sumber siswa:
+                // - Jika Superadmin atau PJ untuk subkon aktif -> lihat SEMUA siswa di subkon tersebut (lintas kelas & lintas pembimbing!)
+                // - Jika Pembimbing biasa / Walas (bukan PJ subkon aktif) -> lihat siswa bimbingan / kelas perwaliannya saja
+                const baseStudents = (expectedRole === 'superadmin' || canEditActiveSc)
+                    ? allStudentsList.filter((s) => !activeSc || s.sub_concentration === activeSc)
+                    : studentList.filter((s) => !activeSc || s.sub_concentration === activeSc);
+
+                const ckCls = projectChecklistState.className || '';
+                const ckStFilter = projectChecklistState.statusFilter || 'all';
+                const ckSearch = (projectChecklistState.search || '').trim().toLowerCase();
+                const ckClasses = [...new Set(baseStudents.map((s) => s.class_name).filter(Boolean))].sort();
+
+                const activeCols = activeSc
+                    ? (checklistColsMap[activeSc] || DEFAULT_CHECKLIST_COLS)
+                    : [...new Set(SUBCONCS.flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))];
+
+                const filteredRows = baseStudents.filter((s) => {
+                    if (ckCls && s.class_name !== ckCls) return false;
+                    if (ckSearch) {
+                        const hit = (s.full_name || '').toLowerCase().includes(ckSearch) ||
+                            (s.username || '').toLowerCase().includes(ckSearch) ||
+                            (s.class_name || '').toLowerCase().includes(ckSearch) ||
+                            (s.sub_concentration || '').toLowerCase().includes(ckSearch);
+                        if (!hit) return false;
+                    }
+                    const rowData = checklistRowMap[s.id] || { items: {} };
+                    const colsForStu = s.sub_concentration ? (checklistColsMap[s.sub_concentration] || DEFAULT_CHECKLIST_COLS) : activeCols;
+                    const doneCnt = colsForStu.filter((c) => rowData.items?.[c] === 'done').length;
+                    const revCnt = colsForStu.filter((c) => rowData.items?.[c] === 'revisi').length;
+                    if (ckStFilter === 'all_done') return colsForStu.length > 0 && doneCnt === colsForStu.length;
+                    if (ckStFilter === 'not_done') return doneCnt < colsForStu.length;
+                    if (ckStFilter === 'revisi') return revCnt > 0;
+                    return true;
+                });
+
+                const totalDoneAll = baseStudents.filter((s) => {
+                    const cols = s.sub_concentration ? (checklistColsMap[s.sub_concentration] || DEFAULT_CHECKLIST_COLS) : activeCols;
+                    const rowData = checklistRowMap[s.id] || { items: {} };
+                    return cols.length > 0 && cols.every((c) => rowData.items?.[c] === 'done');
+                }).length;
+                const totalRevisiAll = baseStudents.filter((s) => {
+                    const cols = s.sub_concentration ? (checklistColsMap[s.sub_concentration] || DEFAULT_CHECKLIST_COLS) : activeCols;
+                    const rowData = checklistRowMap[s.id] || { items: {} };
+                    return cols.some((c) => rowData.items?.[c] === 'revisi');
+                }).length;
+                const totalNotDoneAll = baseStudents.length - totalDoneAll;
+
+                const subconcTabs = [
+                    ...(expectedRole === 'mentor' ? [{ val: '', label: `Semua Siswa ${staffScopeMode === 'homeroom' && myHomeroomClass ? myHomeroomClass : 'Bimbingan'}` }] : []),
+                    ...SUBCONCS.map((sc) => ({
+                        val: sc,
+                        label: `${sc}${myPjSubconcs.includes(sc) ? ' ★PJ' : ''}`
+                    }))
+                ];
+
+                container.innerHTML = `
+                    ${modeSwitcherHtml}
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                        <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] space-y-4">
+                            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                <div class="space-y-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${canEditActiveSc ? 'bg-[#E7F9EE] text-[#15803D]' : 'bg-[#EAF4FF] text-[#0082E6]'}">
+                                            ${canEditActiveSc ? '✏️ Mode Edit PJ Sub-Konsentrasi / Admin' : '👁️ Mode Pantau Pembimbing (Diisi oleh PJ Subkon)'}
+                                        </span>
+                                        ${activeSc ? `<span class="text-[11px] font-bold text-slate-500">PJ ${esc(activeSc)}: <strong class="text-[#1E293B]">${pjNamesForActiveSc.length ? esc(pjNamesForActiveSc.join(', ')) : 'Belum ditetapkan (atur di Akun & Plotting)'}</strong></span>` : ''}
+                                    </div>
+                                    <h3 class="text-base font-extrabold text-[#1E293B]">✅ Checklist Project Update PJ Sub-Konsentrasi</h3>
+                                    <p class="text-xs text-slate-500">
+                                        ${canEditActiveSc
+                                            ? 'Klik status tiap kolom tahapan untuk langsung menyimpan (Belum / Proses / Revisi / Done) dan tulis Notes — otomatis langsung terlihat oleh Guru Pembimbing masing-masing siswa.'
+                                            : 'Menampilkan hasil pengecekan & catatan (Notes) terbaru dari Guru PJ Sub-Konsentrasi untuk siswa bimbingan Anda.'}
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                    <button type="button" onclick="exportChecklistXlsx()"
+                                        class="px-3.5 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
+                                        📥 Export Checklist (.xlsx)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Tab Pilih Sub-Konsentrasi (Seperti Tab 2D / 3D di Spreadsheet) -->
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${subconcTabs.map((tab) => `
+                                    <button type="button" onclick="setChecklistSubconc('${esc(tab.val)}')"
+                                        class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${activeSc === tab.val
+                                            ? 'bg-[#0095FF] text-white border-[#0095FF] shadow-sm'
+                                            : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'}">
+                                        ${esc(tab.label)}
+                                    </button>`).join('')}
+                            </div>
+
+                            <!-- Kelola Kolom Tahapan (Khusus PJ Subkon aktif / Superadmin) -->
+                            ${canEditActiveSc && activeSc ? `
+                            <div class="rounded-xl bg-white border border-[#DCEBFF] p-3.5 space-y-2.5">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#0082E6]">Kolom Tahapan Checklist — ${esc(activeSc)}</span>
+                                    <button type="button" onclick="syncChecklistColsFromTasks('${esc(activeSc)}')"
+                                        class="px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer">
+                                        ↻ Tarik dari Daftar Tugas Project
+                                    </button>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    ${activeCols.map((col, ci) => `
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F7FAFF] border border-[#DCEBFF] text-xs font-bold text-[#1E293B]">
+                                            <span>${ci + 1}. ${esc(col)}</span>
+                                            ${activeCols.length > 1 ? `<button type="button" onclick="removeChecklistColumn('${esc(activeSc)}', ${ci})" title="Hapus kolom tahapan ini" class="text-slate-400 hover:text-[#E11D48] font-extrabold cursor-pointer">✕</button>` : ''}
+                                        </span>`).join('')}
+                                </div>
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                    <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Blocking, Lighting, Grading, Final Film + Credit Title)"
+                                        class="flex-1 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                    <button type="button" onclick="addChecklistColumn('${esc(activeSc)}')"
+                                        class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
+                                        + Tambah Kolom
+                                    </button>
+                                </div>
+                            </div>` : ''}
+
+                            <!-- KPI + Filter Bar -->
+                            <div class="grid grid-cols-3 gap-2.5 num-tabular">
+                                <div class="bg-[#E7F9EE] border border-[#BBF7D0] rounded-xl px-3.5 py-2">
+                                    <div class="text-[11px] font-semibold text-[#15803D]">✓ Semua Done</div>
+                                    <div class="text-lg font-extrabold text-[#15803D]">${totalDoneAll} / ${baseStudents.length}</div>
+                                </div>
+                                <div class="bg-[#FFF6D6] border border-[#FDE68A] rounded-xl px-3.5 py-2">
+                                    <div class="text-[11px] font-semibold text-[#B88600]">⏳ Belum Tuntas Semua</div>
+                                    <div class="text-lg font-extrabold text-[#B88600]">${totalNotDoneAll} siswa</div>
+                                </div>
+                                <div class="bg-[#FFF0F4] border border-[#FECDD6] rounded-xl px-3.5 py-2">
+                                    <div class="text-[11px] font-semibold text-[#E11D48]">! Ada Revisi</div>
+                                    <div class="text-lg font-extrabold text-[#E11D48]">${totalRevisiAll} siswa</div>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                <select onchange="setChecklistClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Kelas</option>
+                                    ${ckClasses.map((c) => `<option value="${esc(c)}" ${ckCls === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+                                </select>
+                                <select onchange="setChecklistStatusFilter(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                    <option value="all" ${ckStFilter === 'all' ? 'selected' : ''}>Semua Status (${baseStudents.length})</option>
+                                    <option value="not_done" ${ckStFilter === 'not_done' ? 'selected' : ''}>Belum Tuntas (${totalNotDoneAll})</option>
+                                    <option value="revisi" ${ckStFilter === 'revisi' ? 'selected' : ''}>Ada Revisi (${totalRevisiAll})</option>
+                                    <option value="all_done" ${ckStFilter === 'all_done' ? 'selected' : ''}>Semua Done (${totalDoneAll})</option>
+                                </select>
+                                <input id="checklistSearchInp" type="text" value="${esc(projectChecklistState.search)}" oninput="setChecklistSearch(this.value)"
+                                    placeholder="Cari nama siswa / kelas..."
+                                    class="flex-1 min-w-[180px] max-w-xs px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                                <span class="ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
+                            </div>
+                        </div>
+
+                        <!-- Tabel Checklist Persis Spreadsheet 2D/3D -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="border-b border-[#EDF1F7] bg-[#F7FAFF] text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
+                                        <th class="py-3 px-3 w-10 text-center">No</th>
+                                        <th class="py-3 px-3 sticky left-0 bg-[#F7FAFF] z-10 min-w-[220px] border-r border-[#EDF1F7]">Nama Siswa &amp; Drive</th>
+                                        <th class="py-3 px-2.5 min-w-[115px]">Pembimbing</th>
+                                        ${activeCols.map((col) => `<th class="py-3 px-2.5 text-center min-w-[125px]">${esc(col)}</th>`).join('')}
+                                        <th class="py-3 px-3 min-w-[230px]">Notes (Catatan PJ Subkon)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-[#F1F5F9]">
+                                    ${filteredRows.length ? filteredRows.map((s, idx) => {
+                                        const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
+                                        const stuSubconc = s.sub_concentration || '';
+                                        const stuCanEdit = expectedRole === 'superadmin' || (stuSubconc && myPjSubconcs.includes(stuSubconc));
+                                        const stuColsSet = new Set(stuSubconc ? (checklistColsMap[stuSubconc] || DEFAULT_CHECKLIST_COLS) : activeCols);
+                                        const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
+                                        const notDoneList = activeCols.filter((c) => stuColsSet.has(c) && rowData.items?.[c] !== 'done');
+                                        const waText = notDoneList.length
+                                            ? `Halo ${s.full_name}, update checklist project (${stuSubconc || 'Animasi'}) dari PJ Subkon — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Catatan PJ: ${rowData.notes}` : ''} Mohon segera ditindaklanjuti ya.`
+                                            : `Halo ${s.full_name}, selamat! Semua tahapan checklist project kamu sudah Done ✓`;
+
+                                        return `
+                                            <tr class="hover:bg-[#F8FBFF] align-middle">
+                                                <td class="py-2.5 px-3 text-center font-mono text-slate-400">${idx + 1}</td>
+                                                <td class="py-2.5 px-3 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
+                                                    <div class="font-bold text-[#1E293B] truncate max-w-[205px]">${esc(s.full_name)}</div>
+                                                    <div class="text-[10.5px] text-slate-400 truncate">
+                                                        ${esc(s.class_name || '-')} • <span class="font-semibold text-[#0082E6]">${esc(stuSubconc || 'Belum pilih subkon')}</span>
+                                                    </div>
+                                                    <div class="flex flex-wrap items-center gap-1 mt-1">
+                                                        ${renderWhatsappLink(s.whatsapp_number, true, waText)}
+                                                        ${s.project_drive_url
+                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition">📁 Drive ↗</a>`
+                                                            : `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">Drive -</span>`}
+                                                    </div>
+                                                </td>
+                                                <td class="py-2.5 px-2.5 text-[11px] text-slate-600">
+                                                    ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">Belum di-plot</span>`}
+                                                </td>
+                                                ${activeCols.map((col) => {
+                                                    if (!stuColsSet.has(col)) return `<td class="py-2.5 px-2 text-center text-slate-200">·</td>`;
+                                                    const stVal = rowData.items?.[col] || 'belum';
+                                                    const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
+                                                    if (stuCanEdit) {
+                                                        return `
+                                                            <td class="py-2.5 px-2 text-center">
+                                                                <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
+                                                                    class="w-full px-2 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer focus:outline-none ${stOpt.cls}">
+                                                                    ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.short}</option>`).join('')}
+                                                                </select>
+                                                            </td>`;
+                                                    }
+                                                    return `
+                                                        <td class="py-2.5 px-2 text-center">
+                                                            <span class="inline-block px-2.5 py-1 rounded-lg border text-[11px] font-bold ${stOpt.cls}">${stOpt.short}</span>
+                                                        </td>`;
+                                                }).join('')}
+                                                <td class="py-2.5 px-3">
+                                                    ${stuCanEdit ? `
+                                                        <div class="flex items-center gap-1.5">
+                                                            <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis catatan PJ untuk siswa &amp; pembimbing..."
+                                                                onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
+                                                                class="flex-1 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                                            <button type="button" onclick="saveChecklistNote('${s.id}', this)"
+                                                                class="px-2.5 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
+                                                                Simpan
+                                                            </button>
+                                                        </div>` : `
+                                                        <div class="text-xs ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan PJ')}</div>`}
+                                                    ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-1">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
+                                                </td>
+                                            </tr>`;
+                                    }).join('') : `<tr><td colspan="${activeCols.length + 4}" class="p-8 text-center text-slate-400">Belum ada siswa pada Sub-Konsentrasi / filter ini. Pastikan siswa sudah memilih / di-plot Sub-Konsentrasi di tab Akun &amp; Plotting.</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                return;
+            }
 
             // ==================== MODE 3: PROJECT UPDATE MINGGUAN (PER MINGGU × TUGAS × SISWA) ====================
             if (projectViewMode === 'weekly') {
@@ -3391,37 +3732,40 @@
             const container = document.getElementById('projectTasksContainer');
             if (!container) return;
 
-            const homeroomMap = await loadHomeroomMap();
+            const [homeroomMap, pjMap, checklistColsMap] = await Promise.all([
+                loadHomeroomMap(),
+                loadSubconcPjMap(),
+                loadChecklistColsMap()
+            ]);
             myHomeroomClass = homeroomMap[currentUser.id] ? String(homeroomMap[currentUser.id]) : '';
+            myPjSubconcs = Array.isArray(pjMap[currentUser.id]) ? pjMap[currentUser.id] : [];
             if (!myHomeroomClass && staffScopeMode === 'homeroom') {
                 staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees';
             }
 
-            let sq = supabase
-                .from('profiles')
-                .select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url')
-                .eq('role', 'student')
-                .order('class_name')
-                .order('full_name');
-            if (expectedRole === 'mentor') {
-                if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
-                else sq = sq.eq('mentor_id', currentUser.id);
-            } else if (expectedRole === 'superadmin') {
-                if (staffScopeMode === 'mentees') sq = sq.eq('mentor_id', currentUser.id);
-                else if (staffScopeMode === 'homeroom' && myHomeroomClass) sq = sq.eq('class_name', myHomeroomClass);
-            }
-
-            const [{ data: projTasks }, { data: projSubs }, { data: students }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }] = await Promise.all([
+            const [{ data: projTasks }, { data: projSubs }, { data: allStudents }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }, { data: checklistRowsRaw }] = await Promise.all([
                 supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
                 supabase.from('project_submissions').select('*'),
-                sq,
+                supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name'),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_WEEKLY_PREFIX}%`),
                 supabase.from('profiles').select('id, full_name, username, whatsapp_number').in('role', ['mentor', 'superadmin']).order('full_name'),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`),
-                supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_ARCHIVE_PREFIX}%`)
+                supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_ARCHIVE_PREFIX}%`),
+                supabase.from('app_settings').select('key, value, updated_at').like('key', `${CHECKLIST_ROW_PREFIX}%`)
             ]);
 
-            const studentList = students || [];
+            const allStudentsList = allStudents || [];
+            const studentList = allStudentsList.filter((s) => {
+                if (expectedRole === 'mentor') {
+                    if (staffScopeMode === 'homeroom' && myHomeroomClass) return s.class_name === myHomeroomClass;
+                    return s.mentor_id === currentUser.id;
+                }
+                if (expectedRole === 'superadmin') {
+                    if (staffScopeMode === 'mentees') return s.mentor_id === currentUser.id;
+                    if (staffScopeMode === 'homeroom' && myHomeroomClass) return s.class_name === myHomeroomClass;
+                }
+                return true;
+            });
             const studentIds = new Set(studentList.map((s) => s.id));
             const allTasks = sortMaterialsByPipeline(projTasks || []);
             const subMap = {};
@@ -3431,6 +3775,7 @@
             });
             const weeklyUpdates = parseWeeklyUpdateRows(weeklyRaw || []).filter((u) => studentIds.has(u.student_id));
             const fbLogMap = parseFeedbackLogMap(fbLogRaw || []);
+            const checklistRowMap = parseChecklistRowMap(checklistRowsRaw || []);
             const archives = (archivesRaw || []).map((r) => {
                 try {
                     const parsed = JSON.parse(r.value || '{}');
@@ -3440,7 +3785,7 @@
                 }
             }).filter(Boolean).sort((a, b) => String(b.created_at || b.updated_at || '').localeCompare(String(a.created_at || a.updated_at || '')));
 
-            projectDataCache = { allTasks, subMap, studentList, weeklyUpdates, mentorsList: mentors || [], fbLogMap, archives, homeroomMap };
+            projectDataCache = { allTasks, subMap, studentList, allStudentsList, weeklyUpdates, mentorsList: mentors || [], fbLogMap, archives, homeroomMap, pjMap, checklistColsMap, checklistRowMap };
 
             // Overall Project Progress Summary + Lencana Emas & Total Masalah
             let totalAssignments = 0;
@@ -3837,6 +4182,185 @@
         global.setProjectWeeklyPage = function (p) {
             projectWeeklyState.page = Math.max(1, p);
             renderProjectTrackerBody();
+        };
+
+        // ==================== CHECKLIST PJ SUB-KONSENTRASI HANDLERS ====================
+        global.setChecklistSubconc = function (sc) {
+            projectChecklistState.subconc = sc || '';
+            projectChecklistState.className = '';
+            renderProjectTrackerBody();
+        };
+
+        global.setChecklistClass = function (cls) {
+            projectChecklistState.className = cls || '';
+            renderProjectTrackerBody();
+        };
+
+        global.setChecklistStatusFilter = function (st) {
+            projectChecklistState.statusFilter = st || 'all';
+            renderProjectTrackerBody();
+        };
+
+        global.setChecklistSearch = function (q) {
+            projectChecklistState.search = q || '';
+            renderProjectTrackerBody();
+            const inp = document.getElementById('checklistSearchInp');
+            if (inp) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
+        };
+
+        global.addChecklistColumn = async function (subconc) {
+            const inp = document.getElementById('newChecklistColInput');
+            const name = (inp?.value || '').trim();
+            if (!name || !subconc) { showToast('Tuliskan nama kolom tahapan terlebih dahulu.'); return; }
+            const colsMap = { ...(projectDataCache.checklistColsMap || {}) };
+            const cur = Array.isArray(colsMap[subconc]) ? [...colsMap[subconc]] : [...DEFAULT_CHECKLIST_COLS];
+            if (cur.some((c) => c.toLowerCase() === name.toLowerCase())) {
+                showToast(`Kolom "${name}" sudah ada.`);
+                return;
+            }
+            cur.push(name);
+            colsMap[subconc] = cur;
+            const { error } = await saveChecklistColsMap(colsMap);
+            if (error) { showToast(`Gagal menambah kolom: ${error.message}`); return; }
+            projectDataCache.checklistColsMap = colsMap;
+            showToast(`Kolom "${name}" ditambahkan ke ${subconc} ✓`);
+            renderProjectTrackerBody();
+        };
+
+        global.removeChecklistColumn = async function (subconc, idx) {
+            const colsMap = { ...(projectDataCache.checklistColsMap || {}) };
+            const cur = Array.isArray(colsMap[subconc]) ? [...colsMap[subconc]] : [...DEFAULT_CHECKLIST_COLS];
+            const colName = cur[idx];
+            if (!colName || cur.length <= 1) return;
+            if (!confirm(`Hapus kolom tahapan "${colName}" dari checklist ${subconc}?`)) return;
+            cur.splice(idx, 1);
+            colsMap[subconc] = cur;
+            const { error } = await saveChecklistColsMap(colsMap);
+            if (error) { showToast(`Gagal menghapus kolom: ${error.message}`); return; }
+            projectDataCache.checklistColsMap = colsMap;
+            showToast(`Kolom "${colName}" dihapus.`);
+            renderProjectTrackerBody();
+        };
+
+        global.syncChecklistColsFromTasks = async function (subconc) {
+            if (!subconc) return;
+            const matchedTitles = (projectDataCache.allTasks || [])
+                .filter((t) => !t.sub_concentration || t.sub_concentration === subconc)
+                .map((t) => String(t.title || '').trim())
+                .filter(Boolean);
+            if (!matchedTitles.length) {
+                showToast(`Belum ada tugas project untuk ${subconc}.`);
+                return;
+            }
+            if (!confirm(`Gunakan ${matchedTitles.length} judul tugas dari Project Tracker sebagai kolom tahapan checklist ${subconc}?`)) return;
+            const colsMap = { ...(projectDataCache.checklistColsMap || {}) };
+            colsMap[subconc] = [...new Set(matchedTitles)];
+            const { error } = await saveChecklistColsMap(colsMap);
+            if (error) { showToast(`Gagal menyinkronkan kolom: ${error.message}`); return; }
+            projectDataCache.checklistColsMap = colsMap;
+            showToast(`Kolom tahapan ${subconc} disinkronkan dari Daftar Tugas ✓`);
+            renderProjectTrackerBody();
+        };
+
+        global.updateChecklistCell = async function (studentId, encodedCol, newVal, selectEl) {
+            const colName = decodeURIComponent(encodedCol || '');
+            if (!studentId || !colName) return;
+            const rowMap = projectDataCache.checklistRowMap || {};
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
+            const nextItems = { ...(existing.items || {}), [colName]: newVal };
+            const nowIso = new Date().toISOString();
+            const nextRow = {
+                student_id: studentId,
+                items: nextItems,
+                notes: existing.notes || '',
+                updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
+                updated_at: nowIso
+            };
+
+            if (selectEl) {
+                const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === newVal) || CHECKLIST_STATUS_OPTIONS[0];
+                selectEl.className = `w-full px-2 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer focus:outline-none ${stOpt.cls}`;
+            }
+
+            const { error } = await supabase.from('app_settings').upsert({
+                key: `${CHECKLIST_ROW_PREFIX}${studentId}`,
+                value: JSON.stringify(nextRow),
+                updated_at: nowIso
+            }, { onConflict: 'key' });
+
+            if (error) {
+                showToast(`Gagal menyimpan status: ${error.message}`);
+                return;
+            }
+            rowMap[studentId] = nextRow;
+            projectDataCache.checklistRowMap = rowMap;
+            showToast(`Checklist "${colName}" → ${newVal.toUpperCase()} ✓`);
+            renderProjectTrackerBody();
+        };
+
+        global.saveChecklistNote = async function (studentId, btn) {
+            const inp = document.getElementById(`ckNote_${studentId}`);
+            if (!inp) return;
+            const noteText = inp.value.trim();
+            const rowMap = projectDataCache.checklistRowMap || {};
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
+            const nowIso = new Date().toISOString();
+            const nextRow = {
+                student_id: studentId,
+                items: { ...(existing.items || {}) },
+                notes: noteText,
+                updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
+                updated_at: nowIso
+            };
+            if (btn) { btn.disabled = true; btn.textContent = '...'; }
+            const { error } = await supabase.from('app_settings').upsert({
+                key: `${CHECKLIST_ROW_PREFIX}${studentId}`,
+                value: JSON.stringify(nextRow),
+                updated_at: nowIso
+            }, { onConflict: 'key' });
+            if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
+            if (error) { showToast(`Gagal menyimpan Notes: ${error.message}`); return; }
+            rowMap[studentId] = nextRow;
+            projectDataCache.checklistRowMap = rowMap;
+            showToast('Catatan PJ Subkon tersimpan ✓');
+            renderProjectTrackerBody();
+        };
+
+        global.exportChecklistXlsx = function () {
+            if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
+            const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {}, mentorsList = [] } = projectDataCache;
+            const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m.full_name]));
+            const statusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+            const wb = global.XLSX.utils.book_new();
+            const subconcsToExport = projectChecklistState.subconc ? [projectChecklistState.subconc] : SUBCONCS;
+
+            subconcsToExport.forEach((sc) => {
+                const cols = checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS;
+                const scStudents = allStudentsList.filter((s) => s.sub_concentration === sc);
+                const rows = scStudents.map((s, i) => {
+                    const rd = checklistRowMap[s.id] || { items: {}, notes: '' };
+                    const obj = {
+                        No: i + 1,
+                        'Nama Siswa': s.full_name,
+                        Username: `@${s.username}`,
+                        Kelas: s.class_name || '-',
+                        'No. HP': formatWhatsappDisplay(s.whatsapp_number) || '-',
+                        Pembimbing: (s.mentor_id && mentorMap[s.mentor_id]) || '-',
+                        'Link Google Drive': s.project_drive_url || '-'
+                    };
+                    cols.forEach((c) => {
+                        obj[c] = statusText[rd.items?.[c] || 'belum'] || 'Belum';
+                    });
+                    obj.Notes = rd.notes || '';
+                    obj['Diupdate Oleh'] = rd.updated_by || '';
+                    return obj;
+                });
+                global.XLSX.utils.book_append_sheet(wb, makeWorksheet(rows), sc.slice(0, 31));
+            });
+
+            const stamp = getJakartaYmd(new Date());
+            global.XLSX.writeFile(wb, `Checklist-PJ-Subkon-AniTrack-${stamp}.xlsx`);
+            showToast('File Excel Checklist PJ Subkon diunduh ✓');
         };
 
         global.saveWeeklyUpdateCheck = async function (encodedKey, btn) {
@@ -4294,6 +4818,11 @@
         PROJECT_FB_LOG_PREFIX,
         PROJECT_ARCHIVE_PREFIX,
         HOMEROOM_MAP_KEY,
+        SUBCONC_PJ_MAP_KEY,
+        CHECKLIST_COLS_KEY,
+        CHECKLIST_ROW_PREFIX,
+        DEFAULT_CHECKLIST_COLS,
+        CHECKLIST_STATUS_OPTIONS,
         getJakartaYmd,
         evaluateSubmissionTimeliness,
         computeStudentIssueStats,
@@ -4301,6 +4830,11 @@
         appendFeedbackLogEntry,
         loadHomeroomMap,
         saveHomeroomMap,
+        loadSubconcPjMap,
+        saveSubconcPjMap,
+        loadChecklistColsMap,
+        saveChecklistColsMap,
+        parseChecklistRowMap,
         openFeedbackHistoryModal,
         getWeekKey,
         getWeekRangeInfo,

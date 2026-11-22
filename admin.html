@@ -916,15 +916,22 @@
                                 </div>
                             </div>
 
-                            <!-- Field Tambahan Khusus Role Guru Pembimbing (Wali Kelas Opsional) -->
-                            <div id="newAccMentorFields" class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-[#DCEBFF]">
-                                <div>
+                            <!-- Field Tambahan Khusus Role Guru Pembimbing & Superadmin (Wali Kelas + PJ Sub-Konsentrasi) -->
+                            <div id="newAccMentorFields" class="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-2 border-t border-[#DCEBFF]">
+                                <div class="lg:col-span-4">
                                     <label for="newAccHomeroom" class="block text-[11px] font-semibold text-slate-600 mb-1">Wali Kelas (Opsional)</label>
-                                    <input id="newAccHomeroom" list="anitrackClassList" type="text" placeholder="Kosongkan jika bukan Wali Kelas (mis: X ANI A)"
+                                    <input id="newAccHomeroom" list="anitrackClassList" type="text" placeholder="Kosongkan jika bukan Walas (mis: X ANI A)"
                                         class="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div class="sm:col-span-2 flex items-center text-[11px] text-slate-500 pt-1 sm:pt-4">
-                                    Jika diisi (misal <strong>X ANI A</strong>), guru ini otomatis bisa beralih melihat <strong>seluruh siswa kelas perwaliannya</strong> di Portal Pembimbing.
+                                <div class="lg:col-span-8">
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">PJ Sub-Konsentrasi (Opsional — Berwenang Isi Checklist PJ Subkon)</label>
+                                    <div class="flex flex-wrap items-center gap-2 bg-white border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs">
+                                        <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700"><input type="checkbox" name="newAccPjSubconc" value="2D Animator" class="accent-[#0095FF] rounded" /> 2D Animator</label>
+                                        <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700"><input type="checkbox" name="newAccPjSubconc" value="2D Motion Graphic" class="accent-[#0095FF] rounded" /> 2D Motion Graphic</label>
+                                        <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700"><input type="checkbox" name="newAccPjSubconc" value="3D Animator" class="accent-[#0095FF] rounded" /> 3D Animator</label>
+                                        <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700"><input type="checkbox" name="newAccPjSubconc" value="3D Modeller" class="accent-[#0095FF] rounded" /> 3D Modeller</label>
+                                        <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700"><input type="checkbox" name="newAccPjSubconc" value="3D Motion Graphic" class="accent-[#0095FF] rounded" /> 3D Motion Graphic</label>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1368,6 +1375,7 @@
             let allAccountsList = [];
             let mentorsList = [];
             let homeroomMap = {};
+            let subconcPjMap = {};
             let plottingStudentsCache = [];
             let editingAccountId = null;
             let accountRoleFilter = 'staff'; // 'staff' | 'superadmin' | 'mentor' | 'student' | 'all'
@@ -1418,17 +1426,19 @@
 
             async function loadPlottingStudents() {
                 const cls = document.getElementById('plottingClassFilter').value;
-                const [{ data: allProfiles }, studRes, loadedHomeroom] = await Promise.all([
+                const [{ data: allProfiles }, studRes, loadedHomeroom, loadedPjMap] = await Promise.all([
                     supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number, avatar_url, project_drive_url').order('full_name'),
                     (() => {
                         let q = supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name');
                         if (cls) q = q.eq('class_name', cls);
                         return q;
                     })(),
-                    A.loadHomeroomMap()
+                    A.loadHomeroomMap(),
+                    A.loadSubconcPjMap()
                 ]);
 
                 homeroomMap = loadedHomeroom || {};
+                subconcPjMap = loadedPjMap || {};
                 allAccountsList = allProfiles || [];
                 // Superadmin juga dapat merangkap sebagai Guru Pembimbing
                 mentorsList = allAccountsList.filter((p) => p.role === 'mentor' || p.role === 'superadmin');
@@ -1584,6 +1594,7 @@
                                         ? `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib)</span>`
                                         : `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400">WA belum diisi</span>`)}
                                 ${(u.role === 'mentor' || u.role === 'superadmin') && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
+                                ${(u.role === 'mentor' || u.role === 'superadmin') && Array.isArray(subconcPjMap[u.id]) && subconcPjMap[u.id].length ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">🎨 PJ: ${A.esc(subconcPjMap[u.id].join(', '))}</span>` : ''}
                                 ${u.role === 'superadmin' ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Merangkap Pembimbing</span>` : ''}
                                 ${u.role === 'student' && u.mentor_id ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Pembimbing: ${A.esc(mentorNameMap[u.mentor_id] || 'Guru')}</span>` : ''}
                             </div>
@@ -1602,9 +1613,18 @@
                                     <input id="editAccWa_${u.id}" type="tel" value="${A.esc(waLocal)}" placeholder="Nomor WA (08...)"
                                         class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div id="editAccMentorWrap_${u.id}" class="${(u.role === 'mentor' || u.role === 'superadmin') ? '' : 'hidden'}">
+                                <div id="editAccMentorWrap_${u.id}" class="${(u.role === 'mentor' || u.role === 'superadmin') ? '' : 'hidden'} space-y-1.5">
                                     <input id="editAccHomeroom_${u.id}" list="anitrackClassList" type="text" value="${A.esc(homeroomMap[u.id] || '')}" placeholder="Wali Kelas (kosongkan jika bukan, mis: X ANI A)"
                                         class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
+                                    <div class="rounded-lg bg-white border border-[#E2E8F0] p-2 space-y-1">
+                                        <div class="text-[10px] font-bold uppercase text-slate-400">PJ Sub-Konsentrasi (Opsional):</div>
+                                        <div class="flex flex-wrap gap-1.5 text-[11px]">
+                                            ${SUBCONCS.map((sc) => {
+                                                const checked = Array.isArray(subconcPjMap[u.id]) && subconcPjMap[u.id].includes(sc);
+                                                return `<label class="inline-flex items-center gap-1 cursor-pointer font-semibold text-slate-700"><input type="checkbox" class="edit-pj-${u.id} accent-[#0095FF] rounded" value="${A.esc(sc)}" ${checked ? 'checked' : ''} /> ${A.esc(sc)}</label>`;
+                                            }).join('')}
+                                        </div>
+                                    </div>
                                 </div>
                                 <div id="editAccStudentWrap_${u.id}" class="${u.role === 'student' ? '' : 'hidden'} grid grid-cols-2 gap-2">
                                     <input id="editAccClass_${u.id}" list="anitrackClassList" type="text" value="${A.esc(u.class_name || '')}" placeholder="Kelas (X ANI A)"
@@ -1652,6 +1672,7 @@
                 const subconc = document.getElementById('newAccSubconc')?.value || '';
                 const mentorId = document.getElementById('newAccMentor')?.value || '';
                 const homeroomClass = document.getElementById('newAccHomeroom')?.value.trim() || '';
+                const pjSubconcs = [...document.querySelectorAll('input[name="newAccPjSubconc"]:checked')].map((el) => el.value);
                 const btn = document.getElementById('addAccountBtn');
 
                 if (!name) { setAccountManageFeedback('Nama lengkap wajib diisi.', true); return; }
@@ -1718,6 +1739,10 @@
                 if ((role === 'mentor' || role === 'superadmin') && homeroomClass && insertedAcc?.id) {
                     homeroomMap[insertedAcc.id] = homeroomClass;
                     await A.saveHomeroomMap(homeroomMap);
+                }
+                if ((role === 'mentor' || role === 'superadmin') && pjSubconcs.length && insertedAcc?.id) {
+                    subconcPjMap[insertedAcc.id] = pjSubconcs;
+                    await A.saveSubconcPjMap(subconcPjMap);
                 }
 
                 e.target.reset();
@@ -1797,6 +1822,11 @@
                 else delete homeroomMap[accountId];
                 await A.saveHomeroomMap(homeroomMap);
 
+                const editPjList = [...document.querySelectorAll(`.edit-pj-${accountId}:checked`)].map((el) => el.value);
+                if ((role === 'mentor' || role === 'superadmin') && editPjList.length) subconcPjMap[accountId] = editPjList;
+                else delete subconcPjMap[accountId];
+                await A.saveSubconcPjMap(subconcPjMap);
+
                 editingAccountId = null;
                 setAccountManageFeedback(`Akun "${name}" (${A.roleLabel(role)}) berhasil diperbarui ✓`);
                 A.showToast('Perubahan akun tersimpan ✓');
@@ -1829,13 +1859,18 @@
                         delete homeroomMap[accountId];
                         await A.saveHomeroomMap(homeroomMap);
                     }
+                    if (subconcPjMap[accountId]) {
+                        delete subconcPjMap[accountId];
+                        await A.saveSubconcPjMap(subconcPjMap);
+                    }
                 } else if (role === 'student') {
                     await Promise.all([
                         supabase.from('student_progress').delete().eq('student_id', accountId),
                         supabase.from('project_submissions').delete().eq('student_id', accountId),
                         supabase.from('student_material_progress').delete().eq('student_id', accountId),
                         supabase.from('app_settings').delete().like('key', `${A.PROJECT_WEEKLY_PREFIX}%::${accountId}`),
-                        supabase.from('app_settings').delete().eq('key', `${A.PROJECT_FB_LOG_PREFIX}${accountId}`)
+                        supabase.from('app_settings').delete().eq('key', `${A.PROJECT_FB_LOG_PREFIX}${accountId}`),
+                        supabase.from('app_settings').delete().eq('key', `${A.CHECKLIST_ROW_PREFIX}${accountId}`)
                     ]);
                 }
 
