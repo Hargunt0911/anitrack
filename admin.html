@@ -62,7 +62,7 @@
                     <img src="./logo-anitrack.png" alt="Logo AniTrack" class="w-11 h-11 object-contain shrink-0" />
                     <div class="sidebar-label hidden text-left min-w-0">
                         <div class="text-sm font-extrabold tracking-tight text-[#1E293B] leading-tight">AniTrack</div>
-                        <div class="text-[10px] font-semibold text-[#F13B6E] uppercase tracking-wider">Superadmin</div>
+                        <div id="sidebarRoleSubLabel" class="text-[10px] font-semibold text-[#F13B6E] uppercase tracking-wider">Superadmin</div>
                     </div>
                 </button>
 
@@ -672,8 +672,8 @@
                                     class="px-4 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-xs font-bold transition cursor-pointer">
                                     <span id="missingCountBadge">0</span> Belum Isi Hari Ini
                                 </button>
-                                <button type="button" onclick="toggleResetInputsBox()"
-                                    class="px-4 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">
+                                <button type="button" data-superadmin-only onclick="toggleResetInputsBox()"
+                                    class="hidden px-4 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">
                                     🗑️ Bersihkan Input Siswa
                                 </button>
                             </div>
@@ -857,8 +857,8 @@
                 <section id="tab-plotting" class="hidden space-y-5">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Kelola Akun (Admin, Guru, Siswa) &amp; Plotting</h2>
-                            <p class="text-xs text-slate-500 mt-0.5">Tambahkan akun baru sesuai role (Superadmin, Guru Pembimbing, atau Siswa), ubah role/data akun, serta atur plotting lintas kelas.</p>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Kelola Akun (Superadmin, Admin, Guru, Siswa) &amp; Plotting</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Pengaturan akun &amp; role (Superadmin, Admin Operasional, Guru Pembimbing, Wali Kelas, PJ Subkon, Siswa) dikelola Superadmin; plotting siswa lintas kelas tersedia di bawah.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
                             <button type="button" onclick="downloadPlottingTemplateXlsx()"
@@ -873,8 +873,17 @@
                         </div>
                     </div>
 
-                    <!-- Kelola Semua Akun Pengguna (Multi-Admin, Guru Pembimbing, Siswa) -->
-                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                    <!-- Info Pembatasan Role Non-Superadmin untuk Pengelolaan Akun -->
+                    <div data-non-superadmin-notice class="hidden bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 flex items-start gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-white border border-[#DCEBFF] text-[#0082E6] flex items-center justify-center shrink-0 font-bold">🔒</div>
+                        <div class="space-y-0.5 text-xs text-slate-600 leading-relaxed">
+                            <div class="font-extrabold text-[#1E293B]">Pengelolaan Akun &amp; Role Khusus Superadmin</div>
+                            <p>Penambahan, pengubahan, dan penghapusan akun serta penugasan role (Admin Operasional, Wali Kelas, PJ Sub-Konsentrasi) dibatasi hanya untuk <strong>Superadmin</strong>. Anda tetap dapat melakukan <strong>Plotting Siswa ke Guru Pembimbing</strong> di bawah ini.</p>
+                        </div>
+                    </div>
+
+                    <!-- Kelola Semua Akun Pengguna (Multi-Admin, Guru Pembimbing, Siswa — Khusus Superadmin) -->
+                    <div data-superadmin-only class="hidden bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div class="flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full bg-[#4CB6A7]"></span>
@@ -890,8 +899,9 @@
                                     <select id="newAccRole" onchange="onNewAccRoleChange()"
                                         class="w-full px-3 py-2.5 bg-white border border-[#CBD5E1] rounded-xl text-sm sm:text-xs font-bold text-[#1E293B] focus:outline-none focus:border-[#0095FF]">
                                         <option value="mentor">Guru Pembimbing</option>
+                                        <option value="admin">Admin (Operasional — Terbatas)</option>
                                         <option value="student">Siswa</option>
-                                        <option value="superadmin">Admin / Superadmin</option>
+                                        <option value="superadmin">Superadmin (Akses Penuh)</option>
                                     </select>
                                 </div>
                                 <div class="lg:col-span-3">
@@ -990,6 +1000,10 @@
                                     Admin &amp; Guru
                                 </button>
                                 <button type="button" onclick="setAccountRoleFilter('superadmin')" data-acc-filter="superadmin"
+                                    class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
+                                    Superadmin
+                                </button>
+                                <button type="button" onclick="setAccountRoleFilter('admin')" data-acc-filter="admin"
                                     class="acc-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
                                     Admin
                                 </button>
@@ -1103,7 +1117,15 @@
                         <span id="storageConnBadge" class="self-start sm:self-auto text-xs font-bold px-3.5 py-1.5 rounded-xl bg-white/20 text-white shrink-0">Mode Manual / Export</span>
                     </div>
 
-                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-4">
+                    <div data-non-superadmin-notice class="hidden bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 flex items-start gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-white border border-[#DCEBFF] text-[#0082E6] flex items-center justify-center shrink-0 font-bold">🔒</div>
+                        <div class="space-y-0.5 text-xs text-slate-600 leading-relaxed">
+                            <div class="font-extrabold text-[#1E293B]">Pengaturan Google Apps Script &amp; WA Gateway Dikelola Superadmin</div>
+                            <p>Konfigurasi URL Google Apps Script, API Token WA Gateway (Fonnte/Wablas), template pesan otomatis, serta jadwal kirim jam 07:00 WIB hanya dapat diubah oleh <strong>Superadmin</strong>. Anda tetap dapat melakukan backup/export Excel (<code>.xlsx</code>) dan memantau antrean serta log WA di bawah ini.</p>
+                        </div>
+                    </div>
+
+                    <div data-superadmin-only class="hidden bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-4">
                         <div>
                             <h3 class="text-base font-bold text-[#1E293B]">Sinkronisasi Otomatis via Google Apps Script</h3>
                             <p class="text-xs text-slate-500 mt-0.5">Aktifkan upload file Materi Ajar langsung dari form dan backup Excel (.xlsx) satu klik ke Google Drive.</p>
@@ -1176,8 +1198,8 @@
                             </button>
                         </div>
 
-                        <!-- Pengaturan Gateway WA (Fonnte / Wablas / Custom Webhook) -->
-                        <div class="bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 space-y-4">
+                        <!-- Pengaturan Gateway WA (Fonnte / Wablas / Custom Webhook — Khusus Superadmin) -->
+                        <div data-superadmin-only class="hidden bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
                                 <div class="md:col-span-3">
                                     <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Provider WA Gateway</label>
@@ -1376,9 +1398,19 @@
             let mentorsList = [];
             let homeroomMap = {};
             let subconcPjMap = {};
+            let adminRoleIds = [];
             let plottingStudentsCache = [];
             let editingAccountId = null;
-            let accountRoleFilter = 'staff'; // 'staff' | 'superadmin' | 'mentor' | 'student' | 'all'
+            let accountRoleFilter = 'staff'; // 'staff' | 'superadmin' | 'admin' | 'mentor' | 'student' | 'all'
+
+            function getEffectiveRole(u) {
+                if (!u) return 'student';
+                if (u.role === 'superadmin') return 'superadmin';
+                return adminRoleIds.includes(u.id) ? 'admin' : (u.role || 'student');
+            }
+            function isStaffRole(r) {
+                return r === 'mentor' || r === 'admin' || r === 'superadmin';
+            }
 
             const portal = A.initStaffPortal({
                 role: 'superadmin',
@@ -1409,24 +1441,32 @@
                 const hint = document.getElementById('newAccRoleHint');
                 const btn = document.getElementById('addAccountBtn');
                 studentBox?.classList.toggle('hidden', role !== 'student');
-                mentorBox?.classList.toggle('hidden', role !== 'mentor' && role !== 'superadmin');
+                mentorBox?.classList.toggle('hidden', !isStaffRole(role));
                 waStar?.classList.toggle('hidden', role !== 'mentor');
                 if (hint) {
                     hint.textContent = role === 'superadmin'
-                        ? 'Admin / Superadmin punya akses penuh (termasuk kelola akun, plotting, project, dan notifikasi WA). Bisa lebih dari 1 admin.'
-                        : role === 'mentor'
-                            ? 'Akun Guru Pembimbing wajib mencantumkan Nomor WA aktif (bisa sekaligus ditugaskan sebagai Wali Kelas).'
-                            : 'Akun Siswa dapat langsung login; lengkapi Kelas (wajib), Sub-Konsentrasi & Pembimbing (opsional).';
+                        ? 'Superadmin punya akses penuh seluruh sistem (kelola akun, role, Apps Script, WA Gateway/Fonnte, reset data, & merangkap pembimbing).'
+                        : role === 'admin'
+                            ? 'Admin (Operasional) dapat membuka dashboard admin, memantau seluruh kelas, plotting siswa, & export .xlsx — TANPA akses ubah pengaturan sistem (Apps Script, WA Gateway, Kelola Akun, Reset/Hapus Data).'
+                            : role === 'mentor'
+                                ? 'Akun Guru Pembimbing wajib mencantumkan Nomor WA aktif (bisa sekaligus ditugaskan sebagai Wali Kelas / PJ Sub-Konsentrasi).'
+                                : 'Akun Siswa dapat langsung login; lengkapi Kelas (wajib), Sub-Konsentrasi & Pembimbing (opsional).';
                 }
                 if (btn) {
-                    btn.textContent = role === 'superadmin' ? '+ Tambah Admin' : (role === 'mentor' ? '+ Tambah Guru' : '+ Tambah Siswa');
+                    btn.textContent = role === 'superadmin'
+                        ? '+ Tambah Superadmin'
+                        : role === 'admin'
+                            ? '+ Tambah Admin'
+                            : role === 'mentor'
+                                ? '+ Tambah Guru'
+                                : '+ Tambah Siswa';
                 }
             };
             window.onNewAccRoleChange();
 
             async function loadPlottingStudents() {
                 const cls = document.getElementById('plottingClassFilter').value;
-                const [{ data: allProfiles }, studRes, loadedHomeroom, loadedPjMap] = await Promise.all([
+                const [{ data: allProfiles }, studRes, loadedHomeroom, loadedPjMap, loadedAdminIds] = await Promise.all([
                     supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number, avatar_url, project_drive_url').order('full_name'),
                     (() => {
                         let q = supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name');
@@ -1434,11 +1474,13 @@
                         return q;
                     })(),
                     A.loadHomeroomMap(),
-                    A.loadSubconcPjMap()
+                    A.loadSubconcPjMap(),
+                    A.loadAdminRoleIds()
                 ]);
 
                 homeroomMap = loadedHomeroom || {};
                 subconcPjMap = loadedPjMap || {};
+                adminRoleIds = Array.isArray(loadedAdminIds) ? loadedAdminIds : [];
                 allAccountsList = allProfiles || [];
                 // Superadmin juga dapat merangkap sebagai Guru Pembimbing
                 mentorsList = allAccountsList.filter((p) => p.role === 'mentor' || p.role === 'superadmin');
@@ -1498,13 +1540,15 @@
                 const wrap = document.getElementById('accountsManageList');
                 const countsEl = document.getElementById('accountRoleCounts');
                 const me = A.getUser();
-                const adminCnt = allAccountsList.filter((p) => p.role === 'superadmin').length;
-                const mentorCnt = allAccountsList.filter((p) => p.role === 'mentor').length;
-                const studentCnt = allAccountsList.filter((p) => p.role === 'student').length;
+                const superCnt = allAccountsList.filter((p) => getEffectiveRole(p) === 'superadmin').length;
+                const adminCnt = allAccountsList.filter((p) => getEffectiveRole(p) === 'admin').length;
+                const mentorCnt = allAccountsList.filter((p) => getEffectiveRole(p) === 'mentor').length;
+                const studentCnt = allAccountsList.filter((p) => getEffectiveRole(p) === 'student').length;
 
                 if (countsEl) {
                     countsEl.innerHTML = `
-                        <span class="px-2.5 py-0.5 rounded-full bg-[#FFF0F4] text-[#E11D48]">${adminCnt} Admin</span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-[#FFF0F4] text-[#E11D48]">${superCnt} Superadmin</span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-[#EEF2FF] text-[#4F46E5]">${adminCnt} Admin</span>
                         <span class="px-2.5 py-0.5 rounded-full bg-[#E3F6F3] text-[#2F8F81]">${mentorCnt} Guru</span>
                         <span class="px-2.5 py-0.5 rounded-full bg-[#EAF4FF] text-[#0082E6]">${studentCnt} Siswa</span>
                     `;
@@ -1522,8 +1566,9 @@
 
                 const q = (document.getElementById('accountManageSearch')?.value || '').trim().toLowerCase();
                 let list = allAccountsList.filter((p) => {
-                    if (accountRoleFilter === 'staff' && p.role !== 'superadmin' && p.role !== 'mentor') return false;
-                    if (accountRoleFilter !== 'staff' && accountRoleFilter !== 'all' && p.role !== accountRoleFilter) return false;
+                    const effRole = getEffectiveRole(p);
+                    if (accountRoleFilter === 'staff' && !isStaffRole(effRole)) return false;
+                    if (accountRoleFilter !== 'staff' && accountRoleFilter !== 'all' && effRole !== accountRoleFilter) return false;
                     if (!q) return true;
                     return (p.full_name || '').toLowerCase().includes(q) ||
                         (p.username || '').toLowerCase().includes(q) ||
@@ -1531,8 +1576,8 @@
                         (p.sub_concentration || '').toLowerCase().includes(q);
                 });
 
-                const roleOrder = { superadmin: 1, mentor: 2, student: 3 };
-                list.sort((a, b) => (roleOrder[a.role] || 9) - (roleOrder[b.role] || 9) || (a.full_name || '').localeCompare(b.full_name || ''));
+                const roleOrder = { superadmin: 1, admin: 2, mentor: 3, student: 4 };
+                list.sort((a, b) => (roleOrder[getEffectiveRole(a)] || 9) - (roleOrder[getEffectiveRole(b)] || 9) || (a.full_name || '').localeCompare(b.full_name || ''));
 
                 if (!list.length) {
                     wrap.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-slate-400 bg-[#FAFBFD] border border-dashed border-[#E2E8F0] rounded-xl">Tidak ada akun yang cocok dengan filter ini.</div>`;
@@ -1542,25 +1587,25 @@
                 const maxShow = (accountRoleFilter === 'student' || accountRoleFilter === 'all') && !q ? 36 : list.length;
                 const visibleList = list.slice(0, maxShow);
                 const roleBadgeStyle = {
-                    superadmin: { label: 'ADMIN', cls: 'bg-[#FFF0F4] text-[#E11D48]', av: 'bg-[#FFE8EF] text-[#E11D48]' },
+                    superadmin: { label: 'SUPERADMIN', cls: 'bg-[#FFF0F4] text-[#E11D48]', av: 'bg-[#FFE8EF] text-[#E11D48]' },
+                    admin: { label: 'ADMIN', cls: 'bg-[#EEF2FF] text-[#4F46E5]', av: 'bg-[#EEF2FF] text-[#4F46E5]' },
                     mentor: { label: 'PEMBIMBING', cls: 'bg-[#E3F6F3] text-[#2F8F81]', av: 'bg-[#E3F6F3] text-[#2F8F81]' },
                     student: { label: 'SISWA', cls: 'bg-[#EAF4FF] text-[#0082E6]', av: 'bg-[#EAF4FF] text-[#0095FF]' }
                 };
 
                 wrap.innerHTML = visibleList.map((u) => {
-                    const rb = roleBadgeStyle[u.role] || roleBadgeStyle.student;
+                    const effRole = getEffectiveRole(u);
+                    const rb = roleBadgeStyle[effRole] || roleBadgeStyle.student;
                     const hasWa = Boolean(A.normalizeWhatsapp(u.whatsapp_number));
                     const isEditing = editingAccountId === u.id;
                     const isSelf = me && me.id === u.id;
                     const waLocal = hasWa ? A.formatWhatsappDisplay(u.whatsapp_number).replaceAll('-', '') : '';
-                    const subMeta = u.role === 'mentor'
-                        ? `@${u.username} • ${studentCountByMentor[u.id] || 0} siswa`
-                        : u.role === 'superadmin'
-                            ? `@${u.username} • ${studentCountByMentor[u.id] || 0} siswa${isSelf ? ' • Akun Anda' : ''}`
-                            : `@${u.username} • ${u.class_name || '-'}${u.sub_concentration ? ` • ${u.sub_concentration}` : ''}`;
+                    const subMeta = isStaffRole(effRole)
+                        ? `@${u.username} • ${studentCountByMentor[u.id] || 0} siswa${isSelf ? ' • Akun Anda' : ''}`
+                        : `@${u.username} • ${u.class_name || '-'}${u.sub_concentration ? ` • ${u.sub_concentration}` : ''}`;
 
                     return `
-                        <div class="rounded-xl border ${(u.role === 'mentor' && !hasWa) ? 'border-[#FECDD6] bg-[#FFF8FA]' : 'border-[#EDF1F7] bg-[#FAFBFD]'} p-3.5 space-y-2.5">
+                        <div class="rounded-xl border ${(effRole === 'mentor' && !hasWa) ? 'border-[#FECDD6] bg-[#FFF8FA]' : 'border-[#EDF1F7] bg-[#FAFBFD]'} p-3.5 space-y-2.5">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="flex items-center gap-2.5 min-w-0">
                                     <div class="w-9 h-9 rounded-full ${rb.av} font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
@@ -1580,7 +1625,7 @@
                                         ${isEditing ? 'Tutup' : 'Edit'}
                                     </button>
                                     ${!isSelf ? `
-                                    <button type="button" onclick="deleteUserAccount('${u.id}', '${A.esc(u.full_name)}', '${A.esc(u.role)}')"
+                                    <button type="button" onclick="deleteUserAccount('${u.id}', '${A.esc(u.full_name)}', '${A.esc(effRole)}')"
                                         class="px-2 py-1 rounded-lg bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-[10.5px] font-bold transition cursor-pointer">
                                         Hapus
                                     </button>` : ''}
@@ -1590,13 +1635,14 @@
                             <div class="flex flex-wrap items-center gap-1.5">
                                 ${hasWa
                                     ? A.renderWhatsappLink(u.whatsapp_number, false)
-                                    : (u.role === 'mentor'
+                                    : (effRole === 'mentor'
                                         ? `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib)</span>`
                                         : `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400">WA belum diisi</span>`)}
-                                ${(u.role === 'mentor' || u.role === 'superadmin') && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
-                                ${(u.role === 'mentor' || u.role === 'superadmin') && Array.isArray(subconcPjMap[u.id]) && subconcPjMap[u.id].length ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">🎨 PJ: ${A.esc(subconcPjMap[u.id].join(', '))}</span>` : ''}
-                                ${u.role === 'superadmin' ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Merangkap Pembimbing</span>` : ''}
-                                ${u.role === 'student' && u.mentor_id ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Pembimbing: ${A.esc(mentorNameMap[u.mentor_id] || 'Guru')}</span>` : ''}
+                                ${isStaffRole(effRole) && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
+                                ${isStaffRole(effRole) && Array.isArray(subconcPjMap[u.id]) && subconcPjMap[u.id].length ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">🎨 PJ: ${A.esc(subconcPjMap[u.id].join(', '))}</span>` : ''}
+                                ${effRole === 'superadmin' ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Merangkap Pembimbing</span>` : ''}
+                                ${effRole === 'admin' ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#EEF2FF] text-[#4F46E5]">Admin Operasional (Terbatas)</span>` : ''}
+                                ${effRole === 'student' && u.mentor_id ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Pembimbing: ${A.esc(mentorNameMap[u.mentor_id] || 'Guru')}</span>` : ''}
                             </div>
 
                             ${isEditing ? `
@@ -1606,14 +1652,15 @@
                                         class="col-span-2 px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs focus:outline-none focus:border-[#0095FF]" />
                                     <select id="editAccRole_${u.id}" onchange="onEditAccRoleChange('${u.id}')" ${isSelf ? 'disabled' : ''}
                                         class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-bold focus:outline-none focus:border-[#0095FF] disabled:bg-slate-100">
-                                        <option value="superadmin" ${u.role === 'superadmin' ? 'selected' : ''}>Admin / Superadmin</option>
-                                        <option value="mentor" ${u.role === 'mentor' ? 'selected' : ''}>Guru Pembimbing</option>
-                                        <option value="student" ${u.role === 'student' ? 'selected' : ''}>Siswa</option>
+                                        <option value="superadmin" ${effRole === 'superadmin' ? 'selected' : ''}>Superadmin (Akses Penuh)</option>
+                                        <option value="admin" ${effRole === 'admin' ? 'selected' : ''}>Admin (Operasional — Terbatas)</option>
+                                        <option value="mentor" ${effRole === 'mentor' ? 'selected' : ''}>Guru Pembimbing</option>
+                                        <option value="student" ${effRole === 'student' ? 'selected' : ''}>Siswa</option>
                                     </select>
                                     <input id="editAccWa_${u.id}" type="tel" value="${A.esc(waLocal)}" placeholder="Nomor WA (08...)"
                                         class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div id="editAccMentorWrap_${u.id}" class="${(u.role === 'mentor' || u.role === 'superadmin') ? '' : 'hidden'} space-y-1.5">
+                                <div id="editAccMentorWrap_${u.id}" class="${isStaffRole(effRole) ? '' : 'hidden'} space-y-1.5">
                                     <input id="editAccHomeroom_${u.id}" list="anitrackClassList" type="text" value="${A.esc(homeroomMap[u.id] || '')}" placeholder="Wali Kelas (kosongkan jika bukan, mis: X ANI A)"
                                         class="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
                                     <div class="rounded-lg bg-white border border-[#E2E8F0] p-2 space-y-1">
@@ -1626,7 +1673,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div id="editAccStudentWrap_${u.id}" class="${u.role === 'student' ? '' : 'hidden'} grid grid-cols-2 gap-2">
+                                <div id="editAccStudentWrap_${u.id}" class="${effRole === 'student' ? '' : 'hidden'} grid grid-cols-2 gap-2">
                                     <input id="editAccClass_${u.id}" list="anitrackClassList" type="text" value="${A.esc(u.class_name || '')}" placeholder="Kelas (X ANI A)"
                                         class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]" />
                                     <select id="editAccSubconc_${u.id}" class="px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
@@ -1651,6 +1698,10 @@
             window.renderAccountsManageList = renderAccountsManageList;
 
             window.toggleEditAccount = function (accountId) {
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    A.showToast('Hanya Superadmin yang dapat mengubah akun.');
+                    return;
+                }
                 editingAccountId = editingAccountId === accountId ? null : accountId;
                 renderAccountsManageList();
             };
@@ -1658,12 +1709,17 @@
             window.onEditAccRoleChange = function (accountId) {
                 const role = document.getElementById(`editAccRole_${accountId}`)?.value || 'student';
                 document.getElementById(`editAccStudentWrap_${accountId}`)?.classList.toggle('hidden', role !== 'student');
-                document.getElementById(`editAccMentorWrap_${accountId}`)?.classList.toggle('hidden', role !== 'mentor' && role !== 'superadmin');
+                document.getElementById(`editAccMentorWrap_${accountId}`)?.classList.toggle('hidden', !isStaffRole(role));
             };
 
             document.getElementById('addAccountForm')?.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    setAccountManageFeedback('Hanya Superadmin yang dapat menambahkan akun baru.', true);
+                    return;
+                }
                 const role = document.getElementById('newAccRole').value;
+                const dbRole = role === 'admin' ? 'mentor' : role;
                 const name = document.getElementById('newAccName').value.trim();
                 const username = document.getElementById('newAccUsername').value.trim().toLowerCase();
                 const password = document.getElementById('newAccPassword').value.trim();
@@ -1720,7 +1776,7 @@
                     full_name: name,
                     username,
                     pin_or_password: password,
-                    role,
+                    role: dbRole,
                     whatsapp_number: cleanWa,
                     class_name: role === 'student' ? className : (role === 'superadmin' ? 'All Classes' : null),
                     sub_concentration: role === 'student' ? (subconc || null) : null,
@@ -1736,11 +1792,15 @@
                     return;
                 }
 
-                if ((role === 'mentor' || role === 'superadmin') && homeroomClass && insertedAcc?.id) {
+                if (role === 'admin' && insertedAcc?.id) {
+                    adminRoleIds = [...new Set([...adminRoleIds, insertedAcc.id])];
+                    await A.saveAdminRoleIds(adminRoleIds);
+                }
+                if (isStaffRole(role) && homeroomClass && insertedAcc?.id) {
                     homeroomMap[insertedAcc.id] = homeroomClass;
                     await A.saveHomeroomMap(homeroomMap);
                 }
-                if ((role === 'mentor' || role === 'superadmin') && pjSubconcs.length && insertedAcc?.id) {
+                if (isStaffRole(role) && pjSubconcs.length && insertedAcc?.id) {
                     subconcPjMap[insertedAcc.id] = pjSubconcs;
                     await A.saveSubconcPjMap(subconcPjMap);
                 }
@@ -1758,11 +1818,16 @@
             });
 
             window.saveEditAccount = async function (accountId) {
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    setAccountManageFeedback('Hanya Superadmin yang dapat mengubah data & role akun.', true);
+                    return;
+                }
                 const target = allAccountsList.find((x) => x.id === accountId);
                 if (!target) return;
                 const me = A.getUser();
                 const name = document.getElementById(`editAccName_${accountId}`)?.value.trim() || '';
-                const role = document.getElementById(`editAccRole_${accountId}`)?.value || target.role;
+                const role = document.getElementById(`editAccRole_${accountId}`)?.value || getEffectiveRole(target);
+                const dbRole = role === 'admin' ? 'mentor' : role;
                 const rawWa = document.getElementById(`editAccWa_${accountId}`)?.value.trim() || '';
                 const newPass = document.getElementById(`editAccPass_${accountId}`)?.value.trim() || '';
                 const className = document.getElementById(`editAccClass_${accountId}`)?.value.trim() || '';
@@ -1772,12 +1837,12 @@
 
                 if (!name) { setAccountManageFeedback('Nama lengkap tidak boleh kosong.', true); return; }
                 if (me && me.id === accountId && role !== 'superadmin') {
-                    setAccountManageFeedback('Anda tidak dapat menurunkan role akun Admin yang sedang dipakai login.', true);
+                    setAccountManageFeedback('Anda tidak dapat menurunkan role akun Superadmin yang sedang dipakai login.', true);
                     return;
                 }
-                const adminCnt = allAccountsList.filter((x) => x.role === 'superadmin').length;
-                if (target.role === 'superadmin' && role !== 'superadmin' && adminCnt <= 1) {
-                    setAccountManageFeedback('Minimal harus ada 1 akun Admin aktif di sistem.', true);
+                const superCnt = allAccountsList.filter((x) => x.role === 'superadmin').length;
+                if (target.role === 'superadmin' && role !== 'superadmin' && superCnt <= 1) {
+                    setAccountManageFeedback('Minimal harus ada 1 akun Superadmin aktif di sistem.', true);
                     return;
                 }
 
@@ -1800,7 +1865,7 @@
 
                 const payload = {
                     full_name: name,
-                    role,
+                    role: dbRole,
                     whatsapp_number: cleanWa,
                     class_name: role === 'student' ? className : (role === 'superadmin' ? 'All Classes' : null),
                     sub_concentration: role === 'student' ? (subconc || null) : null,
@@ -1808,7 +1873,7 @@
                 };
                 if (newPass) payload.pin_or_password = newPass;
 
-                // Jika diubah ke student, lepas siswa yang dulunya di-plot ke dia (mentor <-> superadmin tetap pertahankan bimbingan)
+                // Jika diubah ke student, lepas siswa yang dulunya di-plot ke dia (staff <-> staff tetap pertahankan bimbingan)
                 if ((target.role === 'mentor' || target.role === 'superadmin') && role === 'student') {
                     await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', accountId);
                 }
@@ -1818,12 +1883,21 @@
                     setAccountManageFeedback(`Gagal memperbarui akun: ${error.message}`, true);
                     return;
                 }
-                if ((role === 'mentor' || role === 'superadmin') && homeroomClass) homeroomMap[accountId] = homeroomClass;
+
+                const nextAdminIds = role === 'admin'
+                    ? [...new Set([...adminRoleIds, accountId])]
+                    : adminRoleIds.filter((id) => id !== accountId);
+                if (JSON.stringify(nextAdminIds) !== JSON.stringify(adminRoleIds)) {
+                    adminRoleIds = nextAdminIds;
+                    await A.saveAdminRoleIds(adminRoleIds);
+                }
+
+                if (isStaffRole(role) && homeroomClass) homeroomMap[accountId] = homeroomClass;
                 else delete homeroomMap[accountId];
                 await A.saveHomeroomMap(homeroomMap);
 
                 const editPjList = [...document.querySelectorAll(`.edit-pj-${accountId}:checked`)].map((el) => el.value);
-                if ((role === 'mentor' || role === 'superadmin') && editPjList.length) subconcPjMap[accountId] = editPjList;
+                if (isStaffRole(role) && editPjList.length) subconcPjMap[accountId] = editPjList;
                 else delete subconcPjMap[accountId];
                 await A.saveSubconcPjMap(subconcPjMap);
 
@@ -1835,25 +1909,34 @@
             };
 
             window.deleteUserAccount = async function (accountId, fullName, role) {
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    setAccountManageFeedback('Hanya Superadmin yang dapat menghapus akun.', true);
+                    return;
+                }
                 const me = A.getUser();
                 if (me && me.id === accountId) {
                     setAccountManageFeedback('Tidak dapat menghapus akun Anda sendiri yang sedang login.', true);
                     return;
                 }
-                const adminCnt = allAccountsList.filter((x) => x.role === 'superadmin').length;
-                if (role === 'superadmin' && adminCnt <= 1) {
-                    setAccountManageFeedback('Tidak dapat menghapus Admin terakhir.', true);
+                const superCnt = allAccountsList.filter((x) => x.role === 'superadmin').length;
+                if (role === 'superadmin' && superCnt <= 1) {
+                    setAccountManageFeedback('Tidak dapat menghapus Superadmin terakhir.', true);
                     return;
                 }
 
-                const extraWarn = role === 'mentor'
-                    ? '\n\nSeluruh siswa yang di-plot ke guru ini akan dilepas pembimbingnya (akun siswa tidak terhapus).'
+                const extraWarn = (role === 'mentor' || role === 'admin')
+                    ? '\n\nSeluruh siswa yang di-plot ke akun ini akan dilepas pembimbingnya (akun siswa tidak terhapus).'
                     : role === 'student'
                         ? '\n\nSeluruh data progres, daily task, dan update mingguan siswa ini juga akan dihapus.'
                         : '';
                 if (!confirm(`Hapus akun ${A.roleLabel(role)} "${fullName}" secara permanen?${extraWarn}`)) return;
 
-                if (role === 'mentor' || role === 'superadmin') {
+                if (adminRoleIds.includes(accountId)) {
+                    adminRoleIds = adminRoleIds.filter((id) => id !== accountId);
+                    await A.saveAdminRoleIds(adminRoleIds);
+                }
+
+                if (isStaffRole(role)) {
                     await supabase.from('profiles').update({ mentor_id: null }).eq('mentor_id', accountId);
                     if (homeroomMap[accountId]) {
                         delete homeroomMap[accountId];
@@ -2464,31 +2547,34 @@
                     supabase.from('wa_notification_logs').select('*').order('created_at', { ascending: false }).limit(15)
                 ]);
 
-                // Muat konfigurasi tersimpan
+                // Muat konfigurasi tersimpan (token sensitif hanya diisi ke form untuk Superadmin)
+                const isSuper = A.isTrueSuperadmin(A.getUser());
                 let loadedCfg = {};
                 if (cfgRow?.value) {
                     try {
                         const cfg = JSON.parse(cfgRow.value);
                         loadedCfg = cfg || {};
-                        if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
-                        if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
-                        if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
-                        if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
-                        const tplEl = document.getElementById('waMessageTemplateInput');
-                        if (tplEl) tplEl.value = cfg.messageTemplate || A.DEFAULT_WA_TEMPLATE;
-                        document.getElementById('waScheduleEnabled').checked = Boolean(cfg.enabled);
-                        window.onWaProviderChange();
+                        if (isSuper) {
+                            if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
+                            if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
+                            if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
+                            if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
+                            const tplEl = document.getElementById('waMessageTemplateInput');
+                            if (tplEl) tplEl.value = cfg.messageTemplate || A.DEFAULT_WA_TEMPLATE;
+                            document.getElementById('waScheduleEnabled').checked = Boolean(cfg.enabled);
+                            window.onWaProviderChange();
+                        }
                         if (badgeEl) {
                             const active = Boolean(cfg.enabled && (cfg.apiToken || cfg.provider === 'custom_webhook') && A.getGasUrl());
                             badgeEl.textContent = active ? 'Aktif • 07:00 WIB' : (cfg.apiToken ? 'Siap Diaktifkan' : 'Belum Aktif');
                             badgeEl.className = `inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${active ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-500'}`;
                         }
                     } catch { /* ignore */ }
-                } else {
+                } else if (isSuper) {
                     const tplEl = document.getElementById('waMessageTemplateInput');
                     if (tplEl && !tplEl.value.trim()) tplEl.value = A.DEFAULT_WA_TEMPLATE;
                 }
-                window.updateWaTemplatePreview();
+                if (isSuper) window.updateWaTemplatePreview();
 
                 // Hitung antrean siswa hari ini (H-2/H-1/Hari-H & Lewat Deadline belum lapor selesai)
                 const allProf = profiles || [];
@@ -2593,6 +2679,10 @@
             window.loadWaAutomationPanel = loadWaAutomationPanel;
 
             window.saveWaReminderConfig = async function () {
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    setWaConfigFeedback('Hanya Superadmin yang dapat mengubah pengaturan WA Gateway.', true);
+                    return;
+                }
                 const cfg = readWaConfigForm();
                 const btn = document.getElementById('saveWaConfigBtn');
                 if (cfg.enabled && !cfg.apiToken && cfg.provider !== 'custom_webhook') {
@@ -2641,6 +2731,10 @@
             };
 
             window.testSendWaReminder = async function () {
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    setWaConfigFeedback('Hanya Superadmin yang dapat menjalankan tes kirim WA Gateway.', true);
+                    return;
+                }
                 const cfg = readWaConfigForm();
                 if (!A.getGasUrl()) {
                     setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
@@ -2678,6 +2772,10 @@
             };
 
             window.runWaReminderNow = async function () {
+                if (!A.isTrueSuperadmin(A.getUser())) {
+                    setWaConfigFeedback('Hanya Superadmin yang dapat memicu pengiriman massal WA Gateway.', true);
+                    return;
+                }
                 const cfg = readWaConfigForm();
                 if (!A.getGasUrl()) {
                     setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);

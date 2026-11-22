@@ -96,12 +96,12 @@
     <script src="./anitrack-core.js"></script>
     <script>
         (function () {
-            const { supabase, getUser, setUser, redirectToRole } = window.AniTrack;
+            const { supabase, getUser, setUser, redirectToRole, loadAdminRoleIds } = window.AniTrack;
 
             // Jika sudah login di sesi ini, langsung arahkan ke portal sesuai role
             const existing = getUser();
             if (existing && existing.id && existing.role) {
-                redirectToRole(existing.role);
+                redirectToRole(existing);
                 return;
             }
 
@@ -137,8 +137,10 @@
                     return;
                 }
 
+                const adminIds = await loadAdminRoleIds();
+                data.is_operational_admin = data.role !== 'superadmin' && adminIds.includes(data.id);
                 setUser(data);
-                redirectToRole(data.role);
+                redirectToRole(data);
             });
         })();
     </script>

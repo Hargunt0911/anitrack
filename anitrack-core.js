@@ -75,12 +75,49 @@
         sessionStorage.removeItem('anitrack_user');
     }
 
-    function getRolePage(role) {
-        return ROLE_PAGES[role] || './index.html';
+    const ADMIN_ROLE_IDS_KEY = 'admin_role_ids';
+
+    async function loadAdminRoleIds() {
+        if (!supabase) return [];
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', ADMIN_ROLE_IDS_KEY).maybeSingle();
+            if (data?.value) {
+                const parsed = JSON.parse(data.value);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        } catch { /* silent */ }
+        return [];
     }
 
-    function redirectToRole(role) {
-        global.location.replace(getRolePage(role));
+    async function saveAdminRoleIds(ids = []) {
+        if (!supabase) return { error: null };
+        const unique = [...new Set((ids || []).filter(Boolean))];
+        return supabase.from('app_settings').upsert({
+            key: ADMIN_ROLE_IDS_KEY,
+            value: JSON.stringify(unique),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    }
+
+    function isTrueSuperadmin(user) {
+        return Boolean(user && user.role === 'superadmin');
+    }
+
+    function isOperationalAdmin(user) {
+        return Boolean(user && user.role !== 'superadmin' && user.is_operational_admin);
+    }
+
+    function getRolePage(roleOrUser) {
+        if (roleOrUser && typeof roleOrUser === 'object') {
+            if (roleOrUser.role === 'superadmin' || roleOrUser.is_operational_admin) return './admin.html';
+            return ROLE_PAGES[roleOrUser.role] || './index.html';
+        }
+        if (roleOrUser === 'admin') return './admin.html';
+        return ROLE_PAGES[roleOrUser] || './index.html';
+    }
+
+    function redirectToRole(roleOrUser) {
+        global.location.replace(getRolePage(roleOrUser));
     }
 
     function requireRole(expectedRole) {
@@ -89,8 +126,22 @@
             global.location.replace('./index.html');
             return null;
         }
+        if (expectedRole === 'superadmin') {
+            if (user.role !== 'superadmin' && !user.is_operational_admin) {
+                global.location.replace(getRolePage(user));
+                return null;
+            }
+            return user;
+        }
+        if (expectedRole === 'mentor') {
+            if (user.role !== 'mentor' || user.is_operational_admin) {
+                global.location.replace(getRolePage(user));
+                return null;
+            }
+            return user;
+        }
         if (expectedRole && user.role !== expectedRole) {
-            global.location.replace(getRolePage(user.role));
+            global.location.replace(getRolePage(user));
             return null;
         }
         return user;
@@ -103,12 +154,16 @@
 
     async function syncFreshProfile(userId, onFresh) {
         if (!supabase || !userId) return null;
-        const { data: fresh } = await supabase
-            .from('profiles')
-            .select('id, full_name, username, class_name, sub_concentration, role, mentor_id, avatar_url, whatsapp_number, project_drive_url')
-            .eq('id', userId)
-            .maybeSingle();
+        const [{ data: fresh }, adminIds] = await Promise.all([
+            supabase
+                .from('profiles')
+                .select('id, full_name, username, class_name, sub_concentration, role, mentor_id, avatar_url, whatsapp_number, project_drive_url')
+                .eq('id', userId)
+                .maybeSingle(),
+            loadAdminRoleIds()
+        ]);
         if (fresh) {
+            fresh.is_operational_admin = fresh.role !== 'superadmin' && adminIds.includes(fresh.id);
             setUser(fresh);
             if (typeof onFresh === 'function') onFresh(fresh);
         }
@@ -131,9 +186,16 @@
         return (parts[0][0] + parts[1][0]).toUpperCase();
     }
 
-    function roleLabel(role = '') {
-        if (role === 'superadmin') return 'ADMIN';
-        if (role === 'mentor') return 'PEMBIMBING';
+    function roleLabel(roleOrUser = '') {
+        if (roleOrUser && typeof roleOrUser === 'object') {
+            if (roleOrUser.role === 'superadmin') return 'SUPERADMIN';
+            if (roleOrUser.is_operational_admin) return 'ADMIN';
+            if (roleOrUser.role === 'mentor') return 'PEMBIMBING';
+            return 'SISWA';
+        }
+        if (roleOrUser === 'superadmin') return 'SUPERADMIN';
+        if (roleOrUser === 'admin') return 'ADMIN';
+        if (roleOrUser === 'mentor') return 'PEMBIMBING';
         return 'SISWA';
     }
 
@@ -1244,7 +1306,7 @@
             const effectiveAvatar = pendingAvatarDataUrl !== undefined ? pendingAvatarDataUrl : (user.avatar_url || null);
 
             const rolePill = document.getElementById('rolePill');
-            if (rolePill) rolePill.textContent = roleLabel(user.role);
+            if (rolePill) rolePill.textContent = roleLabel(user);
             const topName = document.getElementById('topUserName');
             if (topName) topName.textContent = user.full_name || '-';
             setAvatarEl('topUserAvatar', user.avatar_url || null, user.full_name);
@@ -1254,7 +1316,7 @@
             const pName = document.getElementById('profileName');
             if (pName) pName.textContent = user.full_name || '-';
             const pBadge = document.getElementById('profileBadge');
-            if (pBadge) pBadge.textContent = roleLabel(user.role);
+            if (pBadge) pBadge.textContent = roleLabel(user);
             const pMeta = document.getElementById('profileMeta');
             if (pMeta) {
                 pMeta.textContent =
@@ -1736,6 +1798,10 @@
         loadSharedGasUrl();
 
         global.saveAndTestGasUrl = async function () {
+            if (!isTrueSuperadmin(getUser())) {
+                showToast('Pengaturan Google Apps Script hanya dapat diubah oleh Superadmin.');
+                return;
+            }
             const fb = document.getElementById('gasStatusFeedback');
             const val = document.getElementById('gasUrlInput').value.trim();
             if (!val) {
@@ -1766,6 +1832,10 @@
         };
 
         global.clearGasUrl = async function () {
+            if (!isTrueSuperadmin(getUser())) {
+                showToast('Pengaturan Google Apps Script hanya dapat direset oleh Superadmin.');
+                return;
+            }
             setGasUrl('');
             await supabase.from('app_settings').delete().eq('key', 'gas_web_app_url');
             updateDriveConnUI();
@@ -2616,10 +2686,18 @@
         }
 
         global.toggleResetInputsBox = function () {
+            if (!isTrueSuperadmin(currentUser)) {
+                showToast('Fitur reset input siswa hanya dapat diakses oleh Superadmin.');
+                return;
+            }
             document.getElementById('resetInputsBox')?.classList.toggle('hidden');
         };
 
         global.executeResetStudentInputs = async function () {
+            if (!isTrueSuperadmin(currentUser)) {
+                showToast('Fitur reset input siswa hanya dapat diakses oleh Superadmin.');
+                return;
+            }
             const sel = document.getElementById('resetTargetStudentSelect');
             const fb = document.getElementById('resetInputsFeedback');
             const btn = document.getElementById('executeResetInputsBtn');
@@ -2802,14 +2880,15 @@
                     projectChecklistState.subconc = activeSc;
                 }
 
-                const canEditActiveSc = expectedRole === 'superadmin' || (activeSc && myPjSubconcs.includes(activeSc));
+                const isSuper = isTrueSuperadmin(currentUser);
+                const canEditActiveSc = isSuper || (activeSc && myPjSubconcs.includes(activeSc));
                 // Daftar nama PJ untuk subkon aktif
                 const pjNamesForActiveSc = activeSc
                     ? mentorsList.filter((m) => Array.isArray(pjMap[m.id]) && pjMap[m.id].includes(activeSc)).map((m) => m.full_name)
                     : [];
 
                 // Sumber siswa:
-                // - Jika Superadmin atau PJ untuk subkon aktif -> lihat SEMUA siswa di subkon tersebut (lintas kelas & lintas pembimbing!)
+                // - Jika Superadmin, Admin Operasional, atau PJ untuk subkon aktif -> lihat SEMUA siswa di subkon tersebut
                 // - Jika Pembimbing biasa / Walas (bukan PJ subkon aktif) -> lihat siswa bimbingan / kelas perwaliannya saja
                 const baseStudents = (expectedRole === 'superadmin' || canEditActiveSc)
                     ? allStudentsList.filter((s) => !activeSc || s.sub_concentration === activeSc)
@@ -2978,7 +3057,7 @@
                                     ${filteredRows.length ? filteredRows.map((s, idx) => {
                                         const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
                                         const stuSubconc = s.sub_concentration || '';
-                                        const stuCanEdit = expectedRole === 'superadmin' || (stuSubconc && myPjSubconcs.includes(stuSubconc));
+                                        const stuCanEdit = isSuper || (stuSubconc && myPjSubconcs.includes(stuSubconc));
                                         const stuColsSet = new Set(stuSubconc ? (checklistColsMap[stuSubconc] || DEFAULT_CHECKLIST_COLS) : activeCols);
                                         const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
                                         const notDoneList = activeCols.filter((c) => stuColsSet.has(c) && rowData.items?.[c] !== 'done');
@@ -3716,10 +3795,11 @@
                                         class="px-3.5 py-2 rounded-xl ${isOpen ? 'bg-[#1E293B] text-white' : 'bg-[#0095FF] hover:bg-[#0082E6] text-white shadow-blueGlow'} text-xs font-bold transition cursor-pointer">
                                         ${isOpen ? 'Tutup Panel' : (waitCount > 0 ? `Review (${waitCount})` : 'Review Siswa')}
                                     </button>
+                                    ${isTrueSuperadmin(currentUser) ? `
                                     <button type="button" onclick="deleteProjectTask('${t.id}')"
                                         class="px-3 py-2 rounded-xl bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-xs font-bold transition cursor-pointer">
                                         Hapus
-                                    </button>
+                                    </button>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -4076,6 +4156,10 @@
         };
 
         global.deleteProjectArchive = async function (encodedKey) {
+            if (!isTrueSuperadmin(currentUser)) {
+                showToast('Hanya Superadmin yang dapat menghapus arsip snapshot.');
+                return;
+            }
             const key = decodeURIComponent(encodedKey || '');
             if (!confirm('Hapus arsip snapshot ini secara permanen?')) return;
             await supabase.from('app_settings').delete().eq('key', key);
@@ -4131,10 +4215,11 @@
                                 class="px-3 py-1.5 rounded-lg bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-[11px] font-bold transition cursor-pointer">
                                 📥 Export .xlsx
                             </button>
+                            ${isTrueSuperadmin(currentUser) ? `
                             <button type="button" onclick="deleteProjectArchive('${encodeURIComponent(a.key)}')"
                                 class="px-2.5 py-1.5 rounded-lg bg-[#FFF1F5] hover:bg-[#F13B6E] text-[#F13B6E] hover:text-white text-[11px] font-bold transition cursor-pointer">
                                 Hapus
-                            </button>
+                            </button>` : ''}
                         </div>
                     </div>`).join('');
             }
@@ -4436,6 +4521,10 @@
         };
 
         global.deleteProjectTask = async function (taskId) {
+            if (!isTrueSuperadmin(currentUser)) {
+                showToast('Hanya Superadmin yang dapat menghapus tugas project.');
+                return;
+            }
             if (!confirm('Hapus tugas project ini beserta seluruh data pengumpulannya?')) return;
             const { error } = await supabase.from('project_tasks').delete().eq('id', taskId);
             if (error) { showToast(`Gagal menghapus tugas: ${error.message}`); return; }
@@ -4765,13 +4854,29 @@
             setTimeout(() => icon?.classList.remove('animate-spin'), 400);
         };
 
+        function applyRoleRestrictionsUI() {
+            const isSuper = isTrueSuperadmin(currentUser);
+            document.querySelectorAll('[data-superadmin-only]').forEach((el) => {
+                el.classList.toggle('hidden', !isSuper);
+            });
+            document.querySelectorAll('[data-non-superadmin-notice]').forEach((el) => {
+                el.classList.toggle('hidden', isSuper);
+            });
+            const sbRoleLabel = document.getElementById('sidebarRoleSubLabel');
+            if (sbRoleLabel) {
+                sbRoleLabel.textContent = isSuper ? 'Superadmin' : (currentUser?.is_operational_admin ? 'Admin' : 'Pembimbing');
+            }
+        }
+
         // Boot
         paintProfile();
+        applyRoleRestrictionsUI();
         updateMentorWaBanner();
         paintTabs();
         syncFreshProfile(currentUser.id, (fresh) => {
             currentUser = fresh;
             paintProfile();
+            applyRoleRestrictionsUI();
             updateMentorWaBanner();
         });
         Promise.all([refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadProjectTracker(), extraRefresh()]);
@@ -4794,6 +4899,11 @@
         getUser,
         setUser,
         clearUser,
+        ADMIN_ROLE_IDS_KEY,
+        loadAdminRoleIds,
+        saveAdminRoleIds,
+        isTrueSuperadmin,
+        isOperationalAdmin,
         getRolePage,
         redirectToRole,
         requireRole,
