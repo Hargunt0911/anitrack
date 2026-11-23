@@ -1233,7 +1233,7 @@
                         </div>
                     </div>
 
-                    <!-- ==================== NOTIFIKASI WA OTOMATIS DEADLINE JAM 07:00 WIB ==================== -->
+                    <!-- ==================== NOTIFIKASI OTOMATIS DEADLINE JAM 07:00 WIB (WHATSAPP & TELEGRAM) ==================== -->
                     <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-5">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div class="space-y-1">
@@ -1241,9 +1241,9 @@
                                     <span class="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#E7F9EE] text-[#15803D]">Otomatis Setiap Jam 07:00 WIB</span>
                                     <span id="waScheduleBadge" class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Belum Aktif</span>
                                 </div>
-                                <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">🔔 Notifikasi WhatsApp Otomatis Deadline Project</h3>
+                                <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">🔔 Notifikasi Otomatis Deadline Project (WhatsApp &amp; Telegram)</h3>
                                 <p class="text-xs text-slate-500 leading-relaxed">
-                                    <strong>Aturan Pengiriman:</strong> (1) Saat <strong>H-2, H-1, dan Hari-H</strong> deadline, siswa otomatis mendapat WA pengingat pukul <strong>07:00 WIB</strong>. (2) Jika siswa <strong>belum lapor selesai melebihi deadline</strong>, sistem terus mengirim WA <strong>setiap hari pukul 07:00 WIB</strong> sampai siswa melapor selesai.
+                                    <strong>Pilih Kanal Pengiriman:</strong> Anda bisa mengaktifkan <strong>WhatsApp saja</strong>, <strong>Telegram Bot saja (100% Gratis)</strong>, atau <strong>keduanya bersamaan</strong> setiap pukul <strong>07:00 WIB</strong> untuk siswa H-2 s/d Hari-H dan yang melewati deadline.
                                 </p>
                             </div>
                             <button type="button" onclick="loadWaAutomationPanel()"
@@ -1252,9 +1252,28 @@
                             </button>
                         </div>
 
-                        <!-- Pengaturan Gateway WA (Fonnte / Wablas / Custom Webhook) -->
+                        <!-- Pilihan 2 Kanal Pengiriman (WhatsApp &/atau Telegram) -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-[#BBF7D0] bg-[#F5FBF7] cursor-pointer select-none">
+                                <input id="waChannelEnabled" type="checkbox" checked onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#16A34A]" />
+                                <div class="space-y-0.5">
+                                    <div class="text-xs font-extrabold text-[#15803D]">💬 Pilihan 1: Kirim via WhatsApp Gateway</div>
+                                    <div class="text-[11px] text-slate-600">Kirim pengingat personal langsung ke nomor WA masing-masing siswa (via Fonnte / Wablas / Webhook).</div>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-[#BAE6FD] bg-[#F0F9FF] cursor-pointer select-none">
+                                <input id="tgChannelEnabled" type="checkbox" onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#0284C7]" />
+                                <div class="space-y-0.5">
+                                    <div class="text-xs font-extrabold text-[#0369A1]">✈️ Pilihan 2: Kirim via Telegram Bot (Gratis Resmi)</div>
+                                    <div class="text-[11px] text-slate-600">Kirim rekap pengingat harian ke Grup Telegram Utama atau Grup per Kelas tanpa biaya &amp; tanpa scan QR.</div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Pengaturan Gateway WA & Telegram Bot -->
                         <div class="bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                            <div id="waGatewaySettingsWrap" class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                                <div class="md:col-span-12 text-xs font-extrabold text-[#15803D]">💬 Konfigurasi WhatsApp Gateway</div>
                                 <div class="md:col-span-3">
                                     <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Provider WA Gateway</label>
                                     <select id="waProviderSelect" onchange="onWaProviderChange()"
@@ -1279,7 +1298,32 @@
                                     <input id="waCustomUrlInput" type="url" placeholder="https://pati.wablas.com/api/send-message"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
+                            </div>
 
+                            <!-- Konfigurasi Telegram Bot API -->
+                            <div id="tgGatewaySettingsWrap" class="hidden pt-3 border-t border-[#DCEBFF] grid grid-cols-1 md:grid-cols-12 gap-3">
+                                <div class="md:col-span-12 flex flex-wrap items-center justify-between gap-2">
+                                    <span class="text-xs font-extrabold text-[#0369A1]">✈️ Konfigurasi Telegram Bot API (Gratis Resmi)</span>
+                                    <span class="text-[11px] text-slate-500">Buat bot di <code>@BotFather</code> → masukkan Bot ke grup → ambil Chat ID via <code>@userinfobot</code> / <code>@RawDataBot</code>.</span>
+                                </div>
+                                <div class="md:col-span-6">
+                                    <label for="tgBotTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">Telegram Bot Token (dari @BotFather)</label>
+                                    <input id="tgBotTokenInput" type="password" placeholder="Contoh: 7123456789:AAHxxx..."
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="md:col-span-6">
+                                    <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup / Channel Utama (Default)</label>
+                                    <input id="tgChatIdInput" type="text" placeholder="Contoh: -1001234567890 atau ID pribadi"
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="md:col-span-12">
+                                    <label for="tgClassChatMapInput" class="block text-xs font-semibold text-slate-600 mb-1">Mapping Chat ID Per Kelas (Opsional — 1 baris per kelas: <code class="font-mono">Nama Kelas = ChatID</code>)</label>
+                                    <textarea id="tgClassChatMapInput" rows="2" placeholder="X ANI A = -1001111111111&#10;X ANI B = -1002222222222"
+                                        class="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
                                 <!-- Editor Template Pesan WA Custom (Otomatis Sesuai Nama & Tugas Siswa) -->
                                 <div class="md:col-span-12 pt-2 border-t border-[#DCEBFF] space-y-2.5">
                                     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1329,8 +1373,12 @@
                                         💾 Simpan &amp; Pasang Jadwal 07:00
                                     </button>
                                     <button id="testWaBtn" type="button" onclick="testSendWaReminder()"
-                                        class="px-3.5 py-2 rounded-xl bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] text-xs font-bold transition cursor-pointer">
-                                        🧪 Tes Kirim WA
+                                        class="px-3.5 py-2 rounded-xl bg-white hover:bg-[#E7F9EE] border border-[#BBF7D0] text-[#15803D] text-xs font-bold transition cursor-pointer">
+                                        🧪 Tes WA
+                                    </button>
+                                    <button id="testTgBtn" type="button" onclick="testSendTelegramReminder()"
+                                        class="px-3.5 py-2 rounded-xl bg-white hover:bg-[#E0F2FE] border border-[#BAE6FD] text-[#0369A1] text-xs font-bold transition cursor-pointer">
+                                        ✈️ Tes Telegram
                                     </button>
                                     <button id="runWaNowBtn" type="button" onclick="runWaReminderNow()"
                                         class="px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
@@ -1442,7 +1490,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261123b"></script>
+    <script src="./anitrack-core.js?v=20261123c"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2566,11 +2614,40 @@
                 A.showToast('Template pesan WA dikembalikan ke default.');
             };
 
+            window.toggleNotifChannelPanels = function () {
+                const waOn = Boolean(document.getElementById('waChannelEnabled')?.checked);
+                const tgOn = Boolean(document.getElementById('tgChannelEnabled')?.checked);
+                document.getElementById('waGatewaySettingsWrap')?.classList.toggle('opacity-50', !waOn);
+                document.getElementById('tgGatewaySettingsWrap')?.classList.toggle('hidden', !tgOn);
+            };
+
+            function parseTgClassMapText(raw) {
+                const map = {};
+                String(raw || '').split(/\r?\n/).forEach((line) => {
+                    const idx = line.indexOf('=');
+                    if (idx === -1) return;
+                    const cls = line.slice(0, idx).trim();
+                    const cid = line.slice(idx + 1).trim();
+                    if (cls && cid) map[cls] = cid;
+                });
+                return map;
+            }
+
+            function formatTgClassMapText(obj) {
+                if (!obj || typeof obj !== 'object') return '';
+                return Object.entries(obj).map(([k, v]) => `${k} = ${v}`).join('\n');
+            }
+
             function readWaConfigForm() {
                 return {
+                    waEnabled: Boolean(document.getElementById('waChannelEnabled')?.checked),
                     provider: document.getElementById('waProviderSelect')?.value || 'fonnte',
                     apiToken: (document.getElementById('waApiTokenInput')?.value || '').trim(),
                     customUrl: (document.getElementById('waCustomUrlInput')?.value || '').trim(),
+                    tgEnabled: Boolean(document.getElementById('tgChannelEnabled')?.checked),
+                    tgBotToken: (document.getElementById('tgBotTokenInput')?.value || '').trim(),
+                    tgChatId: (document.getElementById('tgChatIdInput')?.value || '').trim(),
+                    tgClassChatMap: parseTgClassMapText(document.getElementById('tgClassChatMapInput')?.value || ''),
                     appUrl: (document.getElementById('waAppUrlInput')?.value || '').trim(),
                     messageTemplate: (document.getElementById('waMessageTemplateInput')?.value || '').trim(),
                     enabled: Boolean(document.getElementById('waScheduleEnabled')?.checked),
@@ -2609,18 +2686,32 @@
                         const cfg = JSON.parse(cfgRow.value);
                         loadedCfg = cfg || {};
                         if (isAdminStaff) {
+                            const waChk = document.getElementById('waChannelEnabled');
+                            const tgChk = document.getElementById('tgChannelEnabled');
+                            if (waChk) waChk.checked = cfg.waEnabled !== undefined ? Boolean(cfg.waEnabled) : true;
+                            if (tgChk) tgChk.checked = Boolean(cfg.tgEnabled);
                             if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
                             if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
                             if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
+                            if (cfg.tgBotToken) document.getElementById('tgBotTokenInput').value = cfg.tgBotToken;
+                            if (cfg.tgChatId) document.getElementById('tgChatIdInput').value = cfg.tgChatId;
+                            const tgMapEl = document.getElementById('tgClassChatMapInput');
+                            if (tgMapEl) tgMapEl.value = formatTgClassMapText(cfg.tgClassChatMap);
                             if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
                             const tplEl = document.getElementById('waMessageTemplateInput');
                             if (tplEl) tplEl.value = cfg.messageTemplate || A.DEFAULT_WA_TEMPLATE;
                             document.getElementById('waScheduleEnabled').checked = Boolean(cfg.enabled);
                             window.onWaProviderChange();
+                            window.toggleNotifChannelPanels();
                         }
                         if (badgeEl) {
-                            const active = Boolean(cfg.enabled && (cfg.apiToken || cfg.provider === 'custom_webhook') && A.getGasUrl());
-                            badgeEl.textContent = active ? 'Aktif • 07:00 WIB' : (cfg.apiToken ? 'Siap Diaktifkan' : 'Belum Aktif');
+                            const waReady = (cfg.waEnabled !== false) && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
+                            const tgReady = Boolean(cfg.tgEnabled && cfg.tgBotToken && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                            const chList = [];
+                            if (waReady) chList.push('WA');
+                            if (tgReady) chList.push('Telegram');
+                            const active = Boolean(cfg.enabled && chList.length && A.getGasUrl());
+                            badgeEl.textContent = active ? `Aktif (${chList.join(' + ')}) • 07:00 WIB` : (chList.length ? `Siap (${chList.join(' + ')})` : 'Belum Aktif');
                             badgeEl.className = `inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${active ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-500'}`;
                         }
                     } catch { /* ignore */ }
@@ -2681,9 +2772,13 @@
                                                 <td class="py-2.5 px-3">${catBadge}</td>
                                                 <td class="py-2.5 px-3 text-slate-600 max-w-xs truncate" title="${A.esc(itemsText)}">${A.esc(itemsText)}</td>
                                                 <td class="py-2.5 px-3 text-right">
-                                                    ${waUrl
-                                                        ? `<a href="${A.esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white font-bold transition">💬 Kirim WA</a>`
-                                                        : `<span class="text-[10.5px] text-slate-400">Belum ada WA</span>`}
+                                                    <div class="inline-flex items-center gap-1.5">
+                                                        ${waUrl
+                                                            ? `<a href="${A.esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white font-bold transition">💬 WA</a>`
+                                                            : `<span class="text-[10.5px] text-slate-400">No WA</span>`}
+                                                        <a href="${A.esc(A.getTelegramShareUrl(loadedCfg.appUrl || window.location.origin, q.message))}" target="_blank" rel="noopener noreferrer"
+                                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#0284C7] text-[#0369A1] hover:text-white font-bold transition">✈️ Telegram</a>
+                                                    </div>
                                                 </td>
                                             </tr>`;
                                     }).join('')}
@@ -2739,9 +2834,10 @@
                 }
                 const cfg = readWaConfigForm();
                 const btn = document.getElementById('saveWaConfigBtn');
-                if (cfg.enabled && !cfg.apiToken && cfg.provider !== 'custom_webhook') {
-                    setWaConfigFeedback('Masukkan API Token WA Gateway terlebih dahulu sebelum mengaktifkan jadwal otomatis.', true);
-                    document.getElementById('waApiTokenInput')?.focus();
+                const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
+                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                if (cfg.enabled && !waReady && !tgReady) {
+                    setWaConfigFeedback('Pilih dan lengkapi minimal 1 kanal pengiriman (API Token WA atau Bot Token + Chat ID Telegram) sebelum mengaktifkan jadwal otomatis.', true);
                     return;
                 }
 
@@ -2825,9 +2921,9 @@
                 }
             };
 
-            window.runWaReminderNow = async function () {
+            window.testSendTelegramReminder = async function () {
                 if (!A.isAnyAdmin(A.getUser())) {
-                    setWaConfigFeedback('Hanya Admin / Superadmin yang dapat memicu pengiriman massal WA Gateway.', true);
+                    setWaConfigFeedback('Hanya Admin / Superadmin yang dapat menjalankan tes kirim Telegram.', true);
                     return;
                 }
                 const cfg = readWaConfigForm();
@@ -2835,11 +2931,50 @@
                     setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
                     return;
                 }
-                if (!cfg.apiToken && cfg.provider !== 'custom_webhook') {
-                    setWaConfigFeedback('Masukkan API Token WA Gateway terlebih dahulu.', true);
+                if (!cfg.tgBotToken) {
+                    setWaConfigFeedback('Masukkan Telegram Bot Token dari @BotFather terlebih dahulu.', true);
+                    document.getElementById('tgBotTokenInput')?.focus();
                     return;
                 }
-                if (!confirm('Jalankan pengecekan & kirim notifikasi WA sekarang ke seluruh siswa yang masuk H-2 s/d Hari-H atau melewati deadline (belum lapor selesai)?')) return;
+                const targetChat = prompt('Masukkan Chat ID Grup / Pribadi Telegram untuk tes kirim:', cfg.tgChatId || '-100');
+                if (!targetChat || !targetChat.trim()) return;
+
+                const btn = document.getElementById('testTgBtn');
+                btn.disabled = true;
+                btn.textContent = 'Mengirim...';
+                try {
+                    const res = await A.postToGas({ action: 'test_send_telegram', tgBotToken: cfg.tgBotToken, chatId: targetChat.trim(), config: cfg });
+                    btn.disabled = false;
+                    btn.textContent = '✈️ Tes Telegram';
+                    if (!res?.ok) throw new Error(res?.error || res?.detail || 'Pengiriman Telegram gagal.');
+                    setWaConfigFeedback(`Pesan tes Telegram berhasil dikirim ke Chat ID ${targetChat.trim()} ✓`);
+                    A.showToast('Pesan Telegram tes terkirim ✓');
+                    loadWaAutomationPanel();
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = '✈️ Tes Telegram';
+                    setWaConfigFeedback(`Tes Telegram gagal: ${err.message}`, true);
+                }
+            };
+
+            window.runWaReminderNow = async function () {
+                if (!A.isAnyAdmin(A.getUser())) {
+                    setWaConfigFeedback('Hanya Admin / Superadmin yang dapat memicu pengiriman massal WA/Telegram.', true);
+                    return;
+                }
+                const cfg = readWaConfigForm();
+                if (!A.getGasUrl()) {
+                    setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
+                    return;
+                }
+                const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
+                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                if (!waReady && !tgReady) {
+                    setWaConfigFeedback('Aktifkan dan lengkapi minimal 1 kanal (WhatsApp atau Telegram Bot) terlebih dahulu.', true);
+                    return;
+                }
+                const chLabel = [waReady ? 'WhatsApp' : '', tgReady ? 'Telegram' : ''].filter(Boolean).join(' + ');
+                if (!confirm(`Jalankan pengecekan & kirim notifikasi (${chLabel}) sekarang ke seluruh siswa yang masuk H-2 s/d Hari-H atau melewati deadline?`)) return;
 
                 const btn = document.getElementById('runWaNowBtn');
                 btn.disabled = true;
@@ -2848,14 +2983,17 @@
                     const res = await A.postToGas({ action: 'run_wa_deadline_check_now', config: cfg });
                     btn.disabled = false;
                     btn.textContent = '📨 Jalankan Sekarang';
-                    if (!res?.ok) throw new Error(res?.error || 'Gagal menjalankan pengingat WA.');
-                    setWaConfigFeedback(`Selesai (${res.sentDate}): ${res.sentCount} WA terkirim, ${res.failedCount} gagal, ${res.skippedNoWa} belum isi WA (dari ${res.eligibleStudents} siswa memenuhi syarat).`);
-                    A.showToast(`${res.sentCount} notifikasi WA pengingat deadline terkirim ✓`);
+                    if (!res?.ok) throw new Error(res?.error || 'Gagal menjalankan pengingat.');
+                    const parts = [];
+                    if (waReady) parts.push(`WA: ${res.sentCount || 0} terkirim, ${res.failedCount || 0} gagal, ${res.skippedNoWa || 0} belum isi WA`);
+                    if (tgReady) parts.push(`Telegram: ${res.tgSentCount || 0} grup/chat terkirim, ${res.tgFailedCount || 0} gagal`);
+                    setWaConfigFeedback(`Selesai (${res.sentDate}) — ${parts.join(' | ')} (dari ${res.eligibleStudents} siswa memenuhi syarat).`);
+                    A.showToast(`Notifikasi ${chLabel} berhasil dijalankan ✓`);
                     loadWaAutomationPanel();
                 } catch (err) {
                     btn.disabled = false;
                     btn.textContent = '📨 Jalankan Sekarang';
-                    setWaConfigFeedback(`Gagal menjalankan pengingat WA: ${err.message}`, true);
+                    setWaConfigFeedback(`Gagal menjalankan pengingat: ${err.message}`, true);
                 }
             };
         })();
