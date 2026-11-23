@@ -463,14 +463,23 @@
     const SUBCONC_PJ_MAP_KEY = 'subconc_pj_map';
     const CHECKLIST_COLS_KEY = 'proj_checklist_cols';
     const CHECKLIST_ROW_PREFIX = 'proj_checklist_row::';
+    const GLOBAL_ANNOUNCEMENT_KEY = 'global_announcement';
 
     const DEFAULT_CHECKLIST_COLS = ['Compose & Audio Video', 'Grading', 'Final Film + Credit Title'];
     const CHECKLIST_STATUS_OPTIONS = [
-        { value: 'belum', label: 'Belum', short: '– Belum', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-        { value: 'proses', label: 'Proses', short: '⋯ Proses', cls: 'bg-[#EAF4FF] text-[#0082E6] border-[#CBE5FF]' },
-        { value: 'revisi', label: 'Revisi', short: '! Revisi', cls: 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]' },
-        { value: 'done', label: 'Done', short: '✓ Done', cls: 'bg-[#E7F9EE] text-[#15803D] border-[#BBF7D0]' }
+        { value: 'none', label: 'None', short: 'None', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+        { value: 'wip', label: 'WIP', short: 'WIP', cls: 'bg-[#FFF6D6] text-[#B45309] border-[#FDE68A]' },
+        { value: 'revisi', label: 'Revisi', short: 'Revisi', cls: 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]' },
+        { value: 'done', label: 'Done', short: 'Done', cls: 'bg-[#DCFCE7] text-[#15803D] border-[#86EFAC]' }
     ];
+
+    function normalizeChecklistStatus(raw) {
+        const v = String(raw || '').trim().toLowerCase();
+        if (v === 'done' || v === 'selesai' || v === 'acc') return 'done';
+        if (v === 'revisi' || v === 'revision') return 'revisi';
+        if (v === 'wip' || v === 'proses' || v === 'in progress' || v === 'sedang_dikerjakan') return 'wip';
+        return 'none';
+    }
 
     function getJakartaYmd(dateInput = new Date()) {
         try {
@@ -697,9 +706,12 @@
             const sid = String(r.key).slice(CHECKLIST_ROW_PREFIX.length);
             try {
                 const parsed = JSON.parse(r.value || '{}');
+                const rawItems = (parsed.items && typeof parsed.items === 'object') ? parsed.items : {};
+                const normItems = {};
+                Object.keys(rawItems).forEach((k) => { normItems[k] = normalizeChecklistStatus(rawItems[k]); });
                 map[sid] = {
                     student_id: sid,
-                    items: (parsed.items && typeof parsed.items === 'object') ? parsed.items : {},
+                    items: normItems,
                     notes: parsed.notes || '',
                     updated_by: parsed.updated_by || '',
                     updated_at: parsed.updated_at || r.updated_at || null
@@ -752,12 +764,312 @@
                             </div>
                             <span class="font-mono text-[10.5px] text-slate-400">${esc(formatDateTime(e.at))}</span>
                         </div>
-                        <p class="text-slate-700 leading-relaxed">${esc(e.feedback || '(Tanpa catatan tambahan)')}</p>
+                        <div class="text-slate-700 leading-relaxed space-y-2">${formatFeedbackWithImages(e.feedback || '(Tanpa catatan tambahan)')}</div>
                         <div class="text-[10.5px] text-slate-400">Oleh: <strong class="text-slate-600">${esc(e.reviewer_name || 'Guru')}</strong></div>
                     </div>`;
             }).join('');
         }
         modal.classList.remove('hidden');
+    }
+
+    // ==================== GAMBAR CATATAN REVISI, PENGUMUMAN GLOBAL, FLOWCHART & CETAK PDF RAPOR ====================
+    function formatFeedbackWithImages(rawText, forPrint = false) {
+        if (!rawText) return '';
+        const imgTokens = [];
+        const withPlaceholders = String(rawText).replace(/\[IMG:([^\]]+)\]/g, (_m, rawUrl) => {
+            const url = String(rawUrl || '').trim();
+            if (!url) return '';
+            const idx = imgTokens.length;
+            imgTokens.push(url);
+            return `@@ANITRACK_IMG_${idx}@@`;
+        });
+        let html = esc(withPlaceholders).replace(/\r?\n/g, '<br>');
+        imgTokens.forEach((url, idx) => {
+            const safeUrl = esc(url);
+            const imgMarkup = forPrint
+                ? `<div style="margin-top:6px;"><img src="${safeUrl}" alt="Lampiran Revisi" style="max-width:240px;max-height:160px;border:1px solid #cbd5e1;border-radius:6px;display:block;" /></div>`
+                : `<div class="mt-2"><img src="${safeUrl}" alt="Lampiran Coretan Revisi" onclick="openProofLightbox(this.src, 'Lampiran Gambar Revisi Guru')" class="max-w-xs max-h-48 rounded-xl border border-[#CBD5E1] shadow-sm cursor-zoom-in hover:opacity-90 transition object-contain bg-white" title="Klik untuk perbesar gambar revisi" /></div>`;
+            html = html.replace(`@@ANITRACK_IMG_${idx}@@`, imgMarkup);
+        });
+        return html;
+    }
+
+    function stripFeedbackImageTags(rawText) {
+        return String(rawText || '').replace(/\[IMG:[^\]]+\]/g, '[Gambar Revisi]').replace(/\s+/g, ' ').trim();
+    }
+
+    function renderGlobalAnnouncementBanner(text) {
+        const clean = String(text || '').trim();
+        const inp = document.getElementById('globalAnnouncementInput');
+        if (inp && document.activeElement !== inp) inp.value = clean;
+
+        let bar = document.getElementById('anitrackGlobalAnnouncementBar');
+        if (!clean) {
+            if (bar) bar.classList.add('hidden');
+            return;
+        }
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'anitrackGlobalAnnouncementBar';
+            bar.className = 'bg-gradient-to-r from-[#0082E6] via-[#2563EB] to-[#4F46E5] text-white text-xs sm:text-[13px] font-semibold py-2 px-4 shadow-sm border-b border-white/15';
+            bar.innerHTML = `
+                <div class="max-w-[1400px] mx-auto flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+                        <span class="px-2 py-0.5 rounded-md bg-[#F7C200] text-[#1E293B] text-[10px] font-extrabold uppercase tracking-wider shrink-0">📢 Info</span>
+                        <div id="anitrackGlobalAnnouncementText" class="truncate sm:whitespace-normal leading-snug"></div>
+                    </div>
+                    <button type="button" onclick="document.getElementById('anitrackGlobalAnnouncementBar').classList.add('hidden')" title="Tutup sementara"
+                        class="text-white/80 hover:text-white font-bold px-1.5 py-0.5 rounded cursor-pointer shrink-0">✕</button>
+                </div>`;
+            const header = document.querySelector('header');
+            if (header && header.parentNode) {
+                header.parentNode.insertBefore(bar, header.nextSibling);
+            } else {
+                document.body.prepend(bar);
+            }
+        }
+        const txtEl = document.getElementById('anitrackGlobalAnnouncementText');
+        if (txtEl) txtEl.textContent = clean;
+        bar.classList.remove('hidden');
+    }
+
+    async function loadGlobalAnnouncement() {
+        if (!supabase) return '';
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', GLOBAL_ANNOUNCEMENT_KEY).maybeSingle();
+            const txt = data?.value ? String(data.value) : '';
+            renderGlobalAnnouncementBanner(txt);
+            return txt;
+        } catch {
+            return '';
+        }
+    }
+
+    async function saveGlobalAnnouncement(text) {
+        if (!supabase) return { error: new Error('Supabase tidak siap') };
+        const clean = String(text || '').trim();
+        const res = await supabase.from('app_settings').upsert({
+            key: GLOBAL_ANNOUNCEMENT_KEY,
+            value: clean,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+        if (!res.error) renderGlobalAnnouncementBanner(clean);
+        return res;
+    }
+
+    function openStudentFlowchartModal(student, tasks = [], subMap = {}, mentorObj = null, fbLogs = []) {
+        if (!student) return;
+        let modal = document.getElementById('anitrackFlowchartModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackFlowchartModal';
+            modal.className = 'fixed inset-0 z-[82] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            modal.innerHTML = `
+                <div class="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                    <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">🗺️ Timeline Flowchart Progres Siswa</div>
+                            <div id="flowModalTitle" class="text-base font-extrabold text-[#1E293B] truncate mt-0.5"></div>
+                            <div id="flowModalMeta" class="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs"></div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('anitrackFlowchartModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
+                    </div>
+                    <div id="flowModalBody" class="p-5 max-h-[72vh] overflow-y-auto bg-[#FAFBFD]"></div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+
+        const eligible = (tasks || []).filter((t) => !t.sub_concentration || student.sub_concentration === t.sub_concentration);
+        const doneCount = eligible.filter((t) => subMap[`${t.id}__${student.id}`]?.status === 'selesai').length;
+        const pct = eligible.length ? Math.round((doneCount / eligible.length) * 100) : 0;
+
+        document.getElementById('flowModalTitle').textContent = `${student.full_name} (${student.class_name || '-'})`;
+        document.getElementById('flowModalMeta').innerHTML = `
+            <span class="px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6] font-bold">${esc(student.sub_concentration || 'Belum ada subkon')}</span>
+            <span class="px-2 py-0.5 rounded-md bg-[#DCFCE7] text-[#15803D] font-bold">${doneCount}/${eligible.length} Tuntas (${pct}%)</span>
+            ${mentorObj ? `<span class="px-2 py-0.5 rounded-md bg-white border border-[#E2E8F0] text-slate-600 font-semibold">👨‍🏫 ${esc(mentorObj.full_name)}</span>` : ''}
+            ${renderWhatsappLink(student.whatsapp_number, true)}
+            ${student.project_drive_url ? `<a href="${esc(student.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="px-2 py-0.5 rounded-md bg-white border border-[#CBE5FF] text-[#0082E6] hover:bg-[#0095FF] hover:text-white font-bold transition">📁 Drive ↗</a>` : ''}
+            <button type="button" onclick="printStudentReportPdf('${student.id}')" class="px-2 py-0.5 rounded-md bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white font-bold transition cursor-pointer">🖨️ Cetak PDF</button>
+        `;
+
+        const body = document.getElementById('flowModalBody');
+        if (!eligible.length) {
+            body.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">Belum ada tugas project untuk sub-konsentrasi siswa ini.</div>`;
+        } else {
+            body.innerHTML = `
+                <div class="relative pl-6 space-y-3.5 before:content-[''] before:absolute before:left-[9px] before:top-3 before:bottom-3 before:w-0.5 before:bg-[#CBD5E1]">
+                    ${eligible.map((t, idx) => {
+                        const ps = subMap[`${t.id}__${student.id}`] || {};
+                        const stVal = ps.status || 'belum_mulai';
+                        const isDone = stVal === 'selesai';
+                        const isOrange = stVal === 'revisi' || stVal === 'menunggu_review' || stVal === 'sedang_dikerjakan';
+                        const dotCls = isDone ? 'bg-[#22C55E] ring-[#DCFCE7]' : (isOrange ? 'bg-[#F97316] ring-[#FFEDD5]' : 'bg-[#CBD5E1] ring-slate-100');
+                        const cardCls = isDone ? 'bg-[#F0FDF4] border-[#BBF7D0]' : (stVal === 'revisi' ? 'bg-[#FFF5F7] border-[#FECDD6]' : (isOrange ? 'bg-[#FFFBEB] border-[#FDE68A]' : 'bg-white border-[#E2E8F0]'));
+                        const stObj = STATUS_OPTIONS.find((x) => x.value === stVal) || STATUS_OPTIONS[0];
+                        const tm = evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
+                        const revNum = Number(ps.revision_count || 0);
+                        return `
+                            <div class="relative">
+                                <span class="absolute -left-6 top-3.5 w-4 h-4 rounded-full border-2 border-white ring-4 ${dotCls}"></span>
+                                <div class="rounded-xl border p-3.5 shadow-xs space-y-1.5 ${cardCls}">
+                                    <div class="flex flex-wrap items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${idx + 1}. ${esc(t.pipeline_stage)} ${t.due_date ? `• Deadline ${esc(formatDateOnly(t.due_date))}` : ''}</div>
+                                            <div class="text-xs sm:text-sm font-extrabold text-[#1E293B] mt-0.5">${esc(t.title)}</div>
+                                        </div>
+                                        <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${isDone ? tm.badgeClass : stObj.badge}">
+                                            ${isDone ? esc(tm.label) : esc(stObj.label)}
+                                        </span>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">
+                                        ${ps.updated_at ? `<span>⏱ Update: ${esc(formatDateTime(ps.updated_at))}</span>` : `<span>Belum dikumpulkan</span>`}
+                                        ${revNum > 0 ? `<span class="px-1.5 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48] font-bold">Revisi ke-${revNum}</span>` : ''}
+                                        ${ps.proof_image ? `<button type="button" onclick="openProofLightbox('${esc(ps.proof_image)}', '${esc(t.title)} — ${esc(student.full_name)}')" class="font-bold text-[#0082E6] hover:underline cursor-pointer">📷 Lihat Bukti Siswa</button>` : ''}
+                                    </div>
+                                    ${ps.mentor_feedback ? `
+                                        <div class="mt-2 p-2.5 rounded-lg bg-white/90 border border-[#E2E8F0] text-xs text-slate-700">
+                                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Catatan Pembimbing:</div>
+                                            ${formatFeedbackWithImages(ps.mentor_feedback)}
+                                        </div>` : ''}
+                                </div>
+                            </div>`;
+                    }).join('')}
+                </div>`;
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function buildStudentReportPrintHtml(student, ctx = {}) {
+        const { tasks = [], subMap = {}, mentorMap = {}, fbLogMap = {}, checklistColsMap = {}, checklistRowMap = {} } = ctx;
+        const eligible = tasks.filter((t) => !t.sub_concentration || student.sub_concentration === t.sub_concentration);
+        const stats = computeStudentIssueStats(student, tasks, subMap);
+        const pct = stats.eligibleCount ? Math.round((stats.accCount / stats.eligibleCount) * 100) : 0;
+        const mentor = student.mentor_id ? mentorMap[student.mentor_id] : null;
+        const logs = fbLogMap[student.id] || [];
+        const ckCols = (student.sub_concentration && checklistColsMap[student.sub_concentration]) || DEFAULT_CHECKLIST_COLS;
+        const ckRow = checklistRowMap[student.id] || { items: {}, notes: '' };
+        const ckDone = ckCols.filter((c) => normalizeChecklistStatus(ckRow.items?.[c]) === 'done').length;
+        const ckPct = ckCols.length ? Math.round((ckDone / ckCols.length) * 100) : 0;
+        const statusTextMap = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+        const todayId = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+
+        const taskRowsHtml = eligible.length ? eligible.map((t, i) => {
+            const ps = subMap[`${t.id}__${student.id}`] || {};
+            const stVal = ps.status || 'belum_mulai';
+            const stObj = STATUS_OPTIONS.find((x) => x.value === stVal) || STATUS_OPTIONS[0];
+            const tm = evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
+            const taskLogs = logs.filter((l) => l.task_id === t.id || (l.task_title && l.task_title === t.title));
+            const statusDisplay = stVal === 'selesai' ? tm.label : stObj.label;
+            const timeLine = ps.updated_at ? `<div style="font-size:9px;color:#475569;margin-top:2px;">(${esc(formatDateTime(ps.updated_at))})</div>` : '';
+            const histHtml = taskLogs.length
+                ? taskLogs.slice(0, 4).map((l) => `<div style="margin-bottom:4px;border-bottom:1px dashed #e2e8f0;padding-bottom:3px;"><strong>[${esc(formatDateTime(l.at))}]</strong> ${formatFeedbackWithImages(l.feedback, true)}</div>`).join('')
+                : (ps.mentor_feedback ? formatFeedbackWithImages(ps.mentor_feedback, true) : '-');
+            return `
+                <tr>
+                    <td style="border:1px solid #94a3b8;padding:6px;text-align:center;">${i + 1}</td>
+                    <td style="border:1px solid #94a3b8;padding:6px;">
+                        <div style="font-weight:700;">${esc(t.title)}</div>
+                        <div style="font-size:9px;color:#64748b;">${esc(t.pipeline_stage)}${t.due_date ? ` • Deadline: ${esc(formatDateOnly(t.due_date))}` : ''}</div>
+                    </td>
+                    <td style="border:1px solid #94a3b8;padding:6px;text-align:center;font-weight:700;">${esc(statusDisplay)}${timeLine}</td>
+                    <td style="border:1px solid #94a3b8;padding:6px;font-size:10px;line-height:1.4;">${histHtml}</td>
+                </tr>`;
+        }).join('') : `<tr><td colspan="4" style="border:1px solid #94a3b8;padding:10px;text-align:center;color:#64748b;">Belum ada tugas project untuk sub-konsentrasi ini.</td></tr>`;
+
+        const ckSummaryHtml = ckCols.map((c) => {
+            const st = statusTextMap[normalizeChecklistStatus(ckRow.items?.[c])] || 'None';
+            const bg = st === 'Done' ? '#dcfce7' : (st === 'Revisi' ? '#ffe4e6' : (st === 'WIP' ? '#fef3c7' : '#f1f5f9'));
+            return `<span style="display:inline-block;padding:3px 8px;border-radius:6px;background:${bg};border:1px solid #cbd5e1;font-size:10px;font-weight:700;margin:2px 4px 2px 0;">${esc(c)}: ${esc(st)}</span>`;
+        }).join('');
+
+        return `
+            <div class="report-page">
+                <div style="text-align:center;border-bottom:2px solid #0f172a;padding-bottom:8px;margin-bottom:14px;">
+                    <div style="font-size:16px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;">LAPORAN JURNAL &amp; PROGRES PROJECT SISWA</div>
+                    <div style="font-size:11px;color:#334155;margin-top:2px;">Jurusan Animasi — SMKN 4 Malang • Sistem Monitoring AniTrack</div>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:14px;font-size:11px;">
+                    <div style="line-height:1.6;">
+                        <div><strong>Nama Siswa:</strong> ${esc(student.full_name)}</div>
+                        <div><strong>Kelas / Username:</strong> ${esc(student.class_name || '-')} / @${esc(student.username || '-')}</div>
+                        <div><strong>Sub-Konsentrasi:</strong> ${esc(student.sub_concentration || 'Belum diatur')}</div>
+                        <div><strong>No. WhatsApp:</strong> ${esc(formatWhatsappDisplay(student.whatsapp_number) || '-')}</div>
+                        <div><strong>Guru Pembimbing:</strong> ${esc(mentor?.full_name || 'Belum di-plot')}</div>
+                    </div>
+                    <div style="border:1px solid #94a3b8;border-radius:8px;padding:10px 14px;background:#f8fafc;min-width:190px;line-height:1.7;">
+                        <div style="font-weight:700;color:#15803d;">Tugas Tuntas: ${stats.accCount}/${stats.eligibleCount} (${pct}%)</div>
+                        <div style="font-weight:700;color:#a16207;">Lencana Emas: ${stats.goldCount}</div>
+                        <div style="font-weight:700;color:#be123c;">Poin Masalah: ${stats.totalIssues}</div>
+                        <div style="font-weight:700;color:#0369a1;">Project Update: ${ckDone}/${ckCols.length} Done (${ckPct}%)</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:12px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fafbfd;">
+                    <div style="font-size:11px;font-weight:800;margin-bottom:5px;">Status Project Update (${esc(student.sub_concentration || 'Sub-Konsentrasi')}):</div>
+                    <div>${ckSummaryHtml}</div>
+                    ${ckRow.notes ? `<div style="font-size:10px;margin-top:6px;color:#334155;"><strong>Notes PJ Subkon:</strong> ${esc(ckRow.notes)}</div>` : ''}
+                </div>
+
+                <div style="font-size:12px;font-weight:800;margin-bottom:6px;">Rincian Tugas Project &amp; Histori Revisi:</div>
+                <table style="width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:24px;">
+                    <thead>
+                        <tr style="background:#e2e8f0;">
+                            <th style="border:1px solid #94a3b8;padding:6px;width:30px;">No</th>
+                            <th style="border:1px solid #94a3b8;padding:6px;text-align:left;">Nama Tugas &amp; Deadline</th>
+                            <th style="border:1px solid #94a3b8;padding:6px;width:130px;">Status</th>
+                            <th style="border:1px solid #94a3b8;padding:6px;text-align:left;width:230px;">Catatan / Histori Revisi</th>
+                        </tr>
+                    </thead>
+                    <tbody>${taskRowsHtml}</tbody>
+                </table>
+
+                <div style="display:flex;justify-content:space-between;margin-top:26px;padding:0 24px;font-size:11px;text-align:center;">
+                    <div>
+                        <div>Mengetahui,</div>
+                        <div>Orang Tua / Wali Siswa</div>
+                        <div style="height:56px;"></div>
+                        <div style="border-bottom:1px solid #0f172a;width:160px;margin:0 auto;"></div>
+                    </div>
+                    <div>
+                        <div>Malang, ${esc(todayId)}</div>
+                        <div>Guru Pembimbing</div>
+                        <div style="height:56px;"></div>
+                        <div style="font-weight:700;text-decoration:underline;">${esc(mentor?.full_name || '________________________')}</div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function printStudentsReportPdf(studentsArray = [], ctx = {}, titleLabel = 'Laporan Rapor Jurnal Siswa — AniTrack') {
+        if (!studentsArray || !studentsArray.length) {
+            showToast('Tidak ada data siswa untuk dicetak.');
+            return;
+        }
+        const pagesHtml = studentsArray.map((s) => buildStudentReportPrintHtml(s, ctx)).join('');
+        const fullDoc = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>${esc(titleLabel)}</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 16px; background: #fff; }
+                .report-page { page-break-after: always; padding: 8px 4px; }
+                .report-page:last-child { page-break-after: auto; }
+                @media print {
+                    body { padding: 0; }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                }
+            </style>
+        </head><body>${pagesHtml}<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 350); };<\/script></body></html>`;
+
+        const win = window.open('', '_blank');
+        if (!win) {
+            showToast('Popup cetak diblokir browser. Izinkan popup untuk situs ini lalu klik Cetak PDF lagi.');
+            return;
+        }
+        win.document.open();
+        win.document.write(fullDoc);
+        win.document.close();
     }
 
     function computeDeadlineReminderQueue(students, mentors, tasks, submissions, waConfig = {}) {
@@ -2797,6 +3109,7 @@
         let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
         let projectChecklistState = { subconc: '', className: '', statusFilter: 'all', search: '' };
+        let projectClassesState = { search: '', mentorId: '', openClasses: new Set() };
         let myHomeroomClass = '';
         let myPjSubconcs = [];
         let staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees'; // 'all' | 'mentees' | 'homeroom'
@@ -2826,11 +3139,6 @@
                     (t.pipeline_stage || '').toLowerCase().includes(globalSearchTerm);
             });
 
-            if (!filteredTasks.length) {
-                container.innerHTML = `<div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-10 text-center text-sm text-slate-400">Belum ada tugas project untuk filter ini. Tambahkan tugas project &amp; deadline di form atas atau Import Excel (.xlsx).</div>`;
-                return;
-            }
-
             const classes = [...new Set(studentList.map((s) => s.class_name).filter(Boolean))].sort();
             const currentWeekKey = getWeekKey();
             const weeklyByKey = {};
@@ -2859,7 +3167,7 @@
                         </button>
                         <button type="button" onclick="setProjectViewMode('checklist')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'checklist' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            <span>✅ Checklist PJ Subkon</span>
+                            <span>📊 Project Update</span>
                             ${myPjSubconcs.length ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${projectViewMode === 'checklist' ? 'bg-white/25 text-white' : 'bg-[#E7F9EE] text-[#15803D]'}">PJ</span>` : ''}
                         </button>
                         <button type="button" onclick="setProjectViewMode('weekly')"
@@ -2867,53 +3175,246 @@
                             <span>📅 Update Mingguan</span>
                             ${missingWeeklyCount > 0 ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${projectViewMode === 'weekly' ? 'bg-white/25 text-white' : 'bg-[#FFF0F4] text-[#E11D48]'} num-tabular">${missingWeeklyCount} belum</span>` : ''}
                         </button>
+                        <button type="button" onclick="setProjectViewMode('classes')"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'classes' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            🏫 Rekap Per Kelas (${classes.length})
+                        </button>
                         <button type="button" onclick="setProjectViewMode('matrix')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'matrix' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            📊 Matrix Semua Siswa (${studentList.length})
+                            🧩 Matrix Semua Siswa (${studentList.length})
                         </button>
                     </div>
                     <span class="text-[11px] text-slate-400 hidden sm:inline">
                         ${projectViewMode === 'checklist'
-                            ? 'Diisi oleh Guru PJ Sub-Konsentrasi (Done / Proses / Revisi + Notes) dan langsung terpantau Pembimbing masing-masing.'
-                            : (projectViewMode === 'weekly'
-                                ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
-                                : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'))}
+                            ? 'Otomatis mengelompokkan siswa per Sub-Konsentrasi (Progress Bar + None / WIP / Revisi / Done + Notes).'
+                            : (projectViewMode === 'classes'
+                                ? 'Akordion progres rata-rata tiap kelas, Timeline Flowchart siswa, & Cetak PDF Rapor siap tanda tangan.'
+                                : (projectViewMode === 'weekly'
+                                    ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
+                                    : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi (+ gambar coretan).' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.')))}
                     </span>
                 </div>`;
 
-            // ==================== MODE 4: CHECKLIST PJ SUB-KONSENTRASI (DIISI PJ SUBKON -> DIBACA PEMBIMBING) ====================
+            // ==================== MODE 5: REKAP AKORDION PER KELAS + FLOWCHART + CETAK PDF RAPOR ====================
+            if (projectViewMode === 'classes') {
+                const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
+                const cSearch = (projectClassesState.search || '').trim().toLowerCase();
+                const cMentor = projectClassesState.mentorId || '';
+
+                const scopedForClasses = studentList.filter((s) => {
+                    if (subF && s.sub_concentration !== subF) return false;
+                    if (expectedRole === 'superadmin' && cMentor && s.mentor_id !== cMentor) return false;
+                    if (!cSearch) return true;
+                    return (s.full_name || '').toLowerCase().includes(cSearch) ||
+                        (s.username || '').toLowerCase().includes(cSearch) ||
+                        (s.class_name || '').toLowerCase().includes(cSearch) ||
+                        (s.sub_concentration || '').toLowerCase().includes(cSearch);
+                });
+
+                const grouped = {};
+                scopedForClasses.forEach((s) => {
+                    const clsName = s.class_name || 'Tanpa Kelas';
+                    if (!grouped[clsName]) grouped[clsName] = [];
+                    grouped[clsName].push(s);
+                });
+                const sortedClassNames = Object.keys(grouped).sort();
+                if (!projectClassesState.openClasses.size && sortedClassNames.length) {
+                    projectClassesState.openClasses.add(sortedClassNames[0]);
+                }
+
+                container.innerHTML = `
+                    ${modeSwitcherHtml}
+                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 space-y-4">
+                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-extrabold text-[#1E293B]">🏫 Rekap Akordion Per Kelas &amp; Cetak PDF Rapor</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Klik nama kelas untuk membuka daftar siswa, melihat <strong>Timeline Flowchart</strong>, atau <strong>Cetak PDF Rapor</strong> siap tanda tangan orang tua &amp; guru.</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                ${expectedRole === 'superadmin' ? `
+                                <select onchange="setProjectClassesMentor(this.value)" class="px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                    <option value="">Semua Pembimbing</option>
+                                    ${mentorsList.map((m) => `<option value="${esc(m.id)}" ${cMentor === m.id ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}
+                                </select>` : ''}
+                                <input id="projClassesSearchInp" type="text" value="${esc(projectClassesState.search)}" oninput="setProjectClassesSearch(this.value)"
+                                    placeholder="Cari siswa / kelas / subkon..."
+                                    class="px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs w-52 focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <button type="button" onclick="printAllStudentsReportPdf('')"
+                                    class="px-3.5 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    🖨️ Cetak PDF Semua (${scopedForClasses.length})
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            ${sortedClassNames.length ? sortedClassNames.map((clsName) => {
+                                const list = grouped[clsName];
+                                const isOpen = projectClassesState.openClasses.has(clsName);
+                                let sumPct = 0;
+                                let clsGold = 0;
+                                let clsIssues = 0;
+                                const enriched = list.map((s) => {
+                                    const st = computeStudentIssueStats(s, allTasks, subMap);
+                                    const pct = st.eligibleCount ? Math.round((st.accCount / st.eligibleCount) * 100) : 0;
+                                    const waitCnt = allTasks.filter((t) => (!t.sub_concentration || s.sub_concentration === t.sub_concentration) && subMap[`${t.id}__${s.id}`]?.status === 'menunggu_review').length;
+                                    const revCnt = allTasks.filter((t) => (!t.sub_concentration || s.sub_concentration === t.sub_concentration) && subMap[`${t.id}__${s.id}`]?.status === 'revisi').length;
+                                    sumPct += pct;
+                                    clsGold += st.goldCount;
+                                    clsIssues += st.totalIssues;
+                                    return { s, st, pct, waitCnt, revCnt };
+                                });
+                                const avgClsPct = list.length ? Math.round(sumPct / list.length) : 0;
+                                const avgBarColor = avgClsPct === 100 ? 'bg-[#4CAF50]' : (avgClsPct >= 50 ? 'bg-[#38BDF8]' : 'bg-[#F87171]');
+
+                                return `
+                                    <div class="rounded-2xl border border-[#DCE5F2] overflow-hidden shadow-xs">
+                                        <div class="bg-[#1E293B] hover:bg-[#29374E] text-white px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition"
+                                            onclick="toggleClassAccordion('${encodeURIComponent(clsName)}')">
+                                            <div class="flex flex-wrap items-center gap-2.5">
+                                                <span class="text-sm sm:text-base font-extrabold tracking-wide">🏫 ${esc(clsName)}</span>
+                                                <span class="px-2 py-0.5 rounded-full bg-white/15 text-[10.5px] font-bold num-tabular">${list.length} Siswa</span>
+                                                ${clsGold > 0 ? `<span class="px-2 py-0.5 rounded-full bg-[#F7C200]/25 text-[#FFF6D6] text-[10.5px] font-bold">🌟 ${clsGold}</span>` : ''}
+                                                ${clsIssues > 0 ? `<span class="px-2 py-0.5 rounded-full bg-[#F13B6E]/30 text-[#FFE4EC] text-[10.5px] font-bold">⚠️ ${clsIssues}</span>` : ''}
+                                                <span class="text-xs text-slate-300 transition-transform ${isOpen ? 'rotate-180' : ''}">▼</span>
+                                            </div>
+                                            <div class="flex items-center gap-3 w-full sm:w-auto">
+                                                <div class="flex items-center gap-2 flex-1 sm:flex-none num-tabular">
+                                                    <span class="text-[11px] text-slate-300 whitespace-nowrap">Ketuntasan:</span>
+                                                    <div class="w-full sm:w-32 h-2.5 rounded-full bg-white/20 overflow-hidden">
+                                                        <div class="${avgBarColor} h-full rounded-full transition-all duration-500" style="width:${avgClsPct}%"></div>
+                                                    </div>
+                                                    <span class="text-xs font-extrabold w-9 text-right">${avgClsPct}%</span>
+                                                </div>
+                                                <button type="button" onclick="event.stopPropagation(); printAllStudentsReportPdf('${encodeURIComponent(clsName)}')"
+                                                    class="px-2.5 py-1.5 rounded-lg bg-white/15 hover:bg-white text-white hover:text-[#1E293B] text-[11px] font-bold transition cursor-pointer shrink-0">
+                                                    🖨️ PDF Kelas
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="${isOpen ? '' : 'hidden'} bg-white divide-y divide-[#F1F5F9]">
+                                            ${enriched.map(({ s, st, pct, waitCnt, revCnt }) => {
+                                                const mObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
+                                                const logsCnt = (projectDataCache.fbLogMap?.[s.id] || []).length;
+                                                const barCls = pct === 100 ? 'bg-[#4CAF50]' : (pct >= 50 ? 'bg-[#0095FF]' : 'bg-[#F13B6E]');
+                                                return `
+                                                    <div class="p-3.5 sm:px-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 hover:bg-[#F8FBFF] transition">
+                                                        <div class="flex items-start gap-3 min-w-0 flex-1">
+                                                            <div class="w-9 h-9 rounded-full bg-[#EAF4FF] text-[#0095FF] font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
+                                                                ${renderAvatarMarkup(s.avatar_url, s.full_name)}
+                                                            </div>
+                                                            <div class="min-w-0 space-y-1 flex-1">
+                                                                <div class="flex flex-wrap items-center gap-1.5">
+                                                                    <span class="font-extrabold text-xs sm:text-sm text-[#1E293B]">${esc(s.full_name)}</span>
+                                                                    <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6]">${esc(s.sub_concentration || 'Belum ada subkon')}</span>
+                                                                    ${st.goldCount > 0 ? `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00]">🌟 ${st.goldCount} Emas</span>` : ''}
+                                                                    ${st.totalIssues > 0 ? `<span title="${esc(st.detailText)}" class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">⚠️ ${st.totalIssues} Masalah</span>` : ''}
+                                                                    ${waitCnt > 0 ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-[#FFFBEB] text-[#B45309]">🔔 ${waitCnt} Review</span>` : ''}
+                                                                    ${revCnt > 0 ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">✏️ ${revCnt} Revisi</span>` : ''}
+                                                                </div>
+                                                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                                                    <span class="font-mono">@${esc(s.username)}</span>
+                                                                    <span>• Pembimbing: <strong class="text-slate-600">${esc(mObj?.full_name || 'Belum di-plot')}</strong></span>
+                                                                    ${renderWhatsappLink(s.whatsapp_number, true)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                                            <div class="w-28 num-tabular mr-1">
+                                                                <div class="flex items-center justify-between text-[10px] font-bold mb-0.5">
+                                                                    <span class="text-slate-500">${st.accCount}/${st.eligibleCount} ACC</span>
+                                                                    <span class="${pct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${pct}%</span>
+                                                                </div>
+                                                                <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                                                                    <div class="${barCls} h-full rounded-full" style="width:${pct}%"></div>
+                                                                </div>
+                                                            </div>
+                                                            ${s.project_drive_url
+                                                                ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-lg bg-[#F0FDF4] hover:bg-[#16A34A] text-[#15803D] hover:text-white border border-[#BBF7D0] text-[11px] font-bold transition">📁 Drive</a>`
+                                                                : `<span class="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-[11px] font-semibold">No Drive</span>`}
+                                                            <button type="button" onclick="openStudentFlowchart('${s.id}')"
+                                                                class="px-2.5 py-1.5 rounded-lg bg-[#EEF2FF] hover:bg-[#4F46E5] text-[#4F46E5] hover:text-white border border-[#C7D2FE] text-[11px] font-bold transition cursor-pointer">
+                                                                🗺️ Flowchart
+                                                            </button>
+                                                            <button type="button" onclick="openStudentFeedbackHistory('${s.id}')"
+                                                                class="px-2.5 py-1.5 rounded-lg bg-[#F7FAFF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white border border-[#DCEBFF] text-[11px] font-bold transition cursor-pointer">
+                                                                📜 Log${logsCnt ? ` (${logsCnt})` : ''}
+                                                            </button>
+                                                            <button type="button" onclick="printStudentReportPdf('${s.id}')"
+                                                                class="px-2.5 py-1.5 rounded-lg bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white border border-[#BBE9E2] text-[11px] font-bold transition cursor-pointer">
+                                                                🖨️ PDF
+                                                            </button>
+                                                        </div>
+                                                    </div>`;
+                                            }).join('')}
+                                        </div>
+                                    </div>`;
+                            }).join('') : `<div class="p-8 text-center text-xs text-slate-400">Tidak ada siswa yang sesuai pencarian.</div>`}
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            // ==================== MODE 4: PROJECT UPDATE PER SUB-KONSENTRASI (PERSIS SPREADSHEET 2D/3D + OTOMATIS SUBKON) ====================
             if (projectViewMode === 'checklist') {
                 const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {}, pjMap = {} } = projectDataCache;
                 const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
-                // Tentukan default subkon: jika PJ subkon -> pilih subkon PJ pertamanya; jika superadmin -> pilih subkon pertama; jika pembimbing biasa -> '' (semua siswa bimbingan)
+                const isAdminStaff = isAnyAdmin(currentUser);
+                const poolStudents = (expectedRole === 'superadmin' || isAdminStaff) ? allStudentsList : studentList;
+
+                // Tentukan default tab aktif
                 let activeSc = projectChecklistState.subconc;
                 if (!activeSc && (expectedRole === 'superadmin' || myPjSubconcs.length > 0)) {
                     activeSc = myPjSubconcs[0] || SUBCONCS[0];
                     projectChecklistState.subconc = activeSc;
                 }
 
-                const isAdminStaff = isAnyAdmin(currentUser);
-                const canEditActiveSc = isAdminStaff || (activeSc && myPjSubconcs.includes(activeSc));
-                // Daftar nama PJ untuk subkon aktif
-                const pjNamesForActiveSc = activeSc
+                const isSpecificSc = SUBCONCS.includes(activeSc);
+                const isGroup2D = activeSc === '__group_2d';
+                const isGroup3D = activeSc === '__group_3d';
+                const isUnassignedTab = activeSc === '__unassigned';
+                const canEditActiveSc = isAdminStaff || (isSpecificSc && myPjSubconcs.includes(activeSc));
+
+                const pjNamesForActiveSc = isSpecificSc
                     ? mentorsList.filter((m) => Array.isArray(pjMap[m.id]) && pjMap[m.id].includes(activeSc)).map((m) => m.full_name)
                     : [];
 
-                // Sumber siswa:
-                // - Jika Superadmin, Admin Operasional, atau PJ untuk subkon aktif -> lihat SEMUA siswa di subkon tersebut
-                // - Jika Pembimbing biasa / Walas (bukan PJ subkon aktif) -> lihat siswa bimbingan / kelas perwaliannya saja
-                const baseStudents = (expectedRole === 'superadmin' || canEditActiveSc)
-                    ? allStudentsList.filter((s) => !activeSc || s.sub_concentration === activeSc)
-                    : studentList.filter((s) => !activeSc || s.sub_concentration === activeSc);
+                // Helper cek siswa masuk tab yang dipilih (otomatis dari sub_concentration masing-masing siswa)
+                const matchSubconcTab = (s, tabVal) => {
+                    const sc = s.sub_concentration || '';
+                    if (!tabVal) return true;
+                    if (tabVal === '__group_2d') return sc.startsWith('2D');
+                    if (tabVal === '__group_3d') return sc.startsWith('3D');
+                    if (tabVal === '__unassigned') return !sc;
+                    return sc === tabVal;
+                };
+
+                // Sumber siswa: PJ Subkon / Admin melihat seluruh siswa di subkon yang dipegangnya; pembimbing biasa melihat siswa bimbingan/kelasnya
+                const studentSourceForTab = (tabVal) => {
+                    if (expectedRole === 'superadmin' || isAdminStaff) return allStudentsList;
+                    if (SUBCONCS.includes(tabVal) && myPjSubconcs.includes(tabVal)) return allStudentsList;
+                    return studentList;
+                };
+
+                const baseStudents = studentSourceForTab(activeSc).filter((s) => matchSubconcTab(s, activeSc));
 
                 const ckCls = projectChecklistState.className || '';
                 const ckStFilter = projectChecklistState.statusFilter || 'all';
                 const ckSearch = (projectChecklistState.search || '').trim().toLowerCase();
                 const ckClasses = [...new Set(baseStudents.map((s) => s.class_name).filter(Boolean))].sort();
 
-                const activeCols = activeSc
+                const activeCols = isSpecificSc
                     ? (checklistColsMap[activeSc] || DEFAULT_CHECKLIST_COLS)
-                    : [...new Set(SUBCONCS.flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))];
+                    : (isGroup2D
+                        ? [...new Set(SUBCONCS.filter((sc) => sc.startsWith('2D')).flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]
+                        : (isGroup3D
+                            ? [...new Set(SUBCONCS.filter((sc) => sc.startsWith('3D')).flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]
+                            : [...new Set(SUBCONCS.flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]));
+
+                const getStuCols = (s) => (s.sub_concentration && checklistColsMap[s.sub_concentration])
+                    ? checklistColsMap[s.sub_concentration]
+                    : (isSpecificSc ? activeCols : DEFAULT_CHECKLIST_COLS);
 
                 const filteredRows = baseStudents.filter((s) => {
                     if (ckCls && s.class_name !== ckCls) return false;
@@ -2925,33 +3426,53 @@
                         if (!hit) return false;
                     }
                     const rowData = checklistRowMap[s.id] || { items: {} };
-                    const colsForStu = s.sub_concentration ? (checklistColsMap[s.sub_concentration] || DEFAULT_CHECKLIST_COLS) : activeCols;
-                    const doneCnt = colsForStu.filter((c) => rowData.items?.[c] === 'done').length;
-                    const revCnt = colsForStu.filter((c) => rowData.items?.[c] === 'revisi').length;
+                    const colsForStu = getStuCols(s);
+                    const doneCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                    const wipCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip').length;
+                    const revCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi').length;
                     if (ckStFilter === 'all_done') return colsForStu.length > 0 && doneCnt === colsForStu.length;
+                    if (ckStFilter === 'wip') return wipCnt > 0;
                     if (ckStFilter === 'not_done') return doneCnt < colsForStu.length;
                     if (ckStFilter === 'revisi') return revCnt > 0;
                     return true;
                 });
 
+                let sumProgressPct = 0;
                 const totalDoneAll = baseStudents.filter((s) => {
-                    const cols = s.sub_concentration ? (checklistColsMap[s.sub_concentration] || DEFAULT_CHECKLIST_COLS) : activeCols;
+                    const cols = getStuCols(s);
                     const rowData = checklistRowMap[s.id] || { items: {} };
-                    return cols.length > 0 && cols.every((c) => rowData.items?.[c] === 'done');
+                    const d = cols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                    sumProgressPct += cols.length ? Math.round((d / cols.length) * 100) : 0;
+                    return cols.length > 0 && d === cols.length;
+                }).length;
+                const avgProgressPct = baseStudents.length ? Math.round(sumProgressPct / baseStudents.length) : 0;
+                const totalWipAll = baseStudents.filter((s) => {
+                    const cols = getStuCols(s);
+                    const rowData = checklistRowMap[s.id] || { items: {} };
+                    return cols.some((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip');
                 }).length;
                 const totalRevisiAll = baseStudents.filter((s) => {
-                    const cols = s.sub_concentration ? (checklistColsMap[s.sub_concentration] || DEFAULT_CHECKLIST_COLS) : activeCols;
+                    const cols = getStuCols(s);
                     const rowData = checklistRowMap[s.id] || { items: {} };
-                    return cols.some((c) => rowData.items?.[c] === 'revisi');
+                    return cols.some((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi');
                 }).length;
                 const totalNotDoneAll = baseStudents.length - totalDoneAll;
 
+                const unassignedCount = poolStudents.filter((s) => !s.sub_concentration).length;
+                const count2D = poolStudents.filter((s) => (s.sub_concentration || '').startsWith('2D')).length;
+                const count3D = poolStudents.filter((s) => (s.sub_concentration || '').startsWith('3D')).length;
+
                 const subconcTabs = [
-                    ...(expectedRole === 'mentor' ? [{ val: '', label: `Semua Siswa ${staffScopeMode === 'homeroom' && myHomeroomClass ? myHomeroomClass : 'Bimbingan'}` }] : []),
+                    ...(expectedRole === 'mentor' ? [{ val: '', label: `Semua ${staffScopeMode === 'homeroom' && myHomeroomClass ? myHomeroomClass : 'Bimbingan'}`, count: studentList.length, group: 'scope' }] : []),
                     ...SUBCONCS.map((sc) => ({
                         val: sc,
-                        label: `${sc}${myPjSubconcs.includes(sc) ? ' ★PJ' : ''}`
-                    }))
+                        label: `${sc}${myPjSubconcs.includes(sc) ? ' ★PJ' : ''}`,
+                        count: studentSourceForTab(sc).filter((s) => s.sub_concentration === sc).length,
+                        group: 'subconc'
+                    })),
+                    { val: '__group_2d', label: 'Semua 2D', count: count2D, group: 'combo' },
+                    { val: '__group_3d', label: 'Semua 3D', count: count3D, group: 'combo' },
+                    ...(unassignedCount > 0 ? [{ val: '__unassigned', label: '⚠️ Belum Ada Subkon', count: unassignedCount, group: 'warn' }] : [])
                 ];
 
                 container.innerHTML = `
@@ -2961,42 +3482,56 @@
                             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                                 <div class="space-y-1">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${canEditActiveSc ? 'bg-[#E7F9EE] text-[#15803D]' : 'bg-[#EAF4FF] text-[#0082E6]'}">
-                                            ${canEditActiveSc ? '✏️ Mode Edit PJ Sub-Konsentrasi / Admin' : '👁️ Mode Pantau Pembimbing (Diisi oleh PJ Subkon)'}
+                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${canEditActiveSc || isAdminStaff ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#EAF4FF] text-[#0082E6]'}">
+                                            ${canEditActiveSc || isAdminStaff ? '✏️ Mode Edit PJ Sub-Konsentrasi / Admin' : '👁️ Mode Pantau Pembimbing (Diisi oleh PJ Subkon)'}
                                         </span>
-                                        ${activeSc ? `<span class="text-[11px] font-bold text-slate-500">PJ ${esc(activeSc)}: <strong class="text-[#1E293B]">${pjNamesForActiveSc.length ? esc(pjNamesForActiveSc.join(', ')) : 'Belum ditetapkan (atur di Akun & Plotting)'}</strong></span>` : ''}
+                                        <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white border border-[#DCEBFF] text-[#0082E6]">Otomatis per Sub-Konsentrasi Siswa</span>
+                                        ${isSpecificSc ? `<span class="text-[11px] font-bold text-slate-500">PJ ${esc(activeSc)}: <strong class="text-[#1E293B]">${pjNamesForActiveSc.length ? esc(pjNamesForActiveSc.join(', ')) : 'Belum ditetapkan (atur di Akun & Plotting)'}</strong></span>` : ''}
                                     </div>
-                                    <h3 class="text-base font-extrabold text-[#1E293B]">✅ Checklist Project Update PJ Sub-Konsentrasi</h3>
+                                    <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">📊 Project Update — ${esc(isSpecificSc ? activeSc : (isGroup2D ? 'Semua Subkon 2D' : (isGroup3D ? 'Semua Subkon 3D' : (isUnassignedTab ? 'Siswa Belum Ada Sub-Konsentrasi' : 'Semua Siswa'))))}</h3>
                                     <p class="text-xs text-slate-500">
-                                        ${canEditActiveSc
-                                            ? 'Klik status tiap kolom tahapan untuk langsung menyimpan (Belum / Proses / Revisi / Done) dan tulis Notes — otomatis langsung terlihat oleh Guru Pembimbing masing-masing siswa.'
-                                            : 'Menampilkan hasil pengecekan & catatan (Notes) terbaru dari Guru PJ Sub-Konsentrasi untuk siswa bimbingan Anda.'}
+                                        Siswa otomatis masuk ke tabel sesuai Sub-Konsentrasinya. Ubah status tahapan (<strong>None / WIP / Revisi / Done</strong>) untuk langsung menggerakkan <strong>Progress Bar hijau</strong> &amp; menyimpan <strong>Notes</strong> secara real-time.
                                     </p>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                    ${(isAdminStaff || myPjSubconcs.length > 0) ? `
+                                    <label for="importChecklistXlsxInput"
+                                        class="px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
+                                        📤 Import Spreadsheet (.xlsx)
+                                    </label>
+                                    <input id="importChecklistXlsxInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleChecklistImportFile(this)" />` : ''}
                                     <button type="button" onclick="exportChecklistXlsx()"
                                         class="px-3.5 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
-                                        📥 Export Checklist (.xlsx)
+                                        📥 Export Project Update (.xlsx)
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Tab Pilih Sub-Konsentrasi (Seperti Tab 2D / 3D di Spreadsheet) -->
+                            <!-- Tab Otomatis per Sub-Konsentrasi + Grup 2D / 3D -->
                             <div class="flex flex-wrap items-center gap-1.5">
-                                ${subconcTabs.map((tab) => `
-                                    <button type="button" onclick="setChecklistSubconc('${esc(tab.val)}')"
-                                        class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${activeSc === tab.val
-                                            ? 'bg-[#0095FF] text-white border-[#0095FF] shadow-sm'
-                                            : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'}">
-                                        ${esc(tab.label)}
-                                    </button>`).join('')}
+                                ${subconcTabs.map((tab) => {
+                                    const active = activeSc === tab.val;
+                                    const pillCls = active
+                                        ? 'bg-[#0095FF] text-white border-[#0095FF] shadow-sm'
+                                        : (tab.group === 'warn'
+                                            ? 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6] hover:bg-[#FFE4E6]'
+                                            : (tab.group === 'combo'
+                                                ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0] hover:border-[#4CAF50]'
+                                                : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'));
+                                    return `
+                                        <button type="button" onclick="setChecklistSubconc('${esc(tab.val)}')"
+                                            class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer inline-flex items-center gap-1.5 ${pillCls}">
+                                            <span>${esc(tab.label)}</span>
+                                            <span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold num-tabular ${active ? 'bg-white/20 text-white' : 'bg-black/5'}">${tab.count}</span>
+                                        </button>`;
+                                }).join('')}
                             </div>
 
-                            <!-- Kelola Kolom Tahapan (Khusus PJ Subkon aktif / Superadmin) -->
-                            ${canEditActiveSc && activeSc ? `
+                            <!-- Kelola Kolom Tahapan (Khusus PJ Subkon aktif / Admin) -->
+                            ${canEditActiveSc && isSpecificSc ? `
                             <div class="rounded-xl bg-white border border-[#DCEBFF] p-3.5 space-y-2.5">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#0082E6]">Kolom Tahapan Checklist — ${esc(activeSc)}</span>
+                                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#0082E6]">Kolom Tahapan STATUS — ${esc(activeSc)}</span>
                                     <button type="button" onclick="syncChecklistColsFromTasks('${esc(activeSc)}')"
                                         class="px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer">
                                         ↻ Tarik dari Daftar Tugas Project
@@ -3010,7 +3545,8 @@
                                         </span>`).join('')}
                                 </div>
                                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Blocking, Lighting, Grading, Final Film + Credit Title)"
+                                    <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Storyboard, Modeling, Rigging, Compose & Audio Video, Grading, Final Film)"
+                                        onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistColumn('${esc(activeSc)}');}"
                                         class="flex-1 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                     <button type="button" onclick="addChecklistColumn('${esc(activeSc)}')"
                                         class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
@@ -3019,15 +3555,24 @@
                                 </div>
                             </div>` : ''}
 
-                            <!-- KPI + Filter Bar -->
-                            <div class="grid grid-cols-3 gap-2.5 num-tabular">
-                                <div class="bg-[#E7F9EE] border border-[#BBF7D0] rounded-xl px-3.5 py-2">
+                            <!-- 4 KPI Ringkasan -->
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 num-tabular">
+                                <div class="bg-white border border-[#DCEBFF] rounded-xl px-3.5 py-2.5 space-y-1">
+                                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                                        <span>Rata-rata Progres</span>
+                                        <strong class="text-[#15803D]">${avgProgressPct}%</strong>
+                                    </div>
+                                    <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                                        <div class="h-full bg-[#4CAF50] rounded-full transition-all duration-300" style="width:${avgProgressPct}%"></div>
+                                    </div>
+                                </div>
+                                <div class="bg-[#DCFCE7] border border-[#86EFAC] rounded-xl px-3.5 py-2">
                                     <div class="text-[11px] font-semibold text-[#15803D]">✓ Semua Done</div>
                                     <div class="text-lg font-extrabold text-[#15803D]">${totalDoneAll} / ${baseStudents.length}</div>
                                 </div>
                                 <div class="bg-[#FFF6D6] border border-[#FDE68A] rounded-xl px-3.5 py-2">
-                                    <div class="text-[11px] font-semibold text-[#B88600]">⏳ Belum Tuntas Semua</div>
-                                    <div class="text-lg font-extrabold text-[#B88600]">${totalNotDoneAll} siswa</div>
+                                    <div class="text-[11px] font-semibold text-[#B45309]">⏳ Sedang WIP</div>
+                                    <div class="text-lg font-extrabold text-[#B45309]">${totalWipAll} siswa</div>
                                 </div>
                                 <div class="bg-[#FFF0F4] border border-[#FECDD6] rounded-xl px-3.5 py-2">
                                     <div class="text-[11px] font-semibold text-[#E11D48]">! Ada Revisi</div>
@@ -3035,6 +3580,7 @@
                                 </div>
                             </div>
 
+                            <!-- Toolbar Filter -->
                             <div class="flex flex-wrap items-center gap-2">
                                 <select onchange="setChecklistClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
                                     <option value="">Semua Kelas</option>
@@ -3043,26 +3589,34 @@
                                 <select onchange="setChecklistStatusFilter(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
                                     <option value="all" ${ckStFilter === 'all' ? 'selected' : ''}>Semua Status (${baseStudents.length})</option>
                                     <option value="not_done" ${ckStFilter === 'not_done' ? 'selected' : ''}>Belum Tuntas (${totalNotDoneAll})</option>
+                                    <option value="wip" ${ckStFilter === 'wip' ? 'selected' : ''}>Sedang WIP (${totalWipAll})</option>
                                     <option value="revisi" ${ckStFilter === 'revisi' ? 'selected' : ''}>Ada Revisi (${totalRevisiAll})</option>
                                     <option value="all_done" ${ckStFilter === 'all_done' ? 'selected' : ''}>Semua Done (${totalDoneAll})</option>
                                 </select>
                                 <input id="checklistSearchInp" type="text" value="${esc(projectChecklistState.search)}" oninput="setChecklistSearch(this.value)"
-                                    placeholder="Cari nama siswa / kelas..."
+                                    placeholder="Cari nama siswa / kelas / subkon..."
                                     class="flex-1 min-w-[180px] max-w-xs px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
                                 <span class="ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
                             </div>
                         </div>
 
-                        <!-- Tabel Checklist Persis Spreadsheet 2D/3D -->
+                        <!-- Tabel Project Update 2-Tingkat Persis Spreadsheet 2D / 3D -->
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
-                                    <tr class="border-b border-[#EDF1F7] bg-[#F7FAFF] text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
-                                        <th class="py-3 px-3 w-10 text-center">No</th>
-                                        <th class="py-3 px-3 sticky left-0 bg-[#F7FAFF] z-10 min-w-[220px] border-r border-[#EDF1F7]">Nama Siswa &amp; Drive</th>
-                                        <th class="py-3 px-2.5 min-w-[115px]">Pembimbing</th>
-                                        ${activeCols.map((col) => `<th class="py-3 px-2.5 text-center min-w-[125px]">${esc(col)}</th>`).join('')}
-                                        <th class="py-3 px-3 min-w-[230px]">Notes (Catatan PJ Subkon)</th>
+                                    <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                                        <th rowspan="2" class="py-2.5 px-2.5 w-10 text-center border-r border-[#EDF1F7]">No</th>
+                                        <th rowspan="2" class="py-2.5 px-3 sticky left-0 bg-[#F7FAFF] z-10 min-w-[215px] border-r border-[#EDF1F7]">Nama Siswa</th>
+                                        <th rowspan="2" class="py-2.5 px-2.5 text-center min-w-[82px] border-r border-[#EDF1F7]">Kelas</th>
+                                        <th rowspan="2" class="py-2.5 px-3 min-w-[130px] border-r border-[#EDF1F7]">Progress</th>
+                                        <th rowspan="2" class="py-2.5 px-2.5 min-w-[118px] border-r border-[#EDF1F7]">No. HP / WA</th>
+                                        <th rowspan="2" class="py-2.5 px-2.5 min-w-[125px] border-r border-[#EDF1F7]">Link Google Drive</th>
+                                        <th rowspan="2" class="py-2.5 px-2.5 min-w-[120px] border-r border-[#EDF1F7]">Pembimbing</th>
+                                        <th colspan="${activeCols.length}" class="py-2 px-2 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
+                                        <th rowspan="2" class="py-2.5 px-3 min-w-[230px]">Notes</th>
+                                    </tr>
+                                    <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-[10px] font-bold text-[#1D5E55]">
+                                        ${activeCols.map((col) => `<th class="py-2 px-2 text-center min-w-[122px] border-r border-[#DCEEEB]">${esc(col)}</th>`).join('')}
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-[#F1F5F9]">
@@ -3070,53 +3624,73 @@
                                         const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
                                         const stuSubconc = s.sub_concentration || '';
                                         const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
-                                        const stuColsSet = new Set(stuSubconc ? (checklistColsMap[stuSubconc] || DEFAULT_CHECKLIST_COLS) : activeCols);
+                                        const stuCols = getStuCols(s);
+                                        const stuColsSet = new Set(stuCols);
+                                        const doneCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                                        const progPct = stuCols.length ? Math.round((doneCount / stuCols.length) * 100) : 0;
                                         const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
-                                        const notDoneList = activeCols.filter((c) => stuColsSet.has(c) && rowData.items?.[c] !== 'done');
+                                        const notDoneList = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) !== 'done');
                                         const waText = notDoneList.length
-                                            ? `Halo ${s.full_name}, update checklist project (${stuSubconc || 'Animasi'}) dari PJ Subkon — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Catatan PJ: ${rowData.notes}` : ''} Mohon segera ditindaklanjuti ya.`
-                                            : `Halo ${s.full_name}, selamat! Semua tahapan checklist project kamu sudah Done ✓`;
+                                            ? `Halo ${s.full_name}, update Project Update (${stuSubconc || 'Animasi'}) — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Notes: ${rowData.notes}` : ''} Mohon segera dilengkapi di Folder Google Drive ya.`
+                                            : `Halo ${s.full_name}, selamat! Semua tahapan Project Update kamu sudah Done (100%) ✓`;
 
                                         return `
                                             <tr class="hover:bg-[#F8FBFF] align-middle">
-                                                <td class="py-2.5 px-3 text-center font-mono text-slate-400">${idx + 1}</td>
+                                                <td class="py-2.5 px-2.5 text-center font-mono text-slate-400 border-r border-[#F1F5F9]">${idx + 1}</td>
                                                 <td class="py-2.5 px-3 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                                    <div class="font-bold text-[#1E293B] truncate max-w-[205px]">${esc(s.full_name)}</div>
-                                                    <div class="text-[10.5px] text-slate-400 truncate">
-                                                        ${esc(s.class_name || '-')} • <span class="font-semibold text-[#0082E6]">${esc(stuSubconc || 'Belum pilih subkon')}</span>
-                                                    </div>
-                                                    <div class="flex flex-wrap items-center gap-1 mt-1">
-                                                        ${renderWhatsappLink(s.whatsapp_number, true, waText)}
-                                                        ${s.project_drive_url
-                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition">📁 Drive ↗</a>`
-                                                            : `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">Drive -</span>`}
+                                                    <div class="font-bold text-[#1E293B] truncate max-w-[200px]" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
+                                                    <div class="text-[10px] text-slate-400 truncate mt-0.5">
+                                                        <span class="font-mono">@${esc(s.username)}</span> • <span class="font-semibold ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Belum ada subkon')}</span>
                                                     </div>
                                                 </td>
-                                                <td class="py-2.5 px-2.5 text-[11px] text-slate-600">
+                                                <td class="py-2.5 px-2.5 text-center border-r border-[#F1F5F9]">
+                                                    <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
+                                                </td>
+                                                <td class="py-2.5 px-3 border-r border-[#F1F5F9] num-tabular">
+                                                    <div class="flex items-center justify-between text-[10.5px] font-bold mb-1">
+                                                        <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length} Done</span>
+                                                        <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-400'}">${progPct}%</span>
+                                                    </div>
+                                                    <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
+                                                        <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
+                                                    ${renderWhatsappLink(s.whatsapp_number, false, waText)}
+                                                </td>
+                                                <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
+                                                    <div class="flex items-center gap-1">
+                                                        ${s.project_drive_url
+                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[10.5px] font-bold transition whitespace-nowrap">📁 Buka Drive ↗</a>`
+                                                            : `<span class="text-[10.5px] text-slate-400 italic">Belum diisi</span>`}
+                                                        ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-1.5 py-1 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[10px] font-bold cursor-pointer">✎</button>` : ''}
+                                                    </div>
+                                                </td>
+                                                <td class="py-2.5 px-2.5 text-[11px] text-slate-600 border-r border-[#F1F5F9]">
                                                     ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">Belum di-plot</span>`}
                                                 </td>
                                                 ${activeCols.map((col) => {
-                                                    if (!stuColsSet.has(col)) return `<td class="py-2.5 px-2 text-center text-slate-200">·</td>`;
-                                                    const stVal = rowData.items?.[col] || 'belum';
+                                                    if (!stuColsSet.has(col)) return `<td class="py-2.5 px-2 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
+                                                    const stVal = normalizeChecklistStatus(rowData.items?.[col]);
                                                     const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
                                                     if (stuCanEdit) {
                                                         return `
-                                                            <td class="py-2.5 px-2 text-center">
+                                                            <td class="py-2.5 px-1.5 text-center border-r border-[#F1F5F9]">
                                                                 <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
-                                                                    class="w-full px-2 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer focus:outline-none ${stOpt.cls}">
-                                                                    ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.short}</option>`).join('')}
+                                                                    class="w-full px-2 py-1.5 rounded-lg border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
+                                                                    ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
                                                                 </select>
                                                             </td>`;
                                                     }
                                                     return `
-                                                        <td class="py-2.5 px-2 text-center">
-                                                            <span class="inline-block px-2.5 py-1 rounded-lg border text-[11px] font-bold ${stOpt.cls}">${stOpt.short}</span>
+                                                        <td class="py-2.5 px-2 text-center border-r border-[#F1F5F9]">
+                                                            <span class="inline-block min-w-[68px] px-2.5 py-1 rounded-lg border text-[11px] font-extrabold ${stOpt.cls}">${stOpt.label}</span>
                                                         </td>`;
                                                 }).join('')}
                                                 <td class="py-2.5 px-3">
                                                     ${stuCanEdit ? `
                                                         <div class="flex items-center gap-1.5">
-                                                            <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis catatan PJ untuk siswa &amp; pembimbing..."
+                                                            <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis Notes..."
                                                                 onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
                                                                 class="flex-1 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                                             <button type="button" onclick="saveChecklistNote('${s.id}', this)"
@@ -3124,15 +3698,20 @@
                                                                 Simpan
                                                             </button>
                                                         </div>` : `
-                                                        <div class="text-xs ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan PJ')}</div>`}
+                                                        <div class="text-xs ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
                                                     ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-1">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
                                                 </td>
                                             </tr>`;
-                                    }).join('') : `<tr><td colspan="${activeCols.length + 4}" class="p-8 text-center text-slate-400">Belum ada siswa pada Sub-Konsentrasi / filter ini. Pastikan siswa sudah memilih / di-plot Sub-Konsentrasi di tab Akun &amp; Plotting.</td></tr>`}
+                                    }).join('') : `<tr><td colspan="${activeCols.length + 8}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
                                 </tbody>
                             </table>
                         </div>
                     </div>`;
+                return;
+            }
+
+            if (!filteredTasks.length && projectViewMode !== 'weekly') {
+                container.innerHTML = `${modeSwitcherHtml}<div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-10 text-center text-sm text-slate-400">Belum ada tugas project untuk filter ini. Tambahkan tugas project &amp; deadline di form atas atau Import Excel (.xlsx).</div>`;
                 return;
             }
 
@@ -3723,8 +4302,17 @@
                                                         </div>
                                                     </td>
                                                     <td class="py-2.5 px-3">
-                                                        <input type="text" value="${esc(ps.mentor_feedback || '')}" placeholder="Catatan revisi / ACC..."
-                                                            class="proj-fb w-full px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                                        <div class="space-y-1.5">
+                                                            <div class="flex items-center gap-1.5">
+                                                                <input type="text" value="${esc(stripFeedbackImageTags(ps.mentor_feedback || ''))}" placeholder="Catatan revisi / ACC..."
+                                                                    class="proj-fb flex-1 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                                                <button type="button" onclick="openRevisionComposerModal('${t.id}', '${s.id}')" title="Kirim Revisi dengan Gambar Coretan (Ctrl+V / Drag & Drop)"
+                                                                    class="px-2 py-1.5 rounded-lg bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
+                                                                    🖼️
+                                                                </button>
+                                                            </div>
+                                                            ${(ps.mentor_feedback && /\[IMG:/.test(ps.mentor_feedback)) ? `<div class="text-[10px] font-bold text-[#0082E6]">📎 Catatan ini memiliki gambar revisi — klik 🖼️ untuk lihat/edit</div>` : ''}
+                                                        </div>
                                                     </td>
                                                     <td class="py-2.5 px-4 text-right">
                                                         <div class="inline-flex items-center gap-1.5">
@@ -3887,10 +4475,12 @@
             let revisionAssignments = 0;
             let overdueTasksCount = 0;
             let problemStudentsCount = 0;
+            let earlyWarningCount = 0;
 
             studentList.forEach((s) => {
                 const st = computeStudentIssueStats(s, allTasks, subMap);
                 if (st.totalIssues > 0) problemStudentsCount++;
+                if (st.totalIssues >= 2) earlyWarningCount++;
             });
 
             const stageStats = ['Pre-Production', 'Production', 'Post-Production'].map((st) => {
@@ -3969,14 +4559,18 @@
                                     </div>
                                     <div class="text-[11px] text-white/90">${doneAssignments} / ${totalAssignments} penugasan ACC • 🌟 ${goldAssignments} Lencana Emas</div>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" onclick="printAllStudentsReportPdf('')"
+                                        class="px-3 py-2 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer shrink-0">
+                                        🖨️ Cetak PDF Rapor
+                                    </button>
                                     <button type="button" onclick="saveProjectArchiveSnapshot(this)"
                                         class="flex-1 px-3 py-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                        📦 Simpan Arsip Snapshot
+                                        📦 Arsip Snapshot
                                     </button>
                                     <button type="button" onclick="openProjectArchivesModal()"
                                         class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/25 transition cursor-pointer shrink-0">
-                                        🗂️ Arsip (${archives.length})
+                                        🗂️ (${archives.length})
                                     </button>
                                 </div>
                             </div>
@@ -3987,10 +4581,11 @@
                                 <div class="text-[11px] text-white/85">Total Tugas</div>
                                 <div class="text-lg font-extrabold">${allTasks.length}</div>
                             </div>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">🌟 Lencana Emas</div>
+                            <button type="button" onclick="openProjectKpiModal('gold')"
+                                class="text-left bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3.5 py-2.5 transition cursor-pointer" title="Klik untuk melihat daftar peraih Lencana Emas">
+                                <div class="text-[11px] text-white/90 flex items-center justify-between"><span>🌟 Lencana Emas</span><span class="text-[10px] opacity-80">↗</span></div>
                                 <div class="text-lg font-extrabold text-[#FFF6D6]">${goldAssignments}</div>
-                            </div>
+                            </button>
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                                 <div class="text-[11px] text-white/85">Menunggu Review</div>
                                 <div class="text-lg font-extrabold text-[#FFF6D6]">${reviewAssignments}</div>
@@ -4003,10 +4598,11 @@
                                 <div class="text-[11px] text-white/85">Lewat Deadline</div>
                                 <div class="text-lg font-extrabold text-[#FFE4EC]">${overdueTasksCount}</div>
                             </div>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">⚠️ Siswa Bermasalah</div>
+                            <button type="button" onclick="openProjectKpiModal('issues')"
+                                class="text-left bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3.5 py-2.5 transition cursor-pointer" title="Klik untuk melihat daftar siswa bermasalah">
+                                <div class="text-[11px] text-white/90 flex items-center justify-between"><span>⚠️ Bermasalah</span><span class="text-[10px] opacity-80">↗</span></div>
                                 <div class="text-lg font-extrabold text-[#FFE4EC]">${problemStudentsCount}</div>
-                            </div>
+                            </button>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 num-tabular">
@@ -4021,7 +4617,19 @@
                                     </div>
                                 </div>`).join('')}
                         </div>
-                    </div>`;
+                    </div>
+                    ${earlyWarningCount > 0 ? `
+                    <div onclick="openProjectKpiModal('early_warning')"
+                        class="mt-3 rounded-2xl bg-[#FFF0F4] hover:bg-[#FFE4EC] border-l-4 border-[#E11D48] border border-[#FECDD6] p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-[#E11D48] text-white text-lg flex items-center justify-center shrink-0">🚨</span>
+                            <div>
+                                <div class="text-sm font-extrabold text-[#9F1239]">Peringatan Dini Aktif!</div>
+                                <p class="text-xs text-[#BE123C] mt-0.5">Terdapat <strong>${earlyWarningCount} siswa</strong> dengan akumulasi <strong>≥ 2 poin masalah</strong> (keterlambatan / revisi berulang) yang membutuhkan pembinaan segera.</p>
+                            </div>
+                        </div>
+                        <span class="self-start sm:self-center px-3.5 py-2 rounded-xl bg-[#E11D48] text-white text-xs font-bold shrink-0">Cek Detail →</span>
+                    </div>` : ''}`;
             }
 
             renderProjectTrackerBody();
@@ -4079,6 +4687,462 @@
             projectMatrixState.onlyIssues = !projectMatrixState.onlyIssues;
             projectMatrixState.page = 1;
             renderProjectTrackerBody();
+        };
+
+        global.toggleClassAccordion = function (encodedCls) {
+            const cls = decodeURIComponent(encodedCls || '');
+            if (!cls) return;
+            if (projectClassesState.openClasses.has(cls)) projectClassesState.openClasses.delete(cls);
+            else projectClassesState.openClasses.add(cls);
+            renderProjectTrackerBody();
+        };
+
+        global.setProjectClassesSearch = function (q) {
+            projectClassesState.search = q || '';
+            renderProjectTrackerBody();
+            const inp = document.getElementById('projClassesSearchInp');
+            if (inp) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
+        };
+
+        global.setProjectClassesMentor = function (mId) {
+            projectClassesState.mentorId = mId || '';
+            renderProjectTrackerBody();
+        };
+
+        global.openStudentFlowchart = function (studentId) {
+            const { allTasks = [], subMap = {}, studentList = [], allStudentsList = [], mentorsList = [], fbLogMap = {} } = projectDataCache;
+            const stu = studentList.find((s) => s.id === studentId) || allStudentsList.find((s) => s.id === studentId);
+            if (!stu) { showToast('Data siswa tidak ditemukan.'); return; }
+            const mentorObj = stu.mentor_id ? mentorsList.find((m) => m.id === stu.mentor_id) : null;
+            openStudentFlowchartModal(stu, allTasks, subMap, mentorObj, fbLogMap[stu.id] || []);
+        };
+
+        function buildStaffReportCtx() {
+            const { allTasks = [], subMap = {}, mentorsList = [], fbLogMap = {}, checklistColsMap = {}, checklistRowMap = {} } = projectDataCache;
+            return {
+                tasks: allTasks,
+                subMap,
+                mentorMap: Object.fromEntries(mentorsList.map((m) => [m.id, m])),
+                fbLogMap,
+                checklistColsMap,
+                checklistRowMap
+            };
+        }
+
+        global.printStudentReportPdf = function (studentId) {
+            const { studentList = [], allStudentsList = [] } = projectDataCache;
+            const stu = studentList.find((s) => s.id === studentId) || allStudentsList.find((s) => s.id === studentId);
+            if (!stu) { showToast('Data siswa tidak ditemukan.'); return; }
+            printStudentsReportPdf([stu], buildStaffReportCtx(), `Rapor Jurnal — ${stu.full_name} (${stu.class_name || '-'})`);
+        };
+
+        global.printAllStudentsReportPdf = function (encodedCls) {
+            const clsName = decodeURIComponent(encodedCls || '').trim();
+            const pool = (projectDataCache.studentList || []).filter((s) => {
+                if (!clsName) return true;
+                return (s.class_name || 'Tanpa Kelas') === clsName;
+            });
+            if (!pool.length) { showToast('Tidak ada siswa untuk dicetak.'); return; }
+            if (pool.length > 25 && !confirm(`Cetak PDF Rapor sekaligus untuk ${pool.length} siswa${clsName ? ` (Kelas ${clsName})` : ''}?`)) return;
+            const title = clsName ? `Rapor Jurnal Kelas ${clsName} — AniTrack` : `Rapor Jurnal Semua Siswa (${pool.length}) — AniTrack`;
+            printStudentsReportPdf(pool, buildStaffReportCtx(), title);
+        };
+
+        global.openProjectKpiModal = function (type) {
+            const { allTasks = [], subMap = {}, studentList = [], mentorsList = [], fbLogMap = {} } = projectDataCache;
+            const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
+            const enriched = studentList.map((s) => ({
+                s,
+                st: computeStudentIssueStats(s, allTasks, subMap),
+                mentor: s.mentor_id ? mentorMap[s.mentor_id] : null
+            }));
+
+            let title = 'Detail Siswa';
+            let subtitle = '';
+            let accentCls = 'text-[#0082E6]';
+            let list = [];
+
+            if (type === 'gold') {
+                title = '🌟 Daftar Peraih Lencana Emas';
+                subtitle = 'Siswa yang menuntaskan tugas project lebih cepat dari tenggat deadline.';
+                accentCls = 'text-[#B88600]';
+                list = enriched.filter((x) => x.st.goldCount > 0).sort((a, b) => b.st.goldCount - a.st.goldCount);
+            } else if (type === 'early_warning') {
+                title = '🚨 Peringatan Dini — Siswa Butuh Pembinaan Segera';
+                subtitle = 'Siswa dengan akumulasi ≥ 2 poin masalah (terlambat deadline / revisi berulang).';
+                accentCls = 'text-[#E11D48]';
+                list = enriched.filter((x) => x.st.totalIssues >= 2).sort((a, b) => b.st.totalIssues - a.st.totalIssues);
+            } else {
+                title = '⚠️ Daftar Siswa Bermasalah';
+                subtitle = 'Siswa yang memiliki catatan keterlambatan deadline atau revisi tugas project.';
+                accentCls = 'text-[#E11D48]';
+                list = enriched.filter((x) => x.st.totalIssues > 0).sort((a, b) => b.st.totalIssues - a.st.totalIssues);
+            }
+
+            let modal = document.getElementById('anitrackKpiDetailModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'anitrackKpiDetailModal';
+                modal.className = 'fixed inset-0 z-[81] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4';
+                modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+                modal.innerHTML = `
+                    <div class="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                        <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div id="kpiModalTitle" class="text-base font-extrabold"></div>
+                                <div id="kpiModalSub" class="text-xs text-slate-500 mt-0.5"></div>
+                            </div>
+                            <button type="button" onclick="document.getElementById('anitrackKpiDetailModal').classList.add('hidden')"
+                                class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
+                        </div>
+                        <div id="kpiModalBody" class="p-4 max-h-[70vh] overflow-y-auto space-y-2.5 text-xs bg-[#FAFBFD]"></div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+
+            const titleEl = document.getElementById('kpiModalTitle');
+            titleEl.className = `text-base font-extrabold ${accentCls}`;
+            titleEl.textContent = `${title} (${list.length} Siswa)`;
+            document.getElementById('kpiModalSub').textContent = subtitle;
+
+            const body = document.getElementById('kpiModalBody');
+            if (!list.length) {
+                body.innerHTML = `<div class="p-8 text-center text-slate-400">Tidak ada siswa pada kategori ini.</div>`;
+            } else {
+                body.innerHTML = list.map(({ s, st, mentor }) => {
+                    const pct = st.eligibleCount ? Math.round((st.accCount / st.eligibleCount) * 100) : 0;
+                    const logsCnt = (fbLogMap[s.id] || []).length;
+                    const waMsg = type === 'gold'
+                        ? `Selamat ${s.full_name}! Kamu meraih ${st.goldCount} Lencana Emas di AniTrack. Pertahankan prestasimu!`
+                        : `Halo ${s.full_name}, terpantau di AniTrack ada ${st.totalIssues} catatan masalah (${st.detailText}). Yuk segera koordinasi dan selesaikan tugas project-mu ya.`;
+                    return `
+                        <div class="rounded-xl bg-white border ${type === 'gold' ? 'border-[#FDE68A]' : 'border-[#FECDD6]'} p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="space-y-1 min-w-0">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span class="font-extrabold text-[#1E293B] text-xs sm:text-sm">${esc(s.full_name)}</span>
+                                    <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#F1F5F9] text-slate-600">${esc(s.class_name || '-')}</span>
+                                    <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6]">${esc(s.sub_concentration || 'Umum')}</span>
+                                    ${type === 'gold'
+                                        ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00]">🌟 ${st.goldCount} Lencana Emas</span>`
+                                        : `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">⚠️ ${st.totalIssues} Poin Masalah</span>`}
+                                </div>
+                                <div class="text-[11px] text-slate-500">
+                                    Ketuntasan: <strong>${st.accCount}/${st.eligibleCount} (${pct}%)</strong>
+                                    ${mentor ? ` • Pembimbing: <strong>${esc(mentor.full_name)}</strong>` : ''}
+                                    ${type !== 'gold' && st.detailText ? `<div class="text-[#BE123C] mt-0.5">${esc(st.detailText)}</div>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+                                ${renderWhatsappLink(s.whatsapp_number, true, waMsg)}
+                                <button type="button" onclick="openStudentFlowchart('${s.id}')"
+                                    class="px-2.5 py-1.5 rounded-lg bg-[#EEF2FF] hover:bg-[#4F46E5] text-[#4F46E5] hover:text-white text-[11px] font-bold transition cursor-pointer">🗺️ Flowchart</button>
+                                ${logsCnt ? `<button type="button" onclick="openStudentFeedbackHistory('${s.id}')" class="px-2.5 py-1.5 rounded-lg bg-[#F7FAFF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white border border-[#DCEBFF] text-[11px] font-bold transition cursor-pointer">📜 (${logsCnt})</button>` : ''}
+                                <button type="button" onclick="printStudentReportPdf('${s.id}')"
+                                    class="px-2.5 py-1.5 rounded-lg bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-[11px] font-bold transition cursor-pointer">🖨️ PDF</button>
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+            modal.classList.remove('hidden');
+        };
+
+        // ==================== MODAL CATATAN REVISI BERGAMBAR (CTRL+V / DRAG & DROP / PICK) ====================
+        let revComposerState = { taskId: null, studentId: null, prevRev: 0, images: [] };
+
+        function renderRevisionComposerPreviews() {
+            const box = document.getElementById('revComposerPreviews');
+            if (!box) return;
+            if (!revComposerState.images.length) {
+                box.innerHTML = `<div class="text-[11px] text-slate-400 italic">Belum ada gambar coretan dilampirkan.</div>`;
+                return;
+            }
+            box.innerHTML = revComposerState.images.map((img, idx) => `
+                <div class="relative group w-24 h-20 rounded-xl overflow-hidden border border-[#CBD5E1] bg-white shadow-xs shrink-0">
+                    <img src="${esc(img.previewSrc)}" alt="Coretan ${idx + 1}" onclick="openProofLightbox(this.src, 'Lampiran Revisi #${idx + 1}')"
+                        class="w-full h-full object-cover cursor-zoom-in" />
+                    <button type="button" onclick="removeRevisionComposerImage(${idx})" title="Hapus gambar ini"
+                        class="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#E11D48] text-white text-[10px] font-extrabold flex items-center justify-center shadow cursor-pointer">✕</button>
+                </div>`).join('');
+        }
+
+        async function addRevisionComposerFiles(fileList) {
+            const files = Array.from(fileList || []).filter((f) => f && f.type && f.type.startsWith('image/'));
+            if (!files.length) return;
+            const hint = document.getElementById('revComposerStatusHint');
+            if (hint) hint.textContent = `Memproses ${files.length} gambar...`;
+            for (const f of files) {
+                if (revComposerState.images.length >= 4) {
+                    showToast('Maksimal 4 lampiran gambar per catatan revisi.');
+                    break;
+                }
+                try {
+                    const dataUrl = await compressProofImage(f, 1100, 0.78);
+                    revComposerState.images.push({
+                        previewSrc: dataUrl,
+                        dataUrl,
+                        existingUrl: null,
+                        name: f.name || `revisi_${Date.now()}.jpg`
+                    });
+                } catch (err) {
+                    showToast(err.message || 'Gagal membaca gambar.');
+                }
+            }
+            if (hint) hint.textContent = revComposerState.images.length ? `${revComposerState.images.length} gambar siap dilampirkan (Ctrl+V untuk tambah lagi).` : '';
+            renderRevisionComposerPreviews();
+        }
+
+        global.removeRevisionComposerImage = function (idx) {
+            revComposerState.images.splice(idx, 1);
+            renderRevisionComposerPreviews();
+        };
+
+        global.handleRevisionComposerFiles = function (inputEl) {
+            addRevisionComposerFiles(inputEl?.files);
+            if (inputEl) inputEl.value = '';
+        };
+
+        global.openRevisionComposerModal = function (taskId, studentId) {
+            const { allTasks = [], subMap = {}, studentList = [], allStudentsList = [] } = projectDataCache;
+            const taskObj = allTasks.find((t) => t.id === taskId);
+            const stuObj = studentList.find((s) => s.id === studentId) || allStudentsList.find((s) => s.id === studentId);
+            const ps = subMap[`${taskId}__${studentId}`] || {};
+            const rawFb = String(ps.mentor_feedback || '');
+
+            const existingImgs = [];
+            const cleanText = rawFb.replace(/\[IMG:([^\]]+)\]/g, (_, url) => {
+                const u = String(url || '').trim();
+                if (u) existingImgs.push({ previewSrc: u, dataUrl: null, existingUrl: u, name: 'existing' });
+                return '';
+            }).trim();
+
+            revComposerState = {
+                taskId,
+                studentId,
+                prevRev: Number(ps.revision_count || 0),
+                images: existingImgs
+            };
+
+            let modal = document.getElementById('anitrackRevisionComposerModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'anitrackRevisionComposerModal';
+                modal.className = 'fixed inset-0 z-[83] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4';
+                modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+                modal.innerHTML = `
+                    <div class="relative max-w-xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                        <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#FFF5F7] flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#E11D48]">🖼️ Catatan Revisi &amp; Lampiran Gambar Coretan</div>
+                                <div id="revComposerTitle" class="text-sm sm:text-base font-extrabold text-[#1E293B] truncate mt-0.5"></div>
+                                <div id="revComposerSub" class="text-xs text-slate-500 truncate"></div>
+                            </div>
+                            <button type="button" onclick="document.getElementById('anitrackRevisionComposerModal').classList.add('hidden')"
+                                class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
+                        </div>
+                        <div class="p-5 space-y-4 text-xs">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Status Tugas</label>
+                                    <select id="revComposerStatus" class="w-full px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-bold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                        <option value="revisi">Perlu Revisi (Kirim Coretan)</option>
+                                        <option value="selesai">Selesai (ACC Guru)</option>
+                                        <option value="menunggu_review">Menunggu Review</option>
+                                        <option value="sedang_dikerjakan">Sedang Dikerjakan</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-end">
+                                    <div id="revComposerRevInfo" class="w-full px-3 py-2 rounded-xl bg-[#FAFBFD] border border-[#EDF1F7] text-[11px] text-slate-500"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1">Catatan Revisi / Feedback Guru <span class="text-slate-400 font-normal">(Bisa langsung tekan Ctrl+V gambar screenshot di sini!)</span></label>
+                                <textarea id="revComposerText" rows="4"
+                                    placeholder="Tulis catatan perbaikan untuk siswa, lalu tekan Ctrl+V untuk menempel screenshot coretan..."
+                                    class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs text-[#1E293B] focus:bg-white focus:outline-none focus:border-[#0095FF]"></textarea>
+                            </div>
+
+                            <div id="revComposerDropZone"
+                                class="rounded-xl border-2 border-dashed border-[#CBD5E1] hover:border-[#0095FF] bg-[#F8FBFF] p-4 text-center space-y-2 transition">
+                                <div class="text-xs font-bold text-[#1E293B]">📋 Tempel (<kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-[10px]">Ctrl+V</kbd>), Tarik &amp; Lepas Gambar, atau Pilih File</div>
+                                <div class="flex flex-wrap items-center justify-center gap-2">
+                                    <label class="px-3 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[11px] font-bold cursor-pointer transition">
+                                        📷 Pilih Gambar Coretan
+                                        <input type="file" accept="image/*" multiple class="hidden" onchange="handleRevisionComposerFiles(this)" />
+                                    </label>
+                                    <span id="revComposerStatusHint" class="text-[11px] text-slate-500"></span>
+                                </div>
+                                <div id="revComposerPreviews" class="flex flex-wrap items-center justify-center gap-2.5 pt-2"></div>
+                            </div>
+
+                            <div class="flex items-center justify-end gap-2 pt-2 border-t border-[#EDF1F7]">
+                                <button type="button" onclick="document.getElementById('anitrackRevisionComposerModal').classList.add('hidden')"
+                                    class="px-4 py-2 rounded-xl bg-white border border-[#E2E8F0] hover:bg-slate-50 text-slate-600 text-xs font-bold cursor-pointer">Batal</button>
+                                <button type="button" id="revComposerSaveBtn" onclick="submitRevisionComposer(this)"
+                                    class="px-5 py-2 rounded-xl bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-extrabold shadow-sm transition cursor-pointer">
+                                    💾 Simpan Catatan &amp; Lampiran
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+
+                modal.addEventListener('paste', (e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    const imgs = [];
+                    for (const it of items) {
+                        if (it.kind === 'file' && it.type.startsWith('image/')) {
+                            const f = it.getAsFile();
+                            if (f) imgs.push(f);
+                        }
+                    }
+                    if (imgs.length) {
+                        e.preventDefault();
+                        addRevisionComposerFiles(imgs);
+                    }
+                });
+
+                const dz = modal.querySelector('#revComposerDropZone');
+                dz.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dz.classList.add('border-[#0095FF]', 'bg-[#EAF4FF]');
+                });
+                dz.addEventListener('dragleave', () => {
+                    dz.classList.remove('border-[#0095FF]', 'bg-[#EAF4FF]');
+                });
+                dz.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dz.classList.remove('border-[#0095FF]', 'bg-[#EAF4FF]');
+                    addRevisionComposerFiles(e.dataTransfer?.files);
+                });
+            }
+
+            document.getElementById('revComposerTitle').textContent = taskObj?.title || 'Tugas Project';
+            document.getElementById('revComposerSub').textContent = stuObj ? `${stuObj.full_name} • ${stuObj.class_name || '-'} • ${stuObj.sub_concentration || 'Umum'}` : '';
+            document.getElementById('revComposerStatus').value = ps.status === 'selesai' ? 'selesai' : 'revisi';
+            document.getElementById('revComposerText').value = cleanText;
+            document.getElementById('revComposerRevInfo').textContent = revComposerState.prevRev > 0
+                ? `Riwayat revisi sebelumnya: ${revComposerState.prevRev}×`
+                : 'Belum ada revisi sebelumnya';
+            document.getElementById('revComposerStatusHint').textContent = existingImgs.length
+                ? `${existingImgs.length} gambar tersimpan sebelumnya.`
+                : 'Otomatis masuk Google Drive (jika terhubung) atau tersimpan aman di database.';
+            renderRevisionComposerPreviews();
+            modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('revComposerText')?.focus(), 80);
+        };
+
+        global.submitRevisionComposer = async function (btn) {
+            const { taskId, studentId, prevRev, images } = revComposerState;
+            if (!taskId || !studentId) return;
+            const stVal = document.getElementById('revComposerStatus')?.value || 'revisi';
+            const textVal = (document.getElementById('revComposerText')?.value || '').trim();
+            const nextRev = stVal === 'revisi' ? prevRev + 1 : prevRev;
+            const nowIso = new Date().toISOString();
+
+            if (btn) { btn.disabled = true; btn.textContent = 'Mengunggah & menyimpan...'; }
+
+            const finalUrls = [];
+            const hasGas = Boolean(getGasUrl());
+            const taskObj = (projectDataCache.allTasks || []).find((t) => t.id === taskId);
+            const stuObj = (projectDataCache.studentList || []).find((s) => s.id === studentId) || (projectDataCache.allStudentsList || []).find((s) => s.id === studentId);
+
+            for (let i = 0; i < images.length; i++) {
+                const img = images[i];
+                if (img.existingUrl) {
+                    finalUrls.push(img.existingUrl);
+                    continue;
+                }
+                let savedUrl = img.dataUrl;
+                if (hasGas && img.dataUrl && img.dataUrl.includes(',')) {
+                    try {
+                        const base64Data = img.dataUrl.split(',')[1];
+                        const safeName = `Revisi_${(stuObj?.full_name || 'Siswa').replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}_${i + 1}.jpg`;
+                        const res = await postToGas({
+                            action: 'upload_revisi_image',
+                            base64Data,
+                            mimeType: 'image/jpeg',
+                            fileName: safeName
+                        });
+                        if (res && res.ok && res.imageUrl) savedUrl = res.imageUrl;
+                    } catch {
+                        // Fallback otomatis ke Data URL terkompresi jika Drive belum di-redeploy
+                    }
+                }
+                if (savedUrl) finalUrls.push(savedUrl);
+            }
+
+            const imgTags = finalUrls.map((u) => `[IMG:${u}]`).join('\n');
+            const combinedFb = [textVal, imgTags].filter(Boolean).join('\n').trim();
+
+            const { error } = await supabase.from('project_submissions').upsert({
+                project_task_id: taskId,
+                student_id: studentId,
+                status: stVal,
+                mentor_feedback: combinedFb || null,
+                revision_count: nextRev,
+                reviewed_by: currentUser.id,
+                updated_at: nowIso
+            }, { onConflict: 'project_task_id,student_id' });
+
+            if (!error && (combinedFb || stVal === 'revisi' || stVal === 'selesai')) {
+                await appendFeedbackLogEntry(studentId, {
+                    at: nowIso,
+                    task_id: taskId,
+                    task_title: taskObj?.title || 'Tugas Project',
+                    status: stVal,
+                    revision_no: nextRev,
+                    feedback: combinedFb || (stVal === 'selesai' ? 'Tugas disetujui (ACC Selesai).' : 'Diminta revisi oleh pembimbing.'),
+                    reviewer_name: currentUser.full_name || currentUser.username || 'Guru'
+                });
+            }
+
+            if (btn) { btn.disabled = false; btn.textContent = '💾 Simpan Catatan & Lampiran'; }
+            if (error) {
+                showToast(`Gagal menyimpan catatan revisi: ${error.message}`);
+                return;
+            }
+            document.getElementById('anitrackRevisionComposerModal')?.classList.add('hidden');
+            showToast(`Catatan revisi${finalUrls.length ? ` + ${finalUrls.length} gambar` : ''} tersimpan ✓`);
+            loadProjectTracker();
+        };
+
+        // ==================== PAPAN PENGUMUMAN GLOBAL (ADMIN BROADCAST) ====================
+        global.saveGlobalAnnouncementUi = async function (btn) {
+            if (!isAnyAdmin(currentUser)) {
+                showToast('Hanya Admin / Superadmin yang dapat mengatur pengumuman global.');
+                return;
+            }
+            const inp = document.getElementById('globalAnnouncementInput');
+            const fb = document.getElementById('globalAnnouncementFeedback');
+            const text = (inp?.value || '').trim();
+            if (btn) { btn.disabled = true; btn.textContent = 'Menyebarkan...'; }
+            const { error } = await saveGlobalAnnouncement(text);
+            if (btn) { btn.disabled = false; btn.textContent = '📢 Sebarkan'; }
+            if (error) {
+                showToast(`Gagal menyimpan pengumuman: ${error.message}`);
+                return;
+            }
+            if (fb) {
+                fb.textContent = text ? 'Pengumuman aktif disebarkan ✓' : 'Banner pengumuman dimatikan.';
+                setTimeout(() => { if (fb) fb.textContent = ''; }, 3000);
+            }
+            showToast(text ? 'Pengumuman global aktif di semua portal ✓' : 'Banner pengumuman global dihapus.');
+        };
+
+        global.clearGlobalAnnouncementUi = async function (btn) {
+            if (!isAnyAdmin(currentUser)) {
+                showToast('Hanya Admin / Superadmin yang dapat menghapus pengumuman global.');
+                return;
+            }
+            const inp = document.getElementById('globalAnnouncementInput');
+            if (inp) inp.value = '';
+            if (btn) btn.disabled = true;
+            const { error } = await saveGlobalAnnouncement('');
+            if (btn) btn.disabled = false;
+            if (error) { showToast(`Gagal menghapus pengumuman: ${error.message}`); return; }
+            showToast('Banner pengumuman global dihapus ✓');
         };
 
         global.openStudentFeedbackHistory = function (studentId) {
@@ -4362,9 +5426,11 @@
         global.updateChecklistCell = async function (studentId, encodedCol, newVal, selectEl) {
             const colName = decodeURIComponent(encodedCol || '');
             if (!studentId || !colName) return;
+            const normVal = normalizeChecklistStatus(newVal);
+            const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === normVal) || CHECKLIST_STATUS_OPTIONS[0];
             const rowMap = projectDataCache.checklistRowMap || {};
             const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
-            const nextItems = { ...(existing.items || {}), [colName]: newVal };
+            const nextItems = { ...(existing.items || {}), [colName]: normVal };
             const nowIso = new Date().toISOString();
             const nextRow = {
                 student_id: studentId,
@@ -4375,8 +5441,7 @@
             };
 
             if (selectEl) {
-                const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === newVal) || CHECKLIST_STATUS_OPTIONS[0];
-                selectEl.className = `w-full px-2 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer focus:outline-none ${stOpt.cls}`;
+                selectEl.className = `w-full px-2 py-1.5 rounded-lg border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}`;
             }
 
             const { error } = await supabase.from('app_settings').upsert({
@@ -4391,7 +5456,7 @@
             }
             rowMap[studentId] = nextRow;
             projectDataCache.checklistRowMap = rowMap;
-            showToast(`Checklist "${colName}" → ${newVal.toUpperCase()} ✓`);
+            showToast(`Project Update "${colName}" → ${stOpt.label} ✓`);
             renderProjectTrackerBody();
         };
 
@@ -4423,30 +5488,193 @@
             renderProjectTrackerBody();
         };
 
+        global.editStudentDriveQuick = async function (studentId, studentName) {
+            const stu = (projectDataCache.allStudentsList || []).find((s) => s.id === studentId);
+            const cur = stu?.project_drive_url || '';
+            const next = prompt(`Masukkan Link Folder Google Drive Project untuk ${studentName}:`, cur);
+            if (next === null) return;
+            const trimmed = next.trim();
+            if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+                showToast('Link Google Drive harus diawali https://');
+                return;
+            }
+            const { error } = await supabase.from('profiles').update({ project_drive_url: trimmed || null }).eq('id', studentId);
+            if (error) { showToast(`Gagal menyimpan Link Drive: ${error.message}`); return; }
+            if (stu) stu.project_drive_url = trimmed || null;
+            const stuScoped = (projectDataCache.studentList || []).find((s) => s.id === studentId);
+            if (stuScoped) stuScoped.project_drive_url = trimmed || null;
+            showToast(`Link Google Drive ${studentName} diperbarui ✓`);
+            renderProjectTrackerBody();
+        };
+
+        global.handleChecklistImportFile = async function (inp) {
+            const file = inp?.files?.[0];
+            if (!file) return;
+            if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); inp.value = ''; return; }
+            try {
+                const buf = await file.arrayBuffer();
+                const wb = global.XLSX.read(buf, { type: 'array' });
+                const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {} } = projectDataCache;
+                const byName = Object.fromEntries(allStudentsList.map((s) => [(s.full_name || '').trim().toLowerCase(), s]));
+                const byUser = Object.fromEntries(allStudentsList.map((s) => [(s.username || '').trim().toLowerCase(), s]));
+
+                const normKey = (k) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const updatesMap = new Map();
+
+                wb.SheetNames.forEach((shName) => {
+                    const ws = wb.Sheets[shName];
+                    const aoa = global.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                    if (!aoa.length) return;
+
+                    // Deteksi header 1-baris (sheet 2D) atau 2-baris bertingkat (sheet 3D: R1 punya STATUS, R2 punya nama tahapan)
+                    let headerRowIdx = 0;
+                    for (let r = 0; r < Math.min(5, aoa.length); r++) {
+                        const rowStr = (aoa[r] || []).map(normKey);
+                        if (rowStr.some((c) => c === 'namasiswa' || c === 'nama')) { headerRowIdx = r; break; }
+                    }
+                    const h1 = aoa[headerRowIdx] || [];
+                    const h2 = aoa[headerRowIdx + 1] || [];
+                    const isTwoRowHeader = h1.some((c) => /status/i.test(String(c || ''))) && h2.some((c) => String(c || '').trim().length > 0 && !/^\d+(\.0)?$/.test(String(c || '').trim()));
+                    const dataStart = isTwoRowHeader ? headerRowIdx + 2 : headerRowIdx + 1;
+                    const maxCols = Math.max(h1.length, isTwoRowHeader ? h2.length : 0);
+                    const headers = [];
+                    for (let c = 0; c < maxCols; c++) {
+                        const top = String(h1[c] || '').trim();
+                        const sub = isTwoRowHeader ? String(h2[c] || '').trim() : '';
+                        headers.push(sub || top);
+                    }
+
+                    const nameIdx = headers.findIndex((h) => ['namasiswa', 'nama', 'siswa'].includes(normKey(h)));
+                    const userIdx = headers.findIndex((h) => ['username', 'user'].includes(normKey(h)));
+                    const driveIdx = headers.findIndex((h) => normKey(h).includes('drive') || normKey(h).includes('linkgoogle'));
+                    const notesIdx = headers.findIndex((h) => normKey(h).startsWith('note'));
+
+                    if (nameIdx < 0 && userIdx < 0) return;
+
+                    const ignoredCols = new Set([nameIdx, userIdx, driveIdx, notesIdx]);
+                    const statusCols = [];
+                    headers.forEach((h, idx) => {
+                        if (ignoredCols.has(idx) || !h) return;
+                        const nk = normKey(h);
+                        if (['no', 'nis', 'nisn', 'kelas', 'nohp', 'nowa', 'hp', 'wa', 'whatsapp', 'progress', 'progres', 'pembimbing', 'subkonsentrasi', 'diupdateoleh'].includes(nk)) return;
+                        statusCols.push({ idx, name: h });
+                    });
+
+                    for (let r = dataStart; r < aoa.length; r++) {
+                        const row = aoa[r] || [];
+                        const rawName = nameIdx >= 0 ? String(row[nameIdx] || '').trim() : '';
+                        const rawUser = userIdx >= 0 ? String(row[userIdx] || '').replace(/^@/, '').trim().toLowerCase() : '';
+                        if (!rawName && !rawUser) continue;
+                        const stu = (rawUser && byUser[rawUser]) || (rawName && byName[rawName.toLowerCase()]);
+                        if (!stu) continue;
+
+                        const driveVal = driveIdx >= 0 ? String(row[driveIdx] || '').trim() : '';
+                        const noteVal = notesIdx >= 0 ? String(row[notesIdx] || '').trim() : '';
+                        const stuCols = (stu.sub_concentration && checklistColsMap[stu.sub_concentration]) || DEFAULT_CHECKLIST_COLS;
+                        const colLookup = Object.fromEntries(stuCols.map((c) => [normKey(c), c]));
+
+                        const items = {};
+                        statusCols.forEach((sc) => {
+                            const rawSt = String(row[sc.idx] || '').trim();
+                            if (!rawSt) return;
+                            const targetCol = colLookup[normKey(sc.name)] || sc.name;
+                            items[targetCol] = normalizeChecklistStatus(rawSt);
+                        });
+
+                        const prev = updatesMap.get(stu.id) || { stu, driveUrl: '', items: {}, note: '' };
+                        if (driveVal && /^https?:\/\//i.test(driveVal)) prev.driveUrl = driveVal;
+                        if (noteVal) prev.note = noteVal;
+                        Object.assign(prev.items, items);
+                        updatesMap.set(stu.id, prev);
+                    }
+                });
+
+                const matched = [...updatesMap.values()].filter((u) => u.driveUrl || u.note || Object.keys(u.items).length > 0);
+                if (!matched.length) {
+                    showToast('Tidak ada data siswa yang cocok dengan database pada file tersebut.');
+                    inp.value = '';
+                    return;
+                }
+
+                const driveCnt = matched.filter((m) => m.driveUrl).length;
+                const statusCnt = matched.filter((m) => Object.keys(m.items).length > 0 || m.note).length;
+                if (!confirm(`Ditemukan ${matched.length} siswa cocok dari "${file.name}":\n• ${driveCnt} Link Google Drive\n• ${statusCnt} data status / Notes\n\nImpor dan simpan ke Project Update sekarang?`)) {
+                    inp.value = '';
+                    return;
+                }
+
+                const nowIso = new Date().toISOString();
+                const updaterName = currentUser.full_name || currentUser.username || 'Admin';
+                showToast(`Mengimpor ${matched.length} data siswa...`);
+
+                for (let i = 0; i < matched.length; i += 10) {
+                    const chunk = matched.slice(i, i + 10);
+                    await Promise.all(chunk.map(async (entry) => {
+                        if (entry.driveUrl && entry.driveUrl !== entry.stu.project_drive_url) {
+                            await supabase.from('profiles').update({ project_drive_url: entry.driveUrl }).eq('id', entry.stu.id);
+                        }
+                        if (Object.keys(entry.items).length > 0 || entry.note) {
+                            const existing = checklistRowMap[entry.stu.id] || { items: {}, notes: '' };
+                            const nextRow = {
+                                student_id: entry.stu.id,
+                                items: { ...(existing.items || {}), ...entry.items },
+                                notes: entry.note || existing.notes || '',
+                                updated_by: updaterName,
+                                updated_at: nowIso
+                            };
+                            await supabase.from('app_settings').upsert({
+                                key: `${CHECKLIST_ROW_PREFIX}${entry.stu.id}`,
+                                value: JSON.stringify(nextRow),
+                                updated_at: nowIso
+                            }, { onConflict: 'key' });
+                        }
+                    }));
+                }
+
+                showToast(`${matched.length} data siswa berhasil diimpor ke Project Update ✓`);
+                await loadProjectTracker();
+            } catch (err) {
+                showToast(`Gagal mengimpor spreadsheet: ${err.message || err}`);
+            } finally {
+                inp.value = '';
+            }
+        };
+
         global.exportChecklistXlsx = function () {
             if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
             const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {}, mentorsList = [] } = projectDataCache;
             const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m.full_name]));
             const statusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
             const wb = global.XLSX.utils.book_new();
-            const subconcsToExport = projectChecklistState.subconc ? [projectChecklistState.subconc] : SUBCONCS;
+            const curTab = projectChecklistState.subconc;
+            const subconcsToExport = SUBCONCS.includes(curTab)
+                ? [curTab]
+                : (curTab === '__group_2d'
+                    ? SUBCONCS.filter((sc) => sc.startsWith('2D'))
+                    : (curTab === '__group_3d'
+                        ? SUBCONCS.filter((sc) => sc.startsWith('3D'))
+                        : SUBCONCS));
 
             subconcsToExport.forEach((sc) => {
                 const cols = checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS;
                 const scStudents = allStudentsList.filter((s) => s.sub_concentration === sc);
                 const rows = scStudents.map((s, i) => {
                     const rd = checklistRowMap[s.id] || { items: {}, notes: '' };
+                    const doneCnt = cols.filter((c) => normalizeChecklistStatus(rd.items?.[c]) === 'done').length;
+                    const pct = cols.length ? Math.round((doneCnt / cols.length) * 100) : 0;
                     const obj = {
                         No: i + 1,
                         'Nama Siswa': s.full_name,
                         Username: `@${s.username}`,
                         Kelas: s.class_name || '-',
+                        'Sub-Konsentrasi': sc,
+                        Progress: `${doneCnt}/${cols.length} (${pct}%)`,
                         'No. HP': formatWhatsappDisplay(s.whatsapp_number) || '-',
-                        Pembimbing: (s.mentor_id && mentorMap[s.mentor_id]) || '-',
-                        'Link Google Drive': s.project_drive_url || '-'
+                        'Link Google Drive': s.project_drive_url || '-',
+                        Pembimbing: (s.mentor_id && mentorMap[s.mentor_id]) || '-'
                     };
                     cols.forEach((c) => {
-                        obj[c] = statusText[rd.items?.[c] || 'belum'] || 'Belum';
+                        obj[c] = statusText[normalizeChecklistStatus(rd.items?.[c])] || 'None';
                     });
                     obj.Notes = rd.notes || '';
                     obj['Diupdate Oleh'] = rd.updated_by || '';
@@ -4456,8 +5684,8 @@
             });
 
             const stamp = getJakartaYmd(new Date());
-            global.XLSX.writeFile(wb, `Checklist-PJ-Subkon-AniTrack-${stamp}.xlsx`);
-            showToast('File Excel Checklist PJ Subkon diunduh ✓');
+            global.XLSX.writeFile(wb, `Project-Update-AniTrack-${stamp}.xlsx`);
+            showToast('File Excel Project Update diunduh ✓');
         };
 
         global.saveWeeklyUpdateCheck = async function (encodedKey, btn) {
@@ -4565,7 +5793,13 @@
         global.saveProjectReview = async function (taskId, studentId, btn) {
             const row = btn.closest('[data-proj-task]');
             const stVal = row.querySelector('.proj-status').value;
-            const fbVal = row.querySelector('.proj-fb').value.trim();
+            const rawInlineVal = row.querySelector('.proj-fb').value.trim();
+            const existingRawFb = String(projectDataCache.subMap?.[`${taskId}__${studentId}`]?.mentor_feedback || '');
+            const existingImgTags = existingRawFb.match(/\[IMG:[^\]]+\]/g) || [];
+            const cleanInlineText = rawInlineVal.replace(/\[Gambar Revisi\]/g, '').trim();
+            const fbVal = (existingImgTags.length && !rawInlineVal.includes('[IMG:'))
+                ? [cleanInlineText, ...existingImgTags].filter(Boolean).join('\n').trim()
+                : rawInlineVal;
             const prevRev = Number(row.dataset.revCount || 0);
             const nextRev = stVal === 'revisi' ? prevRev + 1 : prevRev;
             const nowIso = new Date().toISOString();
@@ -4862,7 +6096,7 @@
         global.refreshAllData = async function () {
             const icon = document.getElementById('refreshIcon');
             icon?.classList.add('animate-spin');
-            await Promise.all([refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadProjectTracker(), extraRefresh()]);
+            await Promise.all([loadGlobalAnnouncement(), refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadProjectTracker(), extraRefresh()]);
             setTimeout(() => icon?.classList.remove('animate-spin'), 400);
         };
 
@@ -4891,7 +6125,7 @@
             applyRoleRestrictionsUI();
             updateMentorWaBanner();
         });
-        Promise.all([refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadProjectTracker(), extraRefresh()]);
+        Promise.all([loadGlobalAnnouncement(), refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadProjectTracker(), extraRefresh()]);
 
         return { refreshMetrics, loadMaterials, loadDailyTaskFeed, loadProjectTracker };
     }
@@ -4958,6 +6192,14 @@
         loadChecklistColsMap,
         saveChecklistColsMap,
         parseChecklistRowMap,
+        normalizeChecklistStatus,
+        formatFeedbackWithImages,
+        stripFeedbackImageTags,
+        loadGlobalAnnouncement,
+        saveGlobalAnnouncement,
+        renderGlobalAnnouncementBanner,
+        openStudentFlowchartModal,
+        printStudentsReportPdf,
         openFeedbackHistoryModal,
         getWeekKey,
         getWeekRangeInfo,

@@ -2125,6 +2125,21 @@
                 A.openFeedbackHistoryModal(`${currentUser.full_name} (${currentUser.class_name || '-'})`, studentFeedbackLogsCache);
             };
 
+            let studentProjectCache = { tasks: [], subMapComposite: {}, checklistColsMap: {}, myChecklistData: { items: {}, notes: '' } };
+            window.openMyFlowchart = function () {
+                A.openStudentFlowchartModal(currentUser, studentProjectCache.tasks, studentProjectCache.subMapComposite, null, studentFeedbackLogsCache);
+            };
+            window.printStudentReportPdf = function () {
+                A.printStudentsReportPdf([currentUser], {
+                    tasks: studentProjectCache.tasks,
+                    subMap: studentProjectCache.subMapComposite,
+                    mentorMap: {},
+                    fbLogMap: { [currentUser.id]: studentFeedbackLogsCache },
+                    checklistColsMap: studentProjectCache.checklistColsMap,
+                    checklistRowMap: { [currentUser.id]: studentProjectCache.myChecklistData }
+                }, `Rapor Jurnal — ${currentUser.full_name} (${currentUser.class_name || '-'})`);
+            };
+
             async function loadStudentProjects() {
                 const listEl = document.getElementById('studentProjectList');
                 const bannerEl = document.getElementById('studentProjectBanner');
@@ -2169,6 +2184,7 @@
                 const myTasks = A.sortMaterialsByPipeline(projTasks || []).filter((t) =>
                     !currentUser.sub_concentration || !t.sub_concentration || t.sub_concentration === currentUser.sub_concentration
                 );
+                studentProjectCache = { tasks: myTasks, subMapComposite, checklistColsMap, myChecklistData };
 
                 const myIssueStats = A.computeStudentIssueStats(currentUser, myTasks, subMapComposite);
                 const total = myTasks.length;
@@ -2198,11 +2214,21 @@
                                 </span>
                                 <h2 class="text-xl sm:text-2xl font-extrabold">Progres Project Keseluruhan</h2>
                                 <p class="text-xs sm:text-sm text-white/90">Kumpulkan lebih awal dari deadline untuk meraih <strong>🌟 Lencana Emas</strong>, dan kirim <strong>Update Mingguan</strong> tiap minggu.</p>
-                                ${studentFeedbackLogsCache.length ? `
-                                <button type="button" onclick="openMyFeedbackHistory()"
-                                    class="inline-flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                    📜 Lihat Semua Riwayat Catatan Guru (${studentFeedbackLogsCache.length})
-                                </button>` : ''}
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
+                                    <button type="button" onclick="openMyFlowchart()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer">
+                                        🗺️ Timeline Flowchart
+                                    </button>
+                                    <button type="button" onclick="printStudentReportPdf()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
+                                        🖨️ Cetak PDF Rapor
+                                    </button>
+                                    ${studentFeedbackLogsCache.length ? `
+                                    <button type="button" onclick="openMyFeedbackHistory()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
+                                        📜 Riwayat Catatan Guru (${studentFeedbackLogsCache.length})
+                                    </button>` : ''}
+                                </div>
                             </div>
                             <div class="w-full lg:w-72 bg-white/15 border border-white/20 rounded-2xl p-4 space-y-2 shrink-0 num-tabular">
                                 <div class="flex items-center justify-between text-xs font-bold">
@@ -2252,23 +2278,37 @@
                                 </div>`).join('')}
                         </div>
                     </div>
-                    <!-- Status Checklist PJ Sub-Konsentrasi (Read-Only untuk Siswa) -->
-                    <div class="mt-4 bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 space-y-3">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">✅ Checklist Project dari Guru PJ ${A.esc(currentUser.sub_concentration || 'Sub-Konsentrasi')}</div>
-                                <p class="text-[11px] text-slate-500 mt-0.5">Status pengecekan resmi dari PJ Sub-Konsentrasi (juga otomatis dilihat oleh Guru Pembimbing kamu).</p>
+                    <!-- Status Project Update per Sub-Konsentrasi (Otomatis mengikuti Subkon siswa) -->
+                    <div class="mt-4 bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 space-y-3.5">
+                        ${(() => {
+                            const doneCk = myChecklistCols.filter((c) => A.normalizeChecklistStatus(myChecklistData.items?.[c]) === 'done').length;
+                            const ckPct = myChecklistCols.length ? Math.round((doneCk / myChecklistCols.length) * 100) : 0;
+                            return `
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                <div>
+                                    <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">📊 Project Update • ${A.esc(currentUser.sub_concentration || 'Sub-Konsentrasi Belum Diatur')}</div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Status tahapan resmi (None / WIP / Revisi / Done) &amp; Notes dari Guru PJ Sub-Konsentrasi (otomatis terpantau Pembimbing).</p>
+                                </div>
+                                <div class="w-full sm:w-52 shrink-0 num-tabular">
+                                    <div class="flex items-center justify-between text-[11px] font-bold mb-1">
+                                        <span class="${ckPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCk}/${myChecklistCols.length} Done</span>
+                                        <span class="font-mono ${ckPct === 100 ? 'text-[#15803D]' : 'text-slate-500'}">${ckPct}%</span>
+                                    </div>
+                                    <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
+                                        <div class="h-full rounded-full transition-all duration-300" style="width:${ckPct}%;background:#4CAF50;"></div>
+                                    </div>
+                                </div>
                             </div>
-                            ${myChecklistData.updated_at ? `<span class="text-[10.5px] font-mono text-slate-400">Update: ${A.esc(myChecklistData.updated_by || 'PJ')} • ${A.esc(A.formatDateTime(myChecklistData.updated_at))}</span>` : ''}
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            ${myChecklistCols.map((col) => {
-                                const stVal = myChecklistData.items?.[col] || 'belum';
-                                const stOpt = A.CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || A.CHECKLIST_STATUS_OPTIONS[0];
-                                return `<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border ${stOpt.cls} text-xs font-bold"><span>${A.esc(col)}:</span><span>${stOpt.short}</span></div>`;
-                            }).join('')}
-                        </div>
-                        ${myChecklistData.notes ? `<div class="rounded-xl bg-[#FFFDF5] border border-[#FDE68A] px-3.5 py-2.5 text-xs text-[#92400E]"><strong>📝 Catatan PJ Subkon:</strong> ${A.esc(myChecklistData.notes)}</div>` : ''}
+                            <div class="flex flex-wrap items-center gap-2">
+                                ${myChecklistCols.map((col) => {
+                                    const stVal = A.normalizeChecklistStatus(myChecklistData.items?.[col]);
+                                    const stOpt = A.CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || A.CHECKLIST_STATUS_OPTIONS[0];
+                                    return `<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border ${stOpt.cls} text-xs font-bold"><span>${A.esc(col)}:</span><span>${stOpt.label}</span></div>`;
+                                }).join('')}
+                            </div>
+                            ${myChecklistData.notes ? `<div class="rounded-xl bg-[#FFFDF5] border border-[#FDE68A] px-3.5 py-2.5 text-xs text-[#92400E]"><strong>📝 Notes PJ Subkon:</strong> ${A.esc(myChecklistData.notes)}</div>` : ''}
+                            ${myChecklistData.updated_at ? `<div class="text-[10.5px] font-mono text-slate-400">Terakhir diperbarui: ${A.esc(myChecklistData.updated_by || 'PJ Subkon')} • ${A.esc(A.formatDateTime(myChecklistData.updated_at))}</div>` : ''}`;
+                        })()}
                     </div>`;
 
                 renderStudentProjectDriveCard();
@@ -2441,11 +2481,11 @@
                             </div>
 
                             ${ps.mentor_feedback ? `
-                            <div class="${isRevision ? 'bg-[#FFF0F4] border-[#FECDD6] text-[#BE123C]' : 'bg-[#E3F6F3] border-[#BBE9E2] text-[#1D5E55]'} border rounded-xl p-3.5 text-xs space-y-1">
+                            <div class="${isRevision ? 'bg-[#FFF0F4] border-[#FECDD6] text-[#BE123C]' : 'bg-[#E3F6F3] border-[#BBE9E2] text-[#1D5E55]'} border rounded-xl p-3.5 text-xs space-y-1.5">
                                 <div class="font-extrabold uppercase tracking-wider text-[10.5px]">
                                     ${isRevision ? `⚠️ Catatan Revisi Guru (Revisi ke-${revNum})` : '💬 Catatan / Feedback Pembimbing'}
                                 </div>
-                                <p class="leading-relaxed">${A.esc(ps.mentor_feedback)}</p>
+                                <div class="leading-relaxed space-y-2">${A.formatFeedbackWithImages(ps.mentor_feedback)}</div>
                             </div>` : ''}
 
                             <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
@@ -2537,7 +2577,7 @@
                 icon?.classList.add('animate-spin');
                 await checkDailyTaskGate();
                 await loadStudentMaterialProgress();
-                await Promise.all([refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadStudentProjects()]);
+                await Promise.all([A.loadGlobalAnnouncement(), refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadStudentProjects()]);
                 setTimeout(() => icon?.classList.remove('animate-spin'), 400);
             };
 
@@ -2561,7 +2601,7 @@
             (async () => {
                 await checkDailyTaskGate();
                 await loadStudentMaterialProgress();
-                await Promise.all([refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadStudentProjects()]);
+                await Promise.all([A.loadGlobalAnnouncement(), refreshMetrics(), loadMaterials(), loadDailyTaskFeed(), loadStudentProjects()]);
             })();
         })();
     </script>

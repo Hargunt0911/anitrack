@@ -211,6 +211,25 @@ function doPost(e) {
       return jsonResponse({ ok: true, deletedCount: deleted });
     }
 
+    // 1e. Upload Gambar Coretan Revisi Guru ke subfolder "AniTrack_Revisi"
+    if (action === 'upload_revisi_image') {
+      const revFolder = getOrCreateSubfolder(root, 'AniTrack_Revisi');
+      const mimeType = payload.mimeType || 'image/jpeg';
+      const ext = mimeType.indexOf('png') >= 0 ? 'png' : (mimeType.indexOf('webp') >= 0 ? 'webp' : 'jpg');
+      const safeName = String(payload.fileName || `revisi_${Date.now()}.${ext}`).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const bytes = Utilities.base64Decode(payload.base64Data);
+      const blob = Utilities.newBlob(bytes, mimeType, safeName);
+      const file = revFolder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      const fid = file.getId();
+      return jsonResponse({
+        ok: true,
+        fileId: fid,
+        fileUrl: file.getUrl(),
+        imageUrl: `https://lh3.googleusercontent.com/d/${fid}=w1200`
+      });
+    }
+
     // 2. Auto-log setiap Daily Task ke Google Spreadsheet bulanan di subfolder "Rekap Daily Task"
     if (action === 'sync_daily_task') {
       const logFolder = getOrCreateSubfolder(root, 'Rekap Daily Task');

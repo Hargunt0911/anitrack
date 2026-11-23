@@ -251,6 +251,34 @@
 
                 <!-- ==================== TAB 0: DASHBOARD SUPERADMIN ==================== -->
                 <section id="tab-overview" class="space-y-6">
+                    <!-- Papan Pengumuman Global (Broadcast ke Siswa, Pembimbing & Admin) -->
+                    <div id="adminBroadcastBox" class="bg-white border border-[#DCEBFF] rounded-2xl shadow-card p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-3.5">
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0082E6] to-[#4F46E5] text-white text-lg flex items-center justify-center shadow-sm shrink-0">📢</span>
+                            <div>
+                                <div class="text-xs font-extrabold text-[#1E293B]">Papan Pengumuman Global</div>
+                                <div class="text-[11px] text-slate-500">Tampil otomatis di bagian atas portal seluruh siswa &amp; pembimbing.</div>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <input id="globalAnnouncementInput" type="text"
+                                placeholder="Tulis pengumuman penting... (mis: Pengumpulan Storyboard maksimal Jumat 15.00 WIB)"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();saveGlobalAnnouncementUi();}"
+                                class="flex-1 px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs text-[#1E293B] focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button type="button" onclick="saveGlobalAnnouncementUi(this)"
+                                    class="px-4 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
+                                    📢 Sebarkan
+                                </button>
+                                <button type="button" onclick="clearGlobalAnnouncementUi(this)"
+                                    class="px-3 py-2.5 rounded-xl bg-[#FFF0F4] hover:bg-[#F13B6E] text-[#E11D48] hover:text-white border border-[#FECDD6] text-xs font-bold transition cursor-pointer" title="Hapus banner pengumuman aktif">
+                                    Hapus
+                                </button>
+                            </div>
+                        </div>
+                        <span id="globalAnnouncementFeedback" class="text-[11px] font-semibold text-[#2F8F81] hidden lg:block"></span>
+                    </div>
+
                     <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
                         <div class="xl:col-span-9 relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#45B1A2] via-[#4FB8AA] to-[#58C2B4] text-white p-5 sm:p-7 shadow-card flex flex-col justify-between min-h-[205px]">
                             <div class="pointer-events-none absolute -top-10 right-52 w-40 h-40 rounded-full bg-white/10"></div>
