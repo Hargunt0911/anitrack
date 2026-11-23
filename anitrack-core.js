@@ -1074,6 +1074,1032 @@
         win.document.close();
     }
 
+    // ==================== 1. MODE GELAP (DARK MODE ENGINE) ====================
+    const DARK_THEME_STORAGE_KEY = 'anitrack_theme';
+
+    function injectDarkModeStyles() {
+        if (document.getElementById('anitrackDarkStyle')) return;
+        const st = document.createElement('style');
+        st.id = 'anitrackDarkStyle';
+        st.textContent = `
+            html.dark, html.dark body { background-color: #0B1120 !important; color: #E2E8F0 !important; }
+            html.dark section.bg-\\[\\#F3F6FB\\], html.dark div.bg-\\[\\#F3F6FB\\], html.dark .bg-\\[\\#F3F6FB\\] { background-color: #0B1120 !important; }
+            html.dark aside#sidebar, html.dark header, html.dark .bg-white { background-color: #111827 !important; }
+            html.dark header.bg-white\\/95 { background-color: rgba(17, 24, 39, 0.94) !important; }
+            html.dark .bg-\\[\\#FAFBFD\\], html.dark .bg-\\[\\#F7F9FC\\], html.dark .bg-\\[\\#F7FAFF\\], html.dark .bg-\\[\\#F8FBFF\\], html.dark .bg-\\[\\#F4F8FF\\], html.dark .bg-slate-50 { background-color: #1A2438 !important; }
+            html.dark .bg-\\[\\#F1F5F9\\], html.dark .bg-slate-100 { background-color: #1E293B !important; }
+            html.dark .bg-\\[\\#EAF4FF\\] { background-color: rgba(0, 149, 255, 0.16) !important; }
+            html.dark .bg-\\[\\#E3F6F3\\], html.dark .bg-\\[\\#E2F5F2\\], html.dark .bg-\\[\\#F0FDF4\\], html.dark .bg-\\[\\#F5FBF7\\], html.dark .bg-\\[\\#E7F9EE\\], html.dark .bg-\\[\\#DCFCE7\\] { background-color: rgba(16, 185, 129, 0.16) !important; }
+            html.dark .bg-\\[\\#FFF0F4\\], html.dark .bg-\\[\\#FFF1F5\\], html.dark .bg-\\[\\#FFF5F7\\], html.dark .bg-\\[\\#FFF8FA\\], html.dark .bg-\\[\\#FFE4EC\\] { background-color: rgba(244, 63, 94, 0.16) !important; }
+            html.dark .bg-\\[\\#FFF6D6\\], html.dark .bg-\\[\\#FFFDF5\\], html.dark .bg-\\[\\#FFFBEB\\] { background-color: rgba(245, 158, 11, 0.16) !important; }
+            html.dark .bg-\\[\\#EEF2FF\\] { background-color: rgba(99, 102, 241, 0.2) !important; }
+            html.dark .border-\\[\\#EDF1F7\\], html.dark .border-\\[\\#E2E8F0\\], html.dark .border-\\[\\#E8EEF6\\], html.dark .border-\\[\\#F1F5F9\\], html.dark .border-\\[\\#DCEBFF\\], html.dark .border-\\[\\#DCE5F2\\], html.dark .border-slate-200 { border-color: #253349 !important; }
+            html.dark .divide-\\[\\#EDF1F7\\] > :not([hidden]) ~ :not([hidden]), html.dark .divide-\\[\\#F1F5F9\\] > :not([hidden]) ~ :not([hidden]) { border-color: #253349 !important; }
+            html.dark .text-\\[\\#1E293B\\], html.dark .text-slate-800, html.dark .text-slate-700 { color: #F1F5F9 !important; }
+            html.dark .text-slate-600, html.dark .text-slate-500 { color: #94A3B8 !important; }
+            html.dark .text-slate-400 { color: #64748B !important; }
+            html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), html.dark select, html.dark textarea { background-color: #0F172A !important; color: #F1F5F9 !important; border-color: #334155 !important; }
+            html.dark input::placeholder, html.dark textarea::placeholder { color: #64748B !important; }
+            html.dark .hover\\:bg-\\[\\#F8FBFF\\]:hover, html.dark .hover\\:bg-\\[\\#F7F9FC\\]:hover, html.dark .hover\\:bg-\\[\\#F4F8FF\\]:hover, html.dark .hover\\:bg-slate-50:hover { background-color: #1E293B !important; }
+            html.dark tr:hover > td.sticky { background-color: #1E293B !important; }
+            html.dark td.sticky, html.dark th.sticky { background-color: #111827 !important; }
+            html.dark .shadow-card { box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35) !important; }
+            html.dark #anitrackNotifPopover { background-color: #111827 !important; border-color: #253349 !important; }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function updateDarkModeButtons(isDark) {
+        document.querySelectorAll('[data-dark-toggle]').forEach((btn) => {
+            btn.title = isDark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap';
+            const icon = btn.querySelector('[data-dark-icon]');
+            if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+        });
+    }
+
+    function applyDarkMode(isDark) {
+        injectDarkModeStyles();
+        document.documentElement.classList.toggle('dark', Boolean(isDark));
+        try { localStorage.setItem(DARK_THEME_STORAGE_KEY, isDark ? 'dark' : 'light'); } catch { /* ignore */ }
+        updateDarkModeButtons(Boolean(isDark));
+    }
+
+    function initDarkMode() {
+        let saved = 'light';
+        try { saved = localStorage.getItem(DARK_THEME_STORAGE_KEY) || 'light'; } catch { /* ignore */ }
+        applyDarkMode(saved === 'dark');
+    }
+
+    function toggleDarkMode() {
+        const next = !document.documentElement.classList.contains('dark');
+        applyDarkMode(next);
+        showToast(next ? 'Mode Gelap aktif 🌙' : 'Mode Terang aktif ☀️');
+    }
+    global.toggleDarkMode = toggleDarkMode;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDarkMode);
+    } else {
+        initDarkMode();
+    }
+
+    // ==================== 2. IN-APP DRAW-OVER IMAGE ANNOTATOR ====================
+    let annotatorCtxState = {
+        baseImg: null,
+        shapes: [],
+        tool: 'pen',
+        color: '#EF4444',
+        width: 4,
+        drawing: false,
+        currentShape: null,
+        onSave: null
+    };
+
+    function redrawAnnotatorCanvas() {
+        const canvas = document.getElementById('anitrackAnnotatorCanvas');
+        if (!canvas || !annotatorCtxState.baseImg) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(annotatorCtxState.baseImg, 0, 0, canvas.width, canvas.height);
+
+        const drawShape = (sh) => {
+            if (!sh) return;
+            ctx.save();
+            ctx.strokeStyle = sh.color || '#EF4444';
+            ctx.fillStyle = sh.color || '#EF4444';
+            ctx.lineWidth = sh.width || 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (sh.tool === 'pen' && sh.points?.length) {
+                ctx.beginPath();
+                ctx.moveTo(sh.points[0].x, sh.points[0].y);
+                for (let i = 1; i < sh.points.length; i++) ctx.lineTo(sh.points[i].x, sh.points[i].y);
+                ctx.stroke();
+            } else if (sh.tool === 'arrow') {
+                const dx = sh.x2 - sh.x1;
+                const dy = sh.y2 - sh.y1;
+                const angle = Math.atan2(dy, dx);
+                const headLen = Math.max(14, (sh.width || 4) * 3.5);
+                ctx.beginPath();
+                ctx.moveTo(sh.x1, sh.y1);
+                ctx.lineTo(sh.x2, sh.y2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(sh.x2, sh.y2);
+                ctx.lineTo(sh.x2 - headLen * Math.cos(angle - Math.PI / 6), sh.y2 - headLen * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(sh.x2 - headLen * Math.cos(angle + Math.PI / 6), sh.y2 - headLen * Math.sin(angle + Math.PI / 6));
+                ctx.closePath();
+                ctx.fill();
+            } else if (sh.tool === 'circle') {
+                const cx = (sh.x1 + sh.x2) / 2;
+                const cy = (sh.y1 + sh.y2) / 2;
+                const rx = Math.abs(sh.x2 - sh.x1) / 2;
+                const ry = Math.abs(sh.y2 - sh.y1) / 2;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, Math.max(2, rx), Math.max(2, ry), 0, 0, Math.PI * 2);
+                ctx.stroke();
+            } else if (sh.tool === 'text' && sh.text) {
+                const fontSize = Math.max(18, (sh.width || 4) * 5);
+                ctx.font = `800 ${fontSize}px "Plus Jakarta Sans", Arial, sans-serif`;
+                const metrics = ctx.measureText(sh.text);
+                const padX = 8;
+                const padY = 5;
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+                ctx.fillRect(sh.x1 - padX, sh.y1 - fontSize - padY + 4, metrics.width + padX * 2, fontSize + padY * 2);
+                ctx.fillStyle = sh.color || '#EF4444';
+                ctx.fillText(sh.text, sh.x1, sh.y1);
+            }
+            ctx.restore();
+        };
+
+        annotatorCtxState.shapes.forEach(drawShape);
+        if (annotatorCtxState.currentShape) drawShape(annotatorCtxState.currentShape);
+    }
+
+    function openImageAnnotatorModal(imgSrc, title = 'Coret Bukti Siswa', onSaveCallback = null) {
+        if (!imgSrc) { showToast('Belum ada gambar bukti untuk dicoret.'); return; }
+        let modal = document.getElementById('anitrackAnnotatorModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackAnnotatorModal';
+            modal.className = 'fixed inset-0 z-[85] bg-slate-900/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4';
+            modal.innerHTML = `
+                <div class="relative max-w-5xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7] flex flex-col max-h-[94vh]">
+                    <div class="px-4 py-3 border-b border-[#EDF1F7] bg-[#F7FAFF] flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-[#E11D48]">✏️ Coret Langsung Bukti Siswa (In-App Annotator)</div>
+                            <div id="annotatorModalTitle" class="text-sm font-extrabold text-[#1E293B] truncate"></div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('anitrackAnnotatorModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
+                    </div>
+                    <div class="px-4 py-2.5 border-b border-[#EDF1F7] bg-white flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <button type="button" data-ann-tool="pen" onclick="setAnnotatorTool('pen')" class="px-2.5 py-1.5 rounded-lg font-bold border cursor-pointer bg-[#1E293B] text-white border-[#1E293B]">✏️ Pena</button>
+                            <button type="button" data-ann-tool="arrow" onclick="setAnnotatorTool('arrow')" class="px-2.5 py-1.5 rounded-lg font-bold border cursor-pointer bg-white text-slate-600 border-[#E2E8F0]">➡️ Panah</button>
+                            <button type="button" data-ann-tool="circle" onclick="setAnnotatorTool('circle')" class="px-2.5 py-1.5 rounded-lg font-bold border cursor-pointer bg-white text-slate-600 border-[#E2E8F0]">⭕ Lingkaran</button>
+                            <button type="button" data-ann-tool="text" onclick="setAnnotatorTool('text')" class="px-2.5 py-1.5 rounded-lg font-bold border cursor-pointer bg-white text-slate-600 border-[#E2E8F0]">🔤 Teks</button>
+                            <span class="mx-1 text-slate-300">|</span>
+                            ${['#EF4444', '#FACC15', '#22C55E', '#38BDF8', '#FFFFFF'].map((c) => `
+                                <button type="button" data-ann-color="${c}" onclick="setAnnotatorColor('${c}')"
+                                    class="w-6 h-6 rounded-full border-2 ${c === '#EF4444' ? 'border-[#1E293B] scale-110' : 'border-slate-300'} cursor-pointer transition" style="background:${c};"></button>`).join('')}
+                            <span class="mx-1 text-slate-300">|</span>
+                            <select id="annotatorWidthSel" onchange="setAnnotatorWidth(this.value)" class="px-2 py-1 rounded-lg border border-[#E2E8F0] text-xs font-bold">
+                                <option value="3">Tipis</option>
+                                <option value="5" selected>Sedang</option>
+                                <option value="9">Tebal</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="undoAnnotatorShape()" class="px-2.5 py-1.5 rounded-lg bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-700 font-bold cursor-pointer">↩️ Undo</button>
+                            <button type="button" onclick="clearAnnotatorShapes()" class="px-2.5 py-1.5 rounded-lg bg-[#FFF0F4] hover:bg-[#F13B6E] text-[#E11D48] hover:text-white font-bold cursor-pointer">🗑️ Reset</button>
+                            <button type="button" onclick="saveAnnotatorResult()" class="px-3.5 py-1.5 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] text-white font-extrabold shadow-sm cursor-pointer">💾 Pakai ke Catatan Revisi</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 bg-slate-900 overflow-auto p-3 flex items-center justify-center min-h-[300px]">
+                        <canvas id="anitrackAnnotatorCanvas" class="max-w-full max-h-[68vh] rounded-lg shadow-xl cursor-crosshair bg-white" style="touch-action:none;"></canvas>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+
+            const canvas = modal.querySelector('#anitrackAnnotatorCanvas');
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+            };
+            canvas.addEventListener('pointerdown', (e) => {
+                const pos = getPos(e);
+                if (annotatorCtxState.tool === 'text') {
+                    const txt = prompt('Tulis catatan singkat pada titik ini:');
+                    if (txt && txt.trim()) {
+                        annotatorCtxState.shapes.push({ tool: 'text', x1: pos.x, y1: pos.y, text: txt.trim(), color: annotatorCtxState.color, width: annotatorCtxState.width });
+                        redrawAnnotatorCanvas();
+                    }
+                    return;
+                }
+                canvas.setPointerCapture?.(e.pointerId);
+                annotatorCtxState.drawing = true;
+                if (annotatorCtxState.tool === 'pen') {
+                    annotatorCtxState.currentShape = { tool: 'pen', points: [pos], color: annotatorCtxState.color, width: annotatorCtxState.width };
+                } else {
+                    annotatorCtxState.currentShape = { tool: annotatorCtxState.tool, x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, color: annotatorCtxState.color, width: annotatorCtxState.width };
+                }
+                redrawAnnotatorCanvas();
+            });
+            canvas.addEventListener('pointermove', (e) => {
+                if (!annotatorCtxState.drawing || !annotatorCtxState.currentShape) return;
+                const pos = getPos(e);
+                if (annotatorCtxState.currentShape.tool === 'pen') {
+                    annotatorCtxState.currentShape.points.push(pos);
+                } else {
+                    annotatorCtxState.currentShape.x2 = pos.x;
+                    annotatorCtxState.currentShape.y2 = pos.y;
+                }
+                redrawAnnotatorCanvas();
+            });
+            const endDraw = () => {
+                if (!annotatorCtxState.drawing) return;
+                annotatorCtxState.drawing = false;
+                if (annotatorCtxState.currentShape) {
+                    annotatorCtxState.shapes.push(annotatorCtxState.currentShape);
+                    annotatorCtxState.currentShape = null;
+                    redrawAnnotatorCanvas();
+                }
+            };
+            canvas.addEventListener('pointerup', endDraw);
+            canvas.addEventListener('pointercancel', endDraw);
+        }
+
+        annotatorCtxState.shapes = [];
+        annotatorCtxState.currentShape = null;
+        annotatorCtxState.drawing = false;
+        annotatorCtxState.onSave = onSaveCallback;
+        document.getElementById('annotatorModalTitle').textContent = title || 'Coret Bukti Siswa';
+
+        const img = new Image();
+        if (!/^data:/i.test(imgSrc)) img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const maxDim = 1200;
+            let w = img.naturalWidth || img.width || 800;
+            let h = img.naturalHeight || img.height || 600;
+            if (w > maxDim || h > maxDim) {
+                if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.getElementById('anitrackAnnotatorCanvas');
+            canvas.width = w;
+            canvas.height = h;
+            annotatorCtxState.baseImg = img;
+            redrawAnnotatorCanvas();
+            modal.classList.remove('hidden');
+        };
+        img.onerror = () => showToast('Gagal memuat gambar ke kanvas coretan.');
+        img.src = imgSrc;
+    }
+
+    global.setAnnotatorTool = function (tool) {
+        annotatorCtxState.tool = tool || 'pen';
+        document.querySelectorAll('[data-ann-tool]').forEach((b) => {
+            const active = b.dataset.annTool === annotatorCtxState.tool;
+            b.className = `px-2.5 py-1.5 rounded-lg font-bold border cursor-pointer ${active ? 'bg-[#1E293B] text-white border-[#1E293B]' : 'bg-white text-slate-600 border-[#E2E8F0]'}`;
+        });
+    };
+    global.setAnnotatorColor = function (c) {
+        annotatorCtxState.color = c || '#EF4444';
+        document.querySelectorAll('[data-ann-color]').forEach((b) => {
+            const active = b.dataset.annColor === annotatorCtxState.color;
+            b.className = `w-6 h-6 rounded-full border-2 ${active ? 'border-[#1E293B] scale-110' : 'border-slate-300'} cursor-pointer transition`;
+        });
+    };
+    global.setAnnotatorWidth = function (w) { annotatorCtxState.width = Number(w || 5); };
+    global.undoAnnotatorShape = function () { annotatorCtxState.shapes.pop(); redrawAnnotatorCanvas(); };
+    global.clearAnnotatorShapes = function () { annotatorCtxState.shapes = []; redrawAnnotatorCanvas(); };
+    global.saveAnnotatorResult = function () {
+        const canvas = document.getElementById('anitrackAnnotatorCanvas');
+        if (!canvas) return;
+        try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+            document.getElementById('anitrackAnnotatorModal')?.classList.add('hidden');
+            if (typeof annotatorCtxState.onSave === 'function') annotatorCtxState.onSave(dataUrl);
+        } catch {
+            showToast('Gambar tidak dapat diekspor dari kanvas (CORS). Gunakan screenshot Ctrl+V di modal revisi.');
+        }
+    };
+
+    // ==================== 3. LINK PANTAU ORANG TUA (READ-ONLY TOKEN) ====================
+    const PARENT_WATCH_PREFIX = 'parent_watch_v1::';
+    const PARENT_TOKEN_PREFIX = 'parent_token::';
+
+    function generateWatchToken() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        let out = '';
+        for (let i = 0; i < 18; i++) out += chars[Math.floor(Math.random() * chars.length)];
+        return out;
+    }
+
+    async function getOrCreateParentWatchToken(student, forceRegenerate = false) {
+        if (!supabase || !student?.id) return null;
+        const watchKey = `${PARENT_WATCH_PREFIX}${student.id}`;
+        let existing = null;
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', watchKey).maybeSingle();
+            if (data?.value) existing = JSON.parse(data.value);
+        } catch { /* ignore */ }
+
+        if (existing?.token && existing.active !== false && !forceRegenerate) {
+            return existing.token;
+        }
+        if (existing?.token && forceRegenerate) {
+            await supabase.from('app_settings').delete().eq('key', `${PARENT_TOKEN_PREFIX}${existing.token}`);
+        }
+        const token = generateWatchToken();
+        const nowIso = new Date().toISOString();
+        const payload = { token, student_id: student.id, student_name: student.full_name || '', class_name: student.class_name || '', active: true, updated_at: nowIso };
+        const [r1, r2] = await Promise.all([
+            supabase.from('app_settings').upsert({ key: watchKey, value: JSON.stringify(payload), updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_settings').upsert({ key: `${PARENT_TOKEN_PREFIX}${token}`, value: JSON.stringify({ student_id: student.id, active: true, updated_at: nowIso }), updated_at: nowIso }, { onConflict: 'key' })
+        ]);
+        if (r1.error || r2.error) return null;
+        return token;
+    }
+
+    function buildParentWatchUrl(token) {
+        try {
+            const u = new URL('./pantau.html', global.location.href);
+            u.searchParams.set('token', token);
+            return u.toString();
+        } catch {
+            return `https://anitrack.republikanimasi.my.id/pantau.html?token=${encodeURIComponent(token)}`;
+        }
+    }
+
+    async function openParentWatchLinkModal(student, forceRegenerate = false) {
+        if (!student?.id) return;
+        showToast(forceRegenerate ? 'Membuat ulang token link orang tua...' : 'Menyiapkan link pantau orang tua...');
+        const token = await getOrCreateParentWatchToken(student, forceRegenerate);
+        if (!token) { showToast('Gagal membuat link pantau orang tua.'); return; }
+        const watchUrl = buildParentWatchUrl(token);
+        const waText = `Yth. Orang Tua/Wali dari *${student.full_name}* (${student.class_name || 'Animasi SMKN 4 Malang'}),\n\nBerikut tautan resmi untuk memantau progres Project, Timeline, dan Daily Task putra/putri Bapak/Ibu secara real-time di AniTrack (tanpa perlu login):\n${watchUrl}\n\nTerima kasih atas kerja samanya.\n— Jurusan Animasi SMKN 4 Malang`;
+        const waShareUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+
+        let modal = document.getElementById('anitrackParentLinkModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackParentLinkModal';
+            modal.className = 'fixed inset-0 z-[84] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            modal.innerHTML = `
+                <div class="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                    <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F0FDF4] flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#15803D]">👨‍👩‍👧 Portal Pantau Orang Tua / Wali (Read-Only)</div>
+                            <div id="parentLinkTitle" class="text-sm sm:text-base font-extrabold text-[#1E293B] truncate mt-0.5"></div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('anitrackParentLinkModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
+                    </div>
+                    <div id="parentLinkBody" class="p-5 space-y-4 text-xs"></div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+        document.getElementById('parentLinkTitle').textContent = `${student.full_name} (${student.class_name || '-'})`;
+        document.getElementById('parentLinkBody').innerHTML = `
+            <p class="text-slate-600 leading-relaxed">Orang tua / wali dapat membuka link ini kapan saja untuk memantau progres project, status Project Update, Timeline Flowchart, dan catatan pembimbing secara <strong>hanya baca (tanpa login)</strong>.</p>
+            <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-slate-500">Tautan Khusus Siswa</label>
+                <input id="parentWatchUrlInput" type="text" readonly value="${esc(watchUrl)}" onclick="this.select()"
+                    class="w-full px-3 py-2.5 rounded-xl bg-[#F7F9FC] border border-[#E2E8F0] font-mono text-[11px] text-[#1E293B]" />
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="copyTextToClipboard('${esc(watchUrl)}', 'Link pantau orang tua disalin ✓')"
+                    class="px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white font-bold transition cursor-pointer">📋 Salin Link</button>
+                <a href="${esc(waShareUrl)}" target="_blank" rel="noopener noreferrer"
+                    class="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold transition">💬 Kirim via WhatsApp</a>
+                <a href="${esc(watchUrl)}" target="_blank" rel="noopener noreferrer"
+                    class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-[#1E293B] border border-[#E2E8F0] font-bold transition">👁️ Buka Pratinjau</a>
+            </div>
+            <div class="pt-3 border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                <span>Token aman &amp; dapat diganti kapan saja.</span>
+                <button type="button" id="regenParentTokenBtn" class="font-bold text-[#E11D48] hover:underline cursor-pointer">🔄 Buat Ulang Token</button>
+            </div>`;
+        document.getElementById('regenParentTokenBtn').onclick = () => {
+            if (confirm('Buat ulang token link? Link lama tidak akan bisa diakses lagi.')) {
+                openParentWatchLinkModal(student, true);
+            }
+        };
+        modal.classList.remove('hidden');
+    }
+
+    // ==================== 4. PUSAT NOTIFIKASI AKTIVITAS (BELL DROPDOWN) ====================
+    let notifCenterState = { roleKey: 'staff', items: [] };
+
+    function getNotifSeenTime(roleKey) {
+        try { return Number(localStorage.getItem(`anitrack_notif_seen_${roleKey}`) || 0); } catch { return 0; }
+    }
+    function setNotifSeenTime(roleKey, ts) {
+        try { localStorage.setItem(`anitrack_notif_seen_${roleKey}`, String(ts)); } catch { /* ignore */ }
+    }
+
+    function updateNotificationCenter(items = [], roleKey = 'staff') {
+        notifCenterState = { roleKey, items: (items || []).slice(0, 25) };
+        const seenAt = getNotifSeenTime(roleKey);
+        const unread = notifCenterState.items.filter((it) => (it.ts || 0) > seenAt || it.urgent).length;
+        const dot = document.getElementById('notifDot');
+        if (dot) dot.classList.toggle('hidden', unread === 0);
+        const pop = document.getElementById('anitrackNotifPopover');
+        if (pop && !pop.classList.contains('hidden')) renderNotificationPopoverBody();
+    }
+
+    function renderNotificationPopoverBody() {
+        const body = document.getElementById('anitrackNotifBody');
+        const cntEl = document.getElementById('anitrackNotifCount');
+        if (!body) return;
+        const items = notifCenterState.items || [];
+        if (cntEl) cntEl.textContent = `${items.length} aktivitas`;
+        if (!items.length) {
+            body.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">Belum ada notifikasi aktivitas terbaru.</div>`;
+            return;
+        }
+        body.innerHTML = items.map((it, idx) => `
+            <button type="button" onclick="handleNotifItemClick(${idx})"
+                class="w-full text-left px-4 py-3 hover:bg-[#F7FAFF] border-b border-[#EDF1F7] last:border-b-0 flex items-start gap-3 transition cursor-pointer">
+                <span class="w-8 h-8 rounded-xl ${esc(it.iconBg || 'bg-[#EAF4FF] text-[#0082E6]')} flex items-center justify-center text-sm shrink-0">${it.icon || '🔔'}</span>
+                <div class="min-w-0 flex-1 space-y-0.5">
+                    <div class="text-xs font-extrabold text-[#1E293B] leading-snug">${esc(it.title)}</div>
+                    ${it.desc ? `<div class="text-[11px] text-slate-500 leading-snug line-clamp-2">${esc(it.desc)}</div>` : ''}
+                    ${it.timeLabel ? `<div class="text-[10px] font-mono text-slate-400">${esc(it.timeLabel)}</div>` : ''}
+                </div>
+            </button>`).join('');
+    }
+
+    global.handleNotifItemClick = function (idx) {
+        const it = (notifCenterState.items || [])[idx];
+        document.getElementById('anitrackNotifPopover')?.classList.add('hidden');
+        if (it && typeof it.onClick === 'function') it.onClick();
+    };
+
+    global.markAllNotifsRead = function () {
+        setNotifSeenTime(notifCenterState.roleKey, Date.now());
+        notifCenterState.items = notifCenterState.items.map((it) => ({ ...it, urgent: false }));
+        document.getElementById('notifDot')?.classList.add('hidden');
+        showToast('Semua notifikasi ditandai sudah dibaca ✓');
+    };
+
+    global.toggleNotificationCenter = function () {
+        let pop = document.getElementById('anitrackNotifPopover');
+        if (!pop) {
+            pop = document.createElement('div');
+            pop.id = 'anitrackNotifPopover';
+            pop.className = 'fixed top-[68px] right-4 z-[76] hidden w-[360px] max-w-[92vw] bg-white rounded-2xl shadow-2xl border border-[#EDF1F7] overflow-hidden';
+            pop.innerHTML = `
+                <div class="px-4 py-3 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-2">
+                    <div>
+                        <div class="text-xs font-extrabold text-[#1E293B]">🔔 Pusat Notifikasi Aktivitas</div>
+                        <div id="anitrackNotifCount" class="text-[10.5px] text-slate-500">0 aktivitas</div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="markAllNotifsRead()" class="text-[10.5px] font-bold text-[#0082E6] hover:underline cursor-pointer">Tandai dibaca</button>
+                        <button type="button" onclick="document.getElementById('anitrackNotifPopover').classList.add('hidden')" class="w-6 h-6 rounded-md bg-white border border-[#E2E8F0] text-slate-500 font-bold text-xs cursor-pointer">✕</button>
+                    </div>
+                </div>
+                <div id="anitrackNotifBody" class="max-h-[65vh] overflow-y-auto"></div>`;
+            document.body.appendChild(pop);
+            document.addEventListener('click', (e) => {
+                if (pop.classList.contains('hidden')) return;
+                if (pop.contains(e.target) || e.target.closest('[data-notif-trigger]')) return;
+                pop.classList.add('hidden');
+            });
+        }
+        const willOpen = pop.classList.contains('hidden');
+        if (willOpen) {
+            renderNotificationPopoverBody();
+            pop.classList.remove('hidden');
+            setNotifSeenTime(notifCenterState.roleKey, Date.now());
+            document.getElementById('notifDot')?.classList.add('hidden');
+        } else {
+            pop.classList.add('hidden');
+        }
+    };
+
+    // ==================== 5. LEADERBOARD APRESIASI & SERTIFIKAT DIGITAL ====================
+    function printStudentCertificatePdf(student, stats = {}) {
+        if (!student) return;
+        const todayId = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+        const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Sertifikat Apresiasi — ${esc(student.full_name)}</title>
+            <style>
+                @page { size: A4 landscape; margin: 12mm; }
+                body { font-family: 'Segoe UI', Georgia, serif; margin: 0; background: #fff; color: #0f172a; }
+                .cert { border: 10px double #0f172a; padding: 36px 48px; text-align: center; min-height: 170mm; box-sizing: border-box; position: relative; background: linear-gradient(135deg, #fffdf5 0%, #ffffff 55%, #f0f9ff 100%); }
+                .badge { display: inline-block; padding: 6px 18px; border-radius: 999px; background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+                h1 { font-size: 34px; letter-spacing: 2px; margin: 16px 0 6px; color: #0f172a; }
+                .name { font-size: 30px; font-weight: 800; color: #0369a1; margin: 18px 0 6px; border-bottom: 2px solid #cbd5e1; display: inline-block; padding: 0 28px 6px; }
+                .meta { font-size: 14px; color: #475569; margin-bottom: 18px; }
+                .desc { font-size: 14px; line-height: 1.7; max-width: 680px; margin: 0 auto 28px; color: #334155; }
+                .signs { display: flex; justify-content: space-between; padding: 0 56px; margin-top: 32px; font-size: 13px; }
+                @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
+            </style></head><body>
+            <div class="cert">
+                <div class="badge">🌟 Sertifikat Apresiasi Prestasi Project Animasi</div>
+                <h1>PIAGAM PENGHARGAAN</h1>
+                <div style="font-size:13px;color:#64748b;letter-spacing:1px;">JURUSAN ANIMASI • SMKN 4 MALANG • ANITRACK</div>
+                <div style="margin-top:24px;font-size:14px;">Diberikan dengan bangga kepada:</div>
+                <div class="name">${esc(student.full_name)}</div>
+                <div class="meta">Kelas ${esc(student.class_name || '-')} • Sub-Konsentrasi ${esc(student.sub_concentration || 'Animasi')}</div>
+                <div class="desc">
+                    Atas dedikasi, kedisiplinan, dan pencapaian luar biasa dalam menyelesaikan proyek produksi animasi dengan capaian
+                    <strong>${stats.accCount || 0}/${stats.eligibleCount || 0} Tugas Tuntas (${stats.pct || 0}%)</strong> serta meraih
+                    <strong>${stats.goldCount || 0} Lencana Emas</strong> ketepatan waktu di sistem monitoring AniTrack.
+                </div>
+                <div class="signs">
+                    <div><div>Mengetahui,</div><div>Ketua Kompetensi Keahlian Animasi</div><div style="height:56px;"></div><div style="border-bottom:1px solid #0f172a;width:180px;margin:0 auto;"></div></div>
+                    <div><div>Malang, ${esc(todayId)}</div><div>Guru Pembimbing Project</div><div style="height:56px;"></div><div style="border-bottom:1px solid #0f172a;width:180px;margin:0 auto;"></div></div>
+                </div>
+            </div>
+            <script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>`;
+        const win = window.open('', '_blank');
+        if (!win) { showToast('Popup cetak diblokir browser. Izinkan popup terlebih dahulu.'); return; }
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+    }
+
+    let leaderboardCacheRows = [];
+    global.printCertFromLeaderboard = function (idx) {
+        const row = leaderboardCacheRows[idx];
+        if (row) printStudentCertificatePdf(row.s, row);
+    };
+
+    function openLeaderboardModal(students = [], tasks = [], subMap = {}) {
+        const rows = (students || []).map((s) => {
+            const st = computeStudentIssueStats(s, tasks, subMap);
+            const pct = st.eligibleCount ? Math.round((st.accCount / st.eligibleCount) * 100) : 0;
+            const score = (st.goldCount * 30) + (pct * 1) + (st.accCount * 5) - (st.totalIssues * 10);
+            return { s, ...st, pct, score };
+        }).sort((a, b) => (b.goldCount - a.goldCount) || (b.pct - a.pct) || (b.accCount - a.accCount) || (a.totalIssues - b.totalIssues));
+        leaderboardCacheRows = rows;
+
+        const clsMap = {};
+        rows.forEach((r) => {
+            const c = r.s.class_name || 'Tanpa Kelas';
+            if (!clsMap[c]) clsMap[c] = { cls: c, count: 0, sumPct: 0, gold: 0 };
+            clsMap[c].count++;
+            clsMap[c].sumPct += r.pct;
+            clsMap[c].gold += r.goldCount;
+        });
+        const topClasses = Object.values(clsMap)
+            .map((c) => ({ ...c, avgPct: c.count ? Math.round(c.sumPct / c.count) : 0 }))
+            .sort((a, b) => (b.avgPct - a.avgPct) || (b.gold - a.gold));
+
+        let modal = document.getElementById('anitrackLeaderboardModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackLeaderboardModal';
+            modal.className = 'fixed inset-0 z-[82] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            modal.innerHTML = `
+                <div class="relative max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7]">
+                    <div class="px-5 py-4 border-b border-[#EDF1F7] bg-gradient-to-r from-[#FFF6D6] via-[#FFFDF5] to-[#EAF4FF] flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#B88600]">🏆 Papan Peringkat &amp; Apresiasi Siswa</div>
+                            <div class="text-base font-extrabold text-[#1E293B]">Leaderboard Lencana Emas &amp; Ketuntasan Project</div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('anitrackLeaderboardModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer">✕</button>
+                    </div>
+                    <div id="leaderboardModalBody" class="p-5 max-h-[75vh] overflow-y-auto space-y-5 text-xs bg-[#FAFBFD]"></div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+
+        const top3 = rows.slice(0, 3);
+        const podiumStyles = [
+            { medal: '🥇 #1', cls: 'bg-[#FFFBEB] border-[#F7C200]' },
+            { medal: '🥈 #2', cls: 'bg-slate-50 border-slate-300' },
+            { medal: '🥉 #3', cls: 'bg-[#FFF7ED] border-[#FDBA74]' }
+        ];
+        document.getElementById('leaderboardModalBody').innerHTML = `
+            ${top3.length ? `
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                ${top3.map((r, i) => `
+                    <div class="rounded-2xl border-2 ${podiumStyles[i].cls} p-4 text-center space-y-1.5 shadow-xs">
+                        <div class="text-sm font-extrabold">${podiumStyles[i].medal}</div>
+                        <div class="w-12 h-12 mx-auto rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-sm flex items-center justify-center overflow-hidden border-2 border-white shadow">
+                            ${renderAvatarMarkup(r.s.avatar_url, r.s.full_name)}
+                        </div>
+                        <div class="font-extrabold text-[#1E293B] truncate">${esc(r.s.full_name)}</div>
+                        <div class="text-[11px] text-slate-500">${esc(r.s.class_name || '-')} • ${esc(r.s.sub_concentration || 'Umum')}</div>
+                        <div class="flex items-center justify-center gap-1.5 pt-1">
+                            <span class="px-2 py-0.5 rounded-full bg-[#FFF6D6] text-[#9A6F00] font-extrabold">🌟 ${r.goldCount} Emas</span>
+                            <span class="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#15803D] font-extrabold">${r.pct}% ACC</span>
+                        </div>
+                        ${(r.pct === 100 || r.goldCount > 0) ? `
+                        <button type="button" onclick="printCertFromLeaderboard(${i})"
+                            class="mt-1 px-3 py-1 rounded-lg bg-[#1E293B] hover:bg-[#0095FF] text-white text-[10.5px] font-bold transition cursor-pointer">
+                            🏅 Cetak Sertifikat
+                        </button>` : ''}
+                    </div>`).join('')}
+            </div>` : ''}
+
+            ${topClasses.length ? `
+            <div class="bg-white border border-[#EDF1F7] rounded-xl p-4 space-y-2.5">
+                <div class="text-xs font-extrabold text-[#1E293B]">🏫 Peringkat Ketuntasan Kelas</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    ${topClasses.map((c, idx) => `
+                        <div class="rounded-xl border border-[#EDF1F7] bg-[#FAFBFD] px-3 py-2 space-y-1">
+                            <div class="flex items-center justify-between text-[11px] font-bold">
+                                <span>#${idx + 1} ${esc(c.cls)} (${c.count} siswa)</span>
+                                <span class="text-[#15803D]">${c.avgPct}% • 🌟 ${c.gold}</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                                <div class="h-full rounded-full" style="width:${c.avgPct}%;background:#4CAF50;"></div>
+                            </div>
+                        </div>`).join('')}
+                </div>
+            </div>` : ''}
+
+            <div class="bg-white border border-[#EDF1F7] rounded-xl overflow-hidden">
+                <div class="px-4 py-2.5 bg-[#F7FAFF] border-b border-[#EDF1F7] font-extrabold text-[#1E293B]">Top 15 Siswa Terbaik</div>
+                <div class="divide-y divide-[#F1F5F9]">
+                    ${rows.slice(0, 15).map((r, i) => `
+                        <div class="px-4 py-2.5 flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <span class="w-6 text-center font-mono font-extrabold text-slate-400">#${i + 1}</span>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-[#1E293B] truncate">${esc(r.s.full_name)}</div>
+                                    <div class="text-[10.5px] text-slate-400">${esc(r.s.class_name || '-')} • ${esc(r.s.sub_concentration || 'Umum')}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <span class="px-2 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00] font-extrabold">🌟 ${r.goldCount}</span>
+                                <span class="px-2 py-0.5 rounded bg-[#DCFCE7] text-[#15803D] font-extrabold">${r.accCount}/${r.eligibleCount} (${r.pct}%)</span>
+                                ${(r.pct === 100 || r.goldCount > 0) ? `
+                                <button type="button" onclick="printCertFromLeaderboard(${i})" class="px-2 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold cursor-pointer">🏅</button>` : ''}
+                            </div>
+                        </div>`).join('') || `<div class="p-6 text-center text-slate-400">Belum ada data progres siswa.</div>`}
+                </div>
+            </div>`;
+        modal.classList.remove('hidden');
+    }
+
+    // ==================== 6. GALERI KARYA FINAL (SHOWCASE) ====================
+    const SHOWCASE_GALLERY_KEY = 'showcase_gallery_v1';
+    let showcaseCache = [];
+    let showcaseFilterSubconc = '';
+    let showcaseCoverDraft = '';
+
+    async function loadShowcaseItems() {
+        if (!supabase) return [];
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', SHOWCASE_GALLERY_KEY).maybeSingle();
+            if (data?.value) {
+                const parsed = JSON.parse(data.value);
+                if (Array.isArray(parsed)) { showcaseCache = parsed; return parsed; }
+            }
+        } catch { /* ignore */ }
+        showcaseCache = [];
+        return [];
+    }
+
+    async function saveShowcaseItems(items = []) {
+        if (!supabase) return { error: new Error('Supabase tidak siap') };
+        showcaseCache = items;
+        return supabase.from('app_settings').upsert({
+            key: SHOWCASE_GALLERY_KEY,
+            value: JSON.stringify(items),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    }
+
+    function renderShowcaseGrid(currentUserObj) {
+        const grid = document.getElementById('showcaseGalleryGrid');
+        if (!grid) return;
+        const filtered = showcaseCache.filter((it) => {
+            if (!showcaseFilterSubconc) return true;
+            if (showcaseFilterSubconc === '2D') return (it.sub_concentration || '').startsWith('2D');
+            if (showcaseFilterSubconc === '3D') return (it.sub_concentration || '').startsWith('3D');
+            return it.sub_concentration === showcaseFilterSubconc;
+        });
+        const isStaff = isAnyAdmin(currentUserObj) || currentUserObj?.role === 'mentor';
+        if (!filtered.length) {
+            grid.innerHTML = `<div class="col-span-full p-10 text-center text-xs text-slate-400">Belum ada karya final di galeri untuk filter ini. Klik <strong>+ Tambah Karya</strong> untuk mulai memamerkan karya terbaik!</div>`;
+            return;
+        }
+        grid.innerHTML = filtered.map((it) => {
+            const thumb = it.cover_image || getYoutubeThumbUrl(it.work_url) || '';
+            const canDel = isStaff || (currentUserObj?.id && it.created_by_id === currentUserObj.id);
+            return `
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl overflow-hidden shadow-card flex flex-col">
+                    <div class="relative h-40 bg-slate-900 overflow-hidden">
+                        ${thumb
+                            ? `<img src="${esc(thumb)}" alt="${esc(it.title)}" onclick="openProofLightbox(this.src, '${esc(it.title)} — ${esc(it.student_name)}')" class="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition duration-300" />`
+                            : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0082E6] to-[#4F46E5] text-white text-3xl">🎬</div>`}
+                        <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-900/75 text-white text-[10px] font-bold">${esc(it.sub_concentration || 'Animasi')}</span>
+                    </div>
+                    <div class="p-3.5 flex-1 flex flex-col justify-between space-y-2.5 text-xs">
+                        <div class="space-y-1">
+                            <div class="font-extrabold text-[#1E293B] text-sm leading-snug">${esc(it.title)}</div>
+                            <div class="text-[11px] font-semibold text-[#0082E6]">${esc(it.student_name)} • ${esc(it.class_name || '-')}</div>
+                            ${it.description ? `<p class="text-[11px] text-slate-500 line-clamp-2">${esc(it.description)}</p>` : ''}
+                        </div>
+                        <div class="flex items-center justify-between gap-2 pt-2 border-t border-[#F1F5F9]">
+                            ${it.work_url
+                                ? `<a href="${esc(it.work_url)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[11px] font-bold transition">▶ Tonton / Buka Karya ↗</a>`
+                                : `<span class="text-[10.5px] text-slate-400">${esc(formatDateOnly(it.created_at))}</span>`}
+                            ${canDel ? `<button type="button" onclick="deleteShowcaseItem('${esc(it.id)}')" class="px-2 py-1 rounded-lg bg-[#FFF0F4] hover:bg-[#F13B6E] text-[#E11D48] hover:text-white text-[10.5px] font-bold cursor-pointer">Hapus</button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    async function openShowcaseGalleryModal(currentUserObj = null) {
+        const user = currentUserObj || getUser() || {};
+        await loadShowcaseItems();
+        showcaseCoverDraft = '';
+
+        let modal = document.getElementById('anitrackShowcaseModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackShowcaseModal';
+            modal.className = 'fixed inset-0 z-[82] bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            modal.innerHTML = `
+                <div class="relative max-w-5xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7] flex flex-col max-h-[90vh]">
+                    <div class="px-5 py-4 border-b border-[#EDF1F7] bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-[#F7C200]">🎬 Showcase Karya Final SMKN 4 Malang</div>
+                            <div class="text-base font-extrabold">Galeri Portofolio &amp; Film Animasi Siswa</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="document.getElementById('showcaseAddForm').classList.toggle('hidden')"
+                                class="px-3.5 py-1.5 rounded-xl bg-[#F7C200] hover:bg-[#E6AE00] text-[#1E293B] text-xs font-extrabold cursor-pointer">+ Tambah Karya</button>
+                            <button type="button" onclick="document.getElementById('anitrackShowcaseModal').classList.add('hidden')"
+                                class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 text-white font-bold text-sm cursor-pointer">✕</button>
+                        </div>
+                    </div>
+                    <div class="p-4 sm:p-5 overflow-y-auto space-y-4 bg-[#FAFBFD] flex-1">
+                        <form id="showcaseAddForm" class="hidden bg-white border border-[#DCEBFF] rounded-2xl p-4 space-y-3 text-xs">
+                            <div class="font-extrabold text-[#1E293B]">Tambahkan Karya Final ke Galeri Showcase</div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                <input id="scTitle" type="text" required placeholder="Judul Karya / Film *" class="px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC]" />
+                                <input id="scStudent" type="text" required placeholder="Nama Siswa / Tim *" class="px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC]" />
+                                <input id="scClass" type="text" placeholder="Kelas (mis: XII ANI A)" class="px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC]" />
+                                <select id="scSubconc" class="px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC]">
+                                    ${SUBCONCS.map((sc) => `<option value="${esc(sc)}">${esc(sc)}</option>`).join('')}
+                                </select>
+                                <input id="scUrl" type="url" placeholder="Link YouTube / Google Drive Karya" class="sm:col-span-2 px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC]" />
+                            </div>
+                            <textarea id="scDesc" rows="2" placeholder="Sinopsis singkat / software yang digunakan (Blender, After Effects, dll)..." class="w-full px-3 py-2 rounded-xl border border-[#E2E8F0] bg-[#F7F9FC]"></textarea>
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <label class="px-3 py-1.5 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold cursor-pointer transition">
+                                    🖼️ Upload Poster / Thumbnail (Opsional)
+                                    <input id="scCoverFile" type="file" accept="image/*" class="hidden" onchange="handleShowcaseCoverPick(this)" />
+                                </label>
+                                <span id="scCoverHint" class="text-[11px] text-slate-400">Otomatis pakai thumbnail YouTube jika kosong.</span>
+                                <button type="submit" class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white font-bold cursor-pointer">💾 Publikasikan</button>
+                            </div>
+                        </form>
+
+                        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                            ${[{ v: '', l: 'Semua Karya' }, { v: '2D', l: 'Grup 2D' }, { v: '3D', l: 'Grup 3D' }, ...SUBCONCS.map((sc) => ({ v: sc, l: sc }))].map((f) => `
+                                <button type="button" data-sc-filter="${esc(f.v)}" onclick="setShowcaseFilter('${esc(f.v)}')"
+                                    class="px-3 py-1.5 rounded-xl font-bold border transition cursor-pointer ${f.v === '' ? 'bg-[#0095FF] text-white border-[#0095FF]' : 'bg-white text-slate-600 border-[#E2E8F0]'}">${esc(f.l)}</button>`).join('')}
+                        </div>
+                        <div id="showcaseGalleryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+
+            modal.querySelector('#showcaseAddForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const u = getUser() || {};
+                const item = {
+                    id: `sc_${Date.now()}`,
+                    title: document.getElementById('scTitle').value.trim(),
+                    student_name: document.getElementById('scStudent').value.trim(),
+                    class_name: document.getElementById('scClass').value.trim() || u.class_name || '',
+                    sub_concentration: document.getElementById('scSubconc').value,
+                    work_url: document.getElementById('scUrl').value.trim(),
+                    description: document.getElementById('scDesc').value.trim(),
+                    cover_image: showcaseCoverDraft || '',
+                    created_by_id: u.id || '',
+                    created_at: new Date().toISOString()
+                };
+                const next = [item, ...showcaseCache];
+                const { error } = await saveShowcaseItems(next);
+                if (error) { showToast(`Gagal menyimpan karya: ${error.message}`); return; }
+                e.target.reset();
+                showcaseCoverDraft = '';
+                document.getElementById('scCoverHint').textContent = 'Otomatis pakai thumbnail YouTube jika kosong.';
+                e.target.classList.add('hidden');
+                showToast('Karya berhasil dipublikasikan ke Galeri Showcase 🎬');
+                renderShowcaseGrid(u);
+            });
+        }
+
+        if (user.role === 'student') {
+            const stuInp = document.getElementById('scStudent');
+            const clsInp = document.getElementById('scClass');
+            const scInp = document.getElementById('scSubconc');
+            if (stuInp && !stuInp.value) stuInp.value = user.full_name || '';
+            if (clsInp && !clsInp.value) clsInp.value = user.class_name || '';
+            if (scInp && user.sub_concentration) scInp.value = user.sub_concentration;
+        }
+        renderShowcaseGrid(user);
+        modal.classList.remove('hidden');
+    }
+
+    global.handleShowcaseCoverPick = async function (inp) {
+        const f = inp.files?.[0];
+        if (!f) return;
+        try {
+            showcaseCoverDraft = await compressProofImage(f, 800, 0.78);
+            const h = document.getElementById('scCoverHint');
+            if (h) h.textContent = `Poster "${f.name}" siap diunggah ✓`;
+        } catch (err) { showToast(err.message); }
+    };
+    global.setShowcaseFilter = function (v) {
+        showcaseFilterSubconc = v || '';
+        document.querySelectorAll('[data-sc-filter]').forEach((b) => {
+            const active = b.dataset.scFilter === showcaseFilterSubconc;
+            b.className = `px-3 py-1.5 rounded-xl font-bold border transition cursor-pointer ${active ? 'bg-[#0095FF] text-white border-[#0095FF]' : 'bg-white text-slate-600 border-[#E2E8F0]'}`;
+        });
+        renderShowcaseGrid(getUser() || {});
+    };
+    global.deleteShowcaseItem = async function (id) {
+        if (!confirm('Hapus karya ini dari Galeri Showcase?')) return;
+        const next = showcaseCache.filter((x) => x.id !== id);
+        const { error } = await saveShowcaseItems(next);
+        if (error) { showToast(`Gagal menghapus: ${error.message}`); return; }
+        showToast('Karya dihapus dari Galeri.');
+        renderShowcaseGrid(getUser() || {});
+    };
+
+    // ==================== 7. KALENDER DEADLINE & TIMELINE GANTT PRODUKSI ====================
+    function buildCalendarAndGanttHtml(tasks = [], year, month, opts = {}) {
+        const { getProgressFn = null, onTaskClickAttrFn = null, prevFn = 'shiftProjectCalendarMonth(-1)', todayFn = 'resetProjectCalendarMonth()', nextFn = 'shiftProjectCalendarMonth(1)' } = opts;
+        const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startOffset = (firstDay.getDay() + 6) % 7; // Senin = 0
+        const todayYmd = getJakartaYmd(new Date());
+
+        const tasksByDate = {};
+        (tasks || []).forEach((t) => {
+            if (!t.due_date) return;
+            const ymd = String(t.due_date).slice(0, 10);
+            if (!tasksByDate[ymd]) tasksByDate[ymd] = [];
+            tasksByDate[ymd].push(t);
+        });
+
+        const stageBadge = (stage) => stage === 'Pre-Production'
+            ? 'bg-[#FFF6D6] text-[#9A6F00] border-[#FDE68A]'
+            : (stage === 'Production' ? 'bg-[#EAF4FF] text-[#0082E6] border-[#CBE5FF]' : 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]');
+        const stageBarColor = (stage) => stage === 'Pre-Production' ? '#F59E0B' : (stage === 'Production' ? '#0095FF' : '#F13B6E');
+
+        const cells = [];
+        for (let i = 0; i < startOffset; i++) cells.push(`<div class="min-h-[82px] bg-[#FAFBFD] border-r border-b border-[#EDF1F7]"></div>`);
+        for (let d = 1; d <= daysInMonth; d++) {
+            const ymd = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const isToday = ymd === todayYmd;
+            const dayTasks = tasksByDate[ymd] || [];
+            cells.push(`
+                <div class="min-h-[82px] p-1.5 border-r border-b border-[#EDF1F7] ${isToday ? 'bg-[#EFF6FF] ring-1 ring-inset ring-[#0095FF]' : 'bg-white'} space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-extrabold ${isToday ? 'px-1.5 py-0.5 rounded-md bg-[#0095FF] text-white' : 'text-slate-600'}">${d}</span>
+                        ${dayTasks.length ? `<span class="text-[9.5px] font-bold text-slate-400">${dayTasks.length} DL</span>` : ''}
+                    </div>
+                    <div class="space-y-1">
+                        ${dayTasks.map((t) => {
+                            const clickAttr = onTaskClickAttrFn ? onTaskClickAttrFn(t) : '';
+                            return `<button type="button" ${clickAttr} title="${esc(t.title)} (${esc(t.pipeline_stage)})"
+                                class="w-full text-left px-1.5 py-0.5 rounded border ${stageBadge(t.pipeline_stage)} text-[10px] font-bold truncate block cursor-pointer hover:opacity-80 transition">
+                                ${esc(t.title)}
+                            </button>`;
+                        }).join('')}
+                    </div>
+                </div>`);
+        }
+
+        // Mini Gantt Timeline Produksi
+        const datedTasks = (tasks || []).filter((t) => t.due_date).sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
+        let ganttHtml = `<div class="p-6 text-center text-xs text-slate-400">Belum ada tugas yang memiliki tanggal deadline untuk ditampilkan di Timeline Gantt.</div>`;
+        if (datedTasks.length) {
+            const toMs = (s) => Date.parse(`${String(s).slice(0, 10)}T00:00:00Z`);
+            const allMs = datedTasks.map((t) => toMs(t.due_date)).filter((n) => !isNaN(n));
+            const todayMs = toMs(todayYmd);
+            const minMs = Math.min(...allMs, todayMs) - (5 * 86400000);
+            const maxMs = Math.max(...allMs, todayMs) + (5 * 86400000);
+            const spanMs = Math.max(86400000 * 14, maxMs - minMs);
+            const todayLeftPct = Math.max(0, Math.min(100, ((todayMs - minMs) / spanMs) * 100));
+
+            ganttHtml = `
+                <div class="relative space-y-2.5 pt-2">
+                    <div class="flex items-center justify-between text-[10.5px] font-mono text-slate-400 px-1">
+                        <span>${formatDateOnly(new Date(minMs).toISOString().slice(0, 10))}</span>
+                        <span class="font-bold text-[#E11D48]">▲ Hari Ini (${formatDateOnly(todayYmd)})</span>
+                        <span>${formatDateOnly(new Date(maxMs).toISOString().slice(0, 10))}</span>
+                    </div>
+                    <div class="relative border border-[#EDF1F7] rounded-xl bg-[#FAFBFD] p-3 space-y-2.5 overflow-hidden">
+                        <div class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-[#E11D48]/60 z-10" style="left:calc(28% + ${(todayLeftPct * 0.72).toFixed(1)}%);"></div>
+                        ${datedTasks.map((t) => {
+                            const dueMs = toMs(t.due_date);
+                            const startMs = Math.max(minMs, (t.created_at ? toMs(t.created_at) : dueMs - (10 * 86400000)));
+                            const safeStart = Math.min(startMs, dueMs - (3 * 86400000));
+                            const leftPct = Math.max(0, ((safeStart - minMs) / spanMs) * 100);
+                            const rightPct = Math.min(100, ((dueMs - minMs) / spanMs) * 100);
+                            const widthPct = Math.max(6, rightPct - leftPct);
+                            const prog = getProgressFn ? getProgressFn(t) : { pct: 0, label: formatDateOnly(t.due_date) };
+                            const clickAttr = onTaskClickAttrFn ? onTaskClickAttrFn(t) : '';
+                            return `
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
+                                    <button type="button" ${clickAttr} class="sm:w-[28%] text-left min-w-0 pr-2 cursor-pointer hover:text-[#0082E6]">
+                                        <div class="font-bold text-[#1E293B] truncate">${esc(t.title)}</div>
+                                        <div class="text-[10px] text-slate-400">${esc(t.pipeline_stage)} • DL ${esc(formatDateOnly(t.due_date))}</div>
+                                    </button>
+                                    <div class="sm:w-[72%] relative h-7 rounded-lg bg-white border border-[#EDF1F7] overflow-hidden">
+                                        <div class="absolute top-1 bottom-1 rounded-md flex items-center px-2 text-[10px] font-extrabold text-white shadow-xs overflow-hidden"
+                                            style="left:${leftPct.toFixed(1)}%;width:${widthPct.toFixed(1)}%;background:${stageBarColor(t.pipeline_stage)};">
+                                            <span class="truncate">${esc(prog.label || `${prog.pct}%`)}</span>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+        }
+
+        return `
+            <div class="space-y-4">
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                    <div class="px-4 py-3 border-b border-[#EDF1F7] bg-[#F7FAFF] flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <div class="text-sm font-extrabold text-[#1E293B]">📅 Kalender Deadline — ${monthNames[month]} ${year}</div>
+                            <div class="text-[11px] text-slate-500">Klik nama tugas pada tanggal untuk langsung membuka detail / review.</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs">
+                            <button type="button" onclick="${prevFn}" class="px-2.5 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] font-bold cursor-pointer">◀</button>
+                            <button type="button" onclick="${todayFn}" class="px-3 py-1.5 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold cursor-pointer">Bulan Ini</button>
+                            <button type="button" onclick="${nextFn}" class="px-2.5 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] font-bold cursor-pointer">▶</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-7 bg-[#FAFBFD] border-b border-[#EDF1F7] text-center text-[11px] font-extrabold text-slate-500">
+                        ${dayNames.map((d) => `<div class="py-2 border-r border-[#EDF1F7] last:border-r-0">${d}</div>`).join('')}
+                    </div>
+                    <div class="grid grid-cols-7">${cells.join('')}</div>
+                </div>
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <div class="text-sm font-extrabold text-[#1E293B]">📊 Timeline Gantt Produksi Animasi</div>
+                            <div class="text-[11px] text-slate-500">Visualisasi rentang waktu seluruh tugas lintas Pre-Production, Production, &amp; Post-Production.</div>
+                        </div>
+                        <div class="flex items-center gap-2 text-[10.5px] font-bold">
+                            <span class="px-2 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00]">● Pre-Production</span>
+                            <span class="px-2 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6]">● Production</span>
+                            <span class="px-2 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48]">● Post-Production</span>
+                        </div>
+                    </div>
+                    ${ganttHtml}
+                </div>
+            </div>`;
+    }
+
+    function openStudentCalendarModal(tasks = [], subMap = {}) {
+        const now = new Date();
+        global._stuCalYear = global._stuCalYear || now.getFullYear();
+        global._stuCalMonth = typeof global._stuCalMonth === 'number' ? global._stuCalMonth : now.getMonth();
+        global._stuCalData = { tasks, subMap };
+
+        let modal = document.getElementById('anitrackStudentCalendarModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackStudentCalendarModal';
+            modal.className = 'fixed inset-0 z-[82] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            modal.innerHTML = `
+                <div class="relative max-w-5xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7] flex flex-col max-h-[90vh]">
+                    <div class="px-5 py-3.5 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
+                        <div class="text-sm sm:text-base font-extrabold text-[#1E293B]">📅 Kalender Deadline &amp; Timeline Gantt Saya</div>
+                        <button type="button" onclick="document.getElementById('anitrackStudentCalendarModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer">✕</button>
+                    </div>
+                    <div id="studentCalendarModalBody" class="p-4 overflow-y-auto bg-[#FAFBFD] flex-1"></div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+        const render = () => {
+            const { tasks: tList, subMap: sMap } = global._stuCalData;
+            document.getElementById('studentCalendarModalBody').innerHTML = buildCalendarAndGanttHtml(tList, global._stuCalYear, global._stuCalMonth, {
+                prevFn: 'shiftStudentCalMonth(-1)',
+                todayFn: 'resetStudentCalMonth()',
+                nextFn: 'shiftStudentCalMonth(1)',
+                getProgressFn: (t) => {
+                    const st = sMap[t.id]?.status || 'belum_mulai';
+                    const opt = STATUS_OPTIONS.find((o) => o.value === st) || STATUS_OPTIONS[0];
+                    return { pct: st === 'selesai' ? 100 : 50, label: opt.label };
+                }
+            });
+        };
+        global.shiftStudentCalMonth = (delta) => {
+            const dt = new Date(global._stuCalYear, global._stuCalMonth + delta, 1);
+            global._stuCalYear = dt.getFullYear();
+            global._stuCalMonth = dt.getMonth();
+            render();
+        };
+        global.resetStudentCalMonth = () => {
+            const n = new Date();
+            global._stuCalYear = n.getFullYear();
+            global._stuCalMonth = n.getMonth();
+            render();
+        };
+        render();
+        modal.classList.remove('hidden');
+    }
+
     function computeDeadlineReminderQueue(students, mentors, tasks, submissions, waConfig = {}) {
         const now = new Date();
         const todayMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
@@ -3112,6 +4138,7 @@
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
         let projectChecklistState = { subconc: '', className: '', statusFilter: 'all', search: '' };
         let projectClassesState = { search: '', mentorId: '', openClasses: new Set() };
+        let projectCalendarState = { year: new Date().getFullYear(), month: new Date().getMonth() };
         let myHomeroomClass = '';
         let myPjSubconcs = [];
         let staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees'; // 'all' | 'mentees' | 'homeroom'
@@ -3181,6 +4208,10 @@
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'classes' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             🏫 Rekap Per Kelas (${classes.length})
                         </button>
+                        <button type="button" onclick="setProjectViewMode('calendar')"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'calendar' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            🗓️ Kalender &amp; Gantt
+                        </button>
                         <button type="button" onclick="setProjectViewMode('matrix')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'matrix' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             🧩 Matrix Semua Siswa (${studentList.length})
@@ -3189,13 +4220,33 @@
                     <span class="text-[11px] text-slate-400 hidden sm:inline">
                         ${projectViewMode === 'checklist'
                             ? 'Otomatis mengelompokkan siswa per Sub-Konsentrasi (Progress Bar + None / WIP / Revisi / Done + Notes).'
-                            : (projectViewMode === 'classes'
-                                ? 'Akordion progres rata-rata tiap kelas, Timeline Flowchart siswa, & Cetak PDF Rapor siap tanda tangan.'
-                                : (projectViewMode === 'weekly'
-                                    ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
-                                    : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" pada tugas untuk memeriksa bukti &amp; memberi revisi (+ gambar coretan).' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.')))}
+                            : (projectViewMode === 'calendar'
+                                ? 'Kalender bulanan deadline & Timeline Gantt lintas Pre-Production, Production, hingga Post-Production.'
+                                : (projectViewMode === 'classes'
+                                    ? 'Akordion progres rata-rata tiap kelas, Link Pantau Ortu, Flowchart, & Cetak PDF Rapor.'
+                                    : (projectViewMode === 'weekly'
+                                        ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
+                                        : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" untuk periksa bukti, coret langsung (✏️), atau kirim revisi bergambar.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'))))}
                     </span>
                 </div>`;
+
+            // ==================== MODE 6: KALENDER DEADLINE & TIMELINE GANTT PRODUKSI ====================
+            if (projectViewMode === 'calendar') {
+                const calHtml = buildCalendarAndGanttHtml(filteredTasks, projectCalendarState.year, projectCalendarState.month, {
+                    prevFn: 'shiftProjectCalendarMonth(-1)',
+                    todayFn: 'resetProjectCalendarMonth()',
+                    nextFn: 'shiftProjectCalendarMonth(1)',
+                    onTaskClickAttrFn: (t) => `onclick="jumpToCalendarTask('${t.id}')"`,
+                    getProgressFn: (t) => {
+                        const elig = studentList.filter((s) => !t.sub_concentration || s.sub_concentration === t.sub_concentration);
+                        const done = elig.filter((s) => subMap[`${t.id}__${s.id}`]?.status === 'selesai').length;
+                        const pct = elig.length ? Math.round((done / elig.length) * 100) : 0;
+                        return { pct, label: `${done}/${elig.length} ACC (${pct}%)` };
+                    }
+                });
+                container.innerHTML = `${modeSwitcherHtml}${calHtml}`;
+                return;
+            }
 
             // ==================== MODE 5: REKAP AKORDION PER KELAS + FLOWCHART + CETAK PDF RAPOR ====================
             if (projectViewMode === 'classes') {
@@ -3338,6 +4389,10 @@
                                                             <button type="button" onclick="openStudentFlowchart('${s.id}')"
                                                                 class="px-2.5 py-1.5 rounded-lg bg-[#EEF2FF] hover:bg-[#4F46E5] text-[#4F46E5] hover:text-white border border-[#C7D2FE] text-[11px] font-bold transition cursor-pointer">
                                                                 🗺️ Flowchart
+                                                            </button>
+                                                            <button type="button" onclick="openStudentParentLink('${s.id}')" title="Buat / Salin Link Pantau Orang Tua (Read-Only)"
+                                                                class="px-2.5 py-1.5 rounded-lg bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white border border-[#FDE68A] text-[11px] font-bold transition cursor-pointer">
+                                                                👨‍👩‍👧 Ortu
                                                             </button>
                                                             <button type="button" onclick="openStudentFeedbackHistory('${s.id}')"
                                                                 class="px-2.5 py-1.5 rounded-lg bg-[#F7FAFF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white border border-[#DCEBFF] text-[11px] font-bold transition cursor-pointer">
@@ -4278,8 +5333,9 @@
                                                                 ` : ''}
                                                                 <div class="min-w-0 space-y-0.5">
                                                                     ${ps.student_notes ? `<div class="text-[11px] text-slate-600 truncate max-w-[180px]" title="${esc(ps.student_notes)}">${esc(ps.student_notes)}</div>` : ''}
-                                                                    <div class="flex items-center gap-2">
-                                                                        ${ps.proof_image ? `<button type="button" onclick="openProofLightbox('${esc(ps.proof_image)}', '${esc(t.title)} — ${esc(s.full_name)}')" class="text-[10.5px] font-bold text-[#0082E6] hover:underline cursor-pointer">Lihat Bukti</button>` : ''}
+                                                                    <div class="flex flex-wrap items-center gap-1.5">
+                                                                        ${ps.proof_image ? `<button type="button" onclick="openProofLightbox('${esc(ps.proof_image)}', '${esc(t.title)} — ${esc(s.full_name)}')" class="text-[10.5px] font-bold text-[#0082E6] hover:underline cursor-pointer">Lihat</button>` : ''}
+                                                                        ${ps.proof_image ? `<button type="button" onclick="openProofAnnotator('${t.id}', '${s.id}')" title="Coret langsung di atas bukti foto siswa lalu kirim sebagai revisi" class="px-1.5 py-0.5 rounded bg-[#FFF0F4] hover:bg-[#E11D48] text-[#E11D48] hover:text-white text-[10px] font-bold transition cursor-pointer">✏️ Coret</button>` : ''}
                                                                         ${ps.proof_url ? `<a href="${esc(ps.proof_url)}" target="_blank" rel="noopener noreferrer" class="text-[10.5px] font-bold text-[#329889] hover:underline">Link ↗</a>` : ''}
                                                                     </div>
                                                                 </div>
@@ -4562,13 +5618,21 @@
                                     <div class="text-[11px] text-white/90">${doneAssignments} / ${totalAssignments} penugasan ACC • 🌟 ${goldAssignments} Lencana Emas</div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" onclick="openStaffLeaderboard()"
+                                        class="px-3 py-2 rounded-xl bg-[#FFF6D6] text-[#9A6F00] hover:bg-[#F7C200] hover:text-white text-[11px] font-extrabold shadow-xs transition cursor-pointer shrink-0">
+                                        🏆 Leaderboard
+                                    </button>
+                                    <button type="button" onclick="openShowcaseGallery()"
+                                        class="px-3 py-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer shrink-0">
+                                        🎬 Galeri Karya
+                                    </button>
                                     <button type="button" onclick="printAllStudentsReportPdf('')"
                                         class="px-3 py-2 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer shrink-0">
-                                        🖨️ Cetak PDF Rapor
+                                        🖨️ PDF Rapor
                                     </button>
                                     <button type="button" onclick="saveProjectArchiveSnapshot(this)"
                                         class="flex-1 px-3 py-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                        📦 Arsip Snapshot
+                                        📦 Arsip
                                     </button>
                                     <button type="button" onclick="openProjectArchivesModal()"
                                         class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/25 transition cursor-pointer shrink-0">
@@ -4633,6 +5697,60 @@
                         <span class="self-start sm:self-center px-3.5 py-2 rounded-xl bg-[#E11D48] text-white text-xs font-bold shrink-0">Cek Detail →</span>
                     </div>` : ''}`;
             }
+
+            // Isi Pusat Notifikasi Aktivitas (Ikon Lonceng Header)
+            const staffNotifs = [];
+            if (earlyWarningCount > 0) {
+                staffNotifs.push({
+                    icon: '🚨',
+                    iconBg: 'bg-[#FFF0F4] text-[#E11D48]',
+                    title: `Peringatan Dini: ${earlyWarningCount} siswa butuh pembinaan`,
+                    desc: 'Klik untuk melihat daftar siswa dengan ≥ 2 poin masalah.',
+                    timeLabel: 'Prioritas Tinggi',
+                    ts: Date.now(),
+                    urgent: true,
+                    onClick: () => { switchTab('projects'); global.openProjectKpiModal('early_warning'); }
+                });
+            }
+            const taskById = Object.fromEntries(allTasks.map((t) => [t.id, t]));
+            const stuById = Object.fromEntries(studentList.map((s) => [s.id, s]));
+            Object.values(subMap)
+                .filter((ps) => ps.status === 'menunggu_review')
+                .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+                .slice(0, 10)
+                .forEach((ps) => {
+                    const s = stuById[ps.student_id];
+                    const t = taskById[ps.project_task_id];
+                    if (!s || !t) return;
+                    staffNotifs.push({
+                        icon: '📩',
+                        iconBg: 'bg-[#FFF6D6] text-[#B88600]',
+                        title: `${s.full_name} mengajukan review`,
+                        desc: `Tugas: ${t.title} (${s.class_name || '-'})`,
+                        timeLabel: ps.updated_at ? formatDateTime(ps.updated_at) : '',
+                        ts: ps.updated_at ? Date.parse(ps.updated_at) || 0 : 0,
+                        onClick: () => { switchTab('projects'); global.jumpToStudentProjectReview(t.id, s.username || s.full_name); }
+                    });
+                });
+            weeklyUpdates
+                .filter((u) => !u.checked_at)
+                .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+                .slice(0, 6)
+                .forEach((u) => {
+                    const s = stuById[u.student_id];
+                    const t = taskById[u.project_task_id];
+                    if (!s || !t) return;
+                    staffNotifs.push({
+                        icon: '📅',
+                        iconBg: 'bg-[#EAF4FF] text-[#0082E6]',
+                        title: `Update Mingguan baru (${u.progress_percent}%) — ${s.full_name}`,
+                        desc: `${t.title}: ${u.summary || ''}`,
+                        timeLabel: u.updated_at ? formatDateTime(u.updated_at) : '',
+                        ts: u.updated_at ? Date.parse(u.updated_at) || 0 : 0,
+                        onClick: () => { switchTab('projects'); global.setProjectViewMode('weekly'); }
+                    });
+                });
+            updateNotificationCenter(staffNotifs, `staff_${currentUser.id}`);
 
             renderProjectTrackerBody();
         }
@@ -4709,6 +5827,55 @@
         global.setProjectClassesMentor = function (mId) {
             projectClassesState.mentorId = mId || '';
             renderProjectTrackerBody();
+        };
+
+        global.shiftProjectCalendarMonth = function (delta) {
+            const dt = new Date(projectCalendarState.year, projectCalendarState.month + delta, 1);
+            projectCalendarState.year = dt.getFullYear();
+            projectCalendarState.month = dt.getMonth();
+            renderProjectTrackerBody();
+        };
+
+        global.resetProjectCalendarMonth = function () {
+            const n = new Date();
+            projectCalendarState.year = n.getFullYear();
+            projectCalendarState.month = n.getMonth();
+            renderProjectTrackerBody();
+        };
+
+        global.jumpToCalendarTask = function (taskId) {
+            projectViewMode = 'tasks';
+            expandedProjectIds.clear();
+            expandedProjectIds.add(taskId);
+            projectReviewState.status = 'all';
+            projectReviewState.page = 1;
+            renderProjectTrackerBody();
+        };
+
+        global.openProofAnnotator = function (taskId, studentId) {
+            const { allTasks = [], subMap = {}, studentList = [], allStudentsList = [] } = projectDataCache;
+            const ps = subMap[`${taskId}__${studentId}`];
+            if (!ps?.proof_image) { showToast('Siswa belum melampirkan gambar bukti pada tugas ini.'); return; }
+            const t = allTasks.find((x) => x.id === taskId);
+            const s = studentList.find((x) => x.id === studentId) || allStudentsList.find((x) => x.id === studentId);
+            openImageAnnotatorModal(ps.proof_image, `${t?.title || 'Bukti Tugas'} — ${s?.full_name || 'Siswa'}`, (annotatedDataUrl) => {
+                global.openRevisionComposerModal(taskId, studentId, annotatedDataUrl);
+            });
+        };
+
+        global.openStudentParentLink = function (studentId) {
+            const { studentList = [], allStudentsList = [] } = projectDataCache;
+            const stu = studentList.find((s) => s.id === studentId) || allStudentsList.find((s) => s.id === studentId);
+            if (!stu) { showToast('Data siswa tidak ditemukan.'); return; }
+            openParentWatchLinkModal(stu);
+        };
+
+        global.openStaffLeaderboard = function () {
+            openLeaderboardModal(projectDataCache.studentList || [], projectDataCache.allTasks || [], projectDataCache.subMap || {});
+        };
+
+        global.openShowcaseGallery = function () {
+            openShowcaseGalleryModal(currentUser);
         };
 
         global.openStudentFlowchart = function (studentId) {
@@ -4838,6 +6005,8 @@
                                 ${renderWhatsappLink(s.whatsapp_number, true, waMsg)}
                                 <button type="button" onclick="openStudentFlowchart('${s.id}')"
                                     class="px-2.5 py-1.5 rounded-lg bg-[#EEF2FF] hover:bg-[#4F46E5] text-[#4F46E5] hover:text-white text-[11px] font-bold transition cursor-pointer">🗺️ Flowchart</button>
+                                <button type="button" onclick="openStudentParentLink('${s.id}')"
+                                    class="px-2.5 py-1.5 rounded-lg bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-[11px] font-bold transition cursor-pointer">👨‍👩‍👧 Ortu</button>
                                 ${logsCnt ? `<button type="button" onclick="openStudentFeedbackHistory('${s.id}')" class="px-2.5 py-1.5 rounded-lg bg-[#F7FAFF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white border border-[#DCEBFF] text-[11px] font-bold transition cursor-pointer">📜 (${logsCnt})</button>` : ''}
                                 <button type="button" onclick="printStudentReportPdf('${s.id}')"
                                     class="px-2.5 py-1.5 rounded-lg bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-[11px] font-bold transition cursor-pointer">🖨️ PDF</button>
@@ -4903,7 +6072,7 @@
             if (inputEl) inputEl.value = '';
         };
 
-        global.openRevisionComposerModal = function (taskId, studentId) {
+        global.openRevisionComposerModal = function (taskId, studentId, preAttachedDataUrl = null) {
             const { allTasks = [], subMap = {}, studentList = [], allStudentsList = [] } = projectDataCache;
             const taskObj = allTasks.find((t) => t.id === taskId);
             const stuObj = studentList.find((s) => s.id === studentId) || allStudentsList.find((s) => s.id === studentId);
@@ -4916,6 +6085,14 @@
                 if (u) existingImgs.push({ previewSrc: u, dataUrl: null, existingUrl: u, name: 'existing' });
                 return '';
             }).trim();
+            if (preAttachedDataUrl) {
+                existingImgs.push({
+                    previewSrc: preAttachedDataUrl,
+                    dataUrl: preAttachedDataUrl,
+                    existingUrl: null,
+                    name: `coretan_${Date.now()}.jpg`
+                });
+            }
 
             revComposerState = {
                 taskId,
@@ -6211,6 +7388,18 @@
         renderGlobalAnnouncementBanner,
         openStudentFlowchartModal,
         printStudentsReportPdf,
+        initDarkMode,
+        toggleDarkMode,
+        openImageAnnotatorModal,
+        PARENT_WATCH_PREFIX,
+        PARENT_TOKEN_PREFIX,
+        openParentWatchLinkModal,
+        updateNotificationCenter,
+        openLeaderboardModal,
+        printStudentCertificatePdf,
+        openShowcaseGalleryModal,
+        buildCalendarAndGanttHtml,
+        openStudentCalendarModal,
         openFeedbackHistoryModal,
         getWeekKey,
         getWeekRangeInfo,

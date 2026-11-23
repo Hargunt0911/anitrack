@@ -247,12 +247,17 @@
                             </svg>
                         </button>
 
-                        <button onclick="switchTab('tasks')" title="Monitoring Daily Task"
-                            class="relative hidden sm:flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
+                        <button type="button" data-notif-trigger onclick="toggleNotificationCenter()" title="Pusat Notifikasi Aktivitas"
+                            class="relative flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
                             <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                             </svg>
                             <span id="notifDot" class="hidden absolute top-1.5 right-2 w-2 h-2 rounded-full bg-[#F13B6E] ring-2 ring-white"></span>
+                        </button>
+
+                        <button type="button" data-dark-toggle onclick="toggleDarkMode()" title="Ganti Mode Gelap / Terang"
+                            class="w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#1E293B] flex items-center justify-center text-sm transition cursor-pointer">
+                            <span data-dark-icon>🌙</span>
                         </button>
 
                         <button onclick="toggleFullscreen()" title="Layar Penuh"
@@ -1437,7 +1442,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261123a"></script>
+    <script src="./anitrack-core.js?v=20261123b"></script>
     <script>
         (function () {
             const A = window.AniTrack;

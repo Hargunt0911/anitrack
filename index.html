@@ -38,6 +38,11 @@
         <div class="pointer-events-none absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-[#4CB6A7]/25 blur-2xl"></div>
         <div class="pointer-events-none absolute top-1/3 right-12 w-36 h-36 rounded-full bg-[#0095FF]/12 blur-xl"></div>
 
+        <button type="button" data-dark-toggle onclick="toggleDarkMode()" title="Ganti Mode Gelap / Terang"
+            class="fixed top-4 right-4 z-20 w-10 h-10 rounded-xl bg-white border border-[#E8EEF6] shadow-cardHover flex items-center justify-center text-base cursor-pointer">
+            <span data-dark-icon>🌙</span>
+        </button>
+
         <div class="relative z-10 w-full max-w-[420px] bg-white border border-[#E8EEF6] rounded-2xl shadow-cardHover p-7 sm:p-8 space-y-6">
             <div class="flex items-center gap-3.5">
                 <img src="./logo-anitrack.png" alt="Logo AniTrack"
@@ -93,7 +98,7 @@
         </div>
     </section>
 
-    <script src="./anitrack-core.js?v=20261123a"></script>
+    <script src="./anitrack-core.js?v=20261123b"></script>
     <script>
         (function () {
             const { supabase, getUser, setUser, redirectToRole, loadAdminRoleIds } = window.AniTrack;

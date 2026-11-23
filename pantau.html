@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Pantau Progres Siswa — AniTrack • SMKN 4 Malang</title>
+    <link rel="icon" type="image/png" href="./logo-anitrack.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        card: '0 2px 12px rgba(15, 23, 42, 0.05)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        html { overflow-y: scroll; scrollbar-gutter: stable; }
+        html, body { background-color: #F3F6FB; color: #1E293B; overflow-x: clip; }
+        .num-tabular { font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+
+<body class="bg-[#F3F6FB] text-[#1E293B] min-h-screen antialiased">
+    <div id="appToast"
+        class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] hidden max-w-[92vw] sm:max-w-md px-5 py-3 rounded-xl bg-[#1E293B] text-white text-xs sm:text-sm font-semibold shadow-2xl flex items-center gap-2.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#F7C200] shrink-0"></span>
+        <span id="appToastText"></span>
+    </div>
+
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[#EDF1F7]">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <img src="./logo-anitrack.png" alt="Logo AniTrack" class="w-10 h-10 object-contain shrink-0" />
+                <div class="min-w-0">
+                    <div class="text-sm sm:text-base font-extrabold text-[#1E293B] leading-tight truncate">AniTrack — Portal Orang Tua / Wali</div>
+                    <div class="text-[11px] font-semibold text-[#4CB6A7] truncate">Jurusan Animasi • SMKN 4 Malang (Hanya Baca)</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" data-dark-toggle onclick="toggleDarkMode()" title="Ganti Mode Gelap / Terang"
+                    class="w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#1E293B] flex items-center justify-center text-sm transition cursor-pointer">
+                    <span data-dark-icon>🌙</span>
+                </button>
+                <button type="button" id="parentPrintPdfBtn" onclick="printParentReport()" class="hidden px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer">
+                    🖨️ Cetak PDF Rapor
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="parentWatchContainer" class="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-10 text-center space-y-2">
+            <div class="text-2xl">⏳</div>
+            <div class="text-sm font-bold text-[#1E293B]">Memuat laporan progres siswa...</div>
+            <p class="text-xs text-slate-400">Mohon tunggu sebentar, sistem sedang memverifikasi tautan resmi AniTrack.</p>
+        </div>
+    </main>
+
+    <footer class="max-w-5xl mx-auto px-4 sm:px-6 py-6 text-center text-[11px] text-slate-400">
+        AniTrack • Sistem Monitoring Project Animasi SMKN 4 Malang • Tautan Khusus Orang Tua / Wali (Read-Only)
+    </footer>
+
+    <script src="./anitrack-core.js?v=20261123b"></script>
+    <script>
+        (async function () {
+            const A = window.AniTrack;
+            const { supabase, esc, STATUS_OPTIONS } = A;
+            const container = document.getElementById('parentWatchContainer');
+            const params = new URLSearchParams(window.location.search);
+            const token = (params.get('token') || '').trim();
+
+            let reportPayload = null;
+            window.printParentReport = function () {
+                if (!reportPayload) return;
+                A.printStudentsReportPdf([reportPayload.student], reportPayload.ctx, `Rapor Jurnal — ${reportPayload.student.full_name}`);
+            };
+
+            function renderError(msg) {
+                container.innerHTML = `
+                    <div class="bg-white border border-[#FECDD6] rounded-2xl shadow-card p-8 text-center space-y-2.5">
+                        <div class="text-3xl">🔒</div>
+                        <div class="text-base font-extrabold text-[#BE123C]">Tautan Tidak Valid atau Sudah Diganti</div>
+                        <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">${esc(msg)}</p>
+                    </div>`;
+            }
+
+            if (!token || !supabase) {
+                renderError('Tautan pantau orang tua tidak memiliki kode token yang sah. Silakan minta tautan terbaru kepada Guru Pembimbing atau Wali Kelas.');
+                return;
+            }
+
+            await A.loadGlobalAnnouncement();
+
+            const { data: tokRow } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', `${A.PARENT_TOKEN_PREFIX}${token}`)
+                .maybeSingle();
+
+            if (!tokRow?.value) {
+                renderError('Kode tautan tidak ditemukan atau sudah dicabut oleh Guru Pembimbing.');
+                return;
+            }
+
+            let tokData = {};
+            try { tokData = JSON.parse(tokRow.value); } catch { /* ignore */ }
+            if (!tokData.student_id || tokData.active === false) {
+                renderError('Tautan pantau ini sudah tidak aktif.');
+                return;
+            }
+
+            const studentId = tokData.student_id;
+            const [
+                { data: student },
+                { data: projTasks },
+                { data: projSubs },
+                { data: dailyTasks },
+                { data: fbLogRow },
+                checklistColsMap,
+                { data: myChecklistRow }
+            ] = await Promise.all([
+                supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, avatar_url, mentor_id, project_drive_url').eq('id', studentId).maybeSingle(),
+                supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
+                supabase.from('project_submissions').select('*').eq('student_id', studentId),
+                supabase.from('daily_tasks').select('id, task_title, status, progress_percent, created_at').eq('student_id', studentId).order('created_at', { ascending: false }).limit(14),
+                supabase.from('app_settings').select('value').eq('key', `${A.PROJECT_FB_LOG_PREFIX}${studentId}`).maybeSingle(),
+                A.loadChecklistColsMap(),
+                supabase.from('app_settings').select('value').eq('key', `${A.CHECKLIST_ROW_PREFIX}${studentId}`).maybeSingle()
+            ]);
+
+            if (!student) {
+                renderError('Data siswa tidak ditemukan di sistem.');
+                return;
+            }
+
+            let mentor = null;
+            if (student.mentor_id) {
+                const { data: mRow } = await supabase.from('profiles').select('id, full_name, whatsapp_number').eq('id', student.mentor_id).maybeSingle();
+                mentor = mRow || null;
+            }
+
+            let fbLogs = [];
+            if (fbLogRow?.value) {
+                try { const p = JSON.parse(fbLogRow.value); if (Array.isArray(p)) fbLogs = p; } catch { /* ignore */ }
+            }
+
+            let myCk = { items: {}, notes: '', updated_by: '', updated_at: null };
+            if (myChecklistRow?.value) {
+                try { myCk = { ...myCk, ...JSON.parse(myChecklistRow.value) }; } catch { /* ignore */ }
+            }
+            const ckCols = (student.sub_concentration && checklistColsMap[student.sub_concentration]) || A.DEFAULT_CHECKLIST_COLS;
+            const ckDone = ckCols.filter((c) => A.normalizeChecklistStatus(myCk.items?.[c]) === 'done').length;
+            const ckPct = ckCols.length ? Math.round((ckDone / ckCols.length) * 100) : 0;
+
+            const allTasks = A.sortMaterialsByPipeline(projTasks || []);
+            const myTasks = allTasks.filter((t) => !student.sub_concentration || !t.sub_concentration || t.sub_concentration === student.sub_concentration);
+            const subMapComposite = Object.fromEntries((projSubs || []).map((ps) => [`${ps.project_task_id}__${student.id}`, ps]));
+            const stats = A.computeStudentIssueStats(student, myTasks, subMapComposite);
+            const pct = stats.eligibleCount ? Math.round((stats.accCount / stats.eligibleCount) * 100) : 0;
+            const dailyList = dailyTasks || [];
+
+            reportPayload = {
+                student,
+                ctx: {
+                    tasks: allTasks,
+                    subMap: subMapComposite,
+                    mentorMap: mentor ? { [mentor.id]: mentor } : {},
+                    fbLogMap: { [student.id]: fbLogs },
+                    checklistColsMap,
+                    checklistRowMap: { [student.id]: myCk }
+                }
+            };
+            document.getElementById('parentPrintPdfBtn')?.classList.remove('hidden');
+
+            const mentorWaMsg = `Halo Bapak/Ibu ${mentor?.full_name || 'Pembimbing'}, saya orang tua/wali dari ${student.full_name} (${student.class_name || '-'}). Ingin berkoordinasi terkait progres project anak saya di AniTrack.`;
+
+            container.innerHTML = `
+                <!-- Hero Biodata & Ringkasan -->
+                <div class="rounded-2xl bg-gradient-to-r from-[#45B1A2] via-[#4FB8AA] to-[#58C2B4] text-white p-5 sm:p-6 shadow-card space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-center gap-4 min-w-0">
+                            <div class="w-16 h-16 rounded-2xl bg-white/20 border-2 border-white/40 flex items-center justify-center font-extrabold text-xl shrink-0 overflow-hidden">
+                                ${A.renderAvatarMarkup(student.avatar_url, student.full_name)}
+                            </div>
+                            <div class="min-w-0 space-y-1">
+                                <span class="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20">
+                                    ${esc(student.class_name || 'Siswa Animasi')} • ${esc(student.sub_concentration || 'Subkon Belum Diatur')}
+                                </span>
+                                <h1 class="text-xl sm:text-2xl font-extrabold truncate">${esc(student.full_name)}</h1>
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-white/90">
+                                    <span>👨‍🏫 Pembimbing: <strong>${esc(mentor?.full_name || 'Belum di-plot')}</strong></span>
+                                    ${mentor?.whatsapp_number ? `<a href="${esc(A.getWhatsappUrl(mentor.whatsapp_number, mentorWaMsg))}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-0.5 rounded-lg bg-[#25D366] text-white font-bold text-[11px] hover:opacity-90">💬 Hubungi Pembimbing</a>` : ''}
+                                    ${student.project_drive_url ? `<a href="${esc(student.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-0.5 rounded-lg bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] font-bold text-[11px] transition">📁 Folder Drive ↗</a>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-full md:w-64 bg-white/15 border border-white/25 rounded-2xl p-4 space-y-2 shrink-0 num-tabular">
+                            <div class="flex items-center justify-between text-xs font-bold">
+                                <span>Ketuntasan Project</span>
+                                <span class="text-lg font-extrabold text-[#FFF6D6]">${pct}%</span>
+                            </div>
+                            <div class="w-full h-2.5 rounded-full bg-white/25 overflow-hidden">
+                                <div class="h-full bg-[#F7C200] rounded-full" style="width:${pct}%"></div>
+                            </div>
+                            <div class="text-[11px] text-white/90">${stats.accCount} / ${stats.eligibleCount} Tugas ACC</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 num-tabular">
+                        <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                            <div class="text-[11px] text-white/85">Tugas Tuntas (ACC)</div>
+                            <div class="text-lg font-extrabold">${stats.accCount}/${stats.eligibleCount}</div>
+                        </div>
+                        <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                            <div class="text-[11px] text-white/85">🌟 Lencana Emas</div>
+                            <div class="text-lg font-extrabold text-[#FFF6D6]">${stats.goldCount}</div>
+                        </div>
+                        <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                            <div class="text-[11px] text-white/85">⚠️ Poin Masalah</div>
+                            <div class="text-lg font-extrabold text-[#FFE4EC]">${stats.totalIssues}</div>
+                        </div>
+                        <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
+                            <div class="text-[11px] text-white/85">Daily Task Tercatat</div>
+                            <div class="text-lg font-extrabold text-[#FFF6D6]">${dailyList.length}</div>
+                        </div>
+                    </div>
+                </div>
+
+                ${stats.totalIssues >= 2 ? `
+                <div class="rounded-2xl bg-[#FFF0F4] border-l-4 border-[#E11D48] border border-[#FECDD6] p-4 flex items-start gap-3">
+                    <span class="text-xl">🚨</span>
+                    <div class="text-xs text-[#9F1239] space-y-0.5">
+                        <div class="font-extrabold">Perhatian Orang Tua / Wali</div>
+                        <p>Terpantau <strong>${stats.totalIssues} catatan masalah</strong> (${esc(stats.detailText)}). Mohon dukungan pendampingan di rumah agar tugas project dapat segera diselesaikan.</p>
+                    </div>
+                </div>` : ''}
+
+                <!-- Project Update PJ Subkon -->
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-3.5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div>
+                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">📊 Project Update • ${esc(student.sub_concentration || 'Animasi')}</div>
+                            <p class="text-xs text-slate-500 mt-0.5">Status tahapan produksi resmi dari Guru PJ Sub-Konsentrasi.</p>
+                        </div>
+                        <div class="w-full sm:w-52 shrink-0 num-tabular">
+                            <div class="flex items-center justify-between text-[11px] font-bold mb-1">
+                                <span class="text-[#15803D]">${ckDone}/${ckCols.length} Done</span>
+                                <span class="font-mono text-slate-500">${ckPct}%</span>
+                            </div>
+                            <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                                <div class="h-full rounded-full" style="width:${ckPct}%;background:#4CAF50;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${ckCols.map((c) => {
+                            const stVal = A.normalizeChecklistStatus(myCk.items?.[c]);
+                            const opt = A.CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || A.CHECKLIST_STATUS_OPTIONS[0];
+                            return `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${opt.cls} text-xs font-bold">${esc(c)}: ${opt.label}</span>`;
+                        }).join('')}
+                    </div>
+                    ${myCk.notes ? `<div class="rounded-xl bg-[#FFFDF5] border border-[#FDE68A] px-3.5 py-2.5 text-xs text-[#92400E]"><strong>📝 Catatan PJ Subkon:</strong> ${esc(myCk.notes)}</div>` : ''}
+                </div>
+
+                <!-- Timeline Flowchart Progres Tugas -->
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                    <div>
+                        <h2 class="text-base font-extrabold text-[#1E293B]">🗺️ Timeline Progres Project &amp; Catatan Guru</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Urutan tahapan tugas dari Pre-Production hingga Post-Production beserta catatan revisi pembimbing.</p>
+                    </div>
+                    ${myTasks.length ? `
+                    <div class="relative pl-6 space-y-3.5 before:content-[''] before:absolute before:left-[9px] before:top-3 before:bottom-3 before:w-0.5 before:bg-[#CBD5E1]">
+                        ${myTasks.map((t, idx) => {
+                            const ps = subMapComposite[`${t.id}__${student.id}`] || {};
+                            const stVal = ps.status || 'belum_mulai';
+                            const isDone = stVal === 'selesai';
+                            const isOrange = stVal === 'revisi' || stVal === 'menunggu_review' || stVal === 'sedang_dikerjakan';
+                            const dotCls = isDone ? 'bg-[#22C55E] ring-[#DCFCE7]' : (isOrange ? 'bg-[#F97316] ring-[#FFEDD5]' : 'bg-[#CBD5E1] ring-slate-100');
+                            const cardCls = isDone ? 'bg-[#F0FDF4] border-[#BBF7D0]' : (stVal === 'revisi' ? 'bg-[#FFF5F7] border-[#FECDD6]' : (isOrange ? 'bg-[#FFFBEB] border-[#FDE68A]' : 'bg-[#FAFBFD] border-[#E2E8F0]'));
+                            const stObj = STATUS_OPTIONS.find((x) => x.value === stVal) || STATUS_OPTIONS[0];
+                            const tm = A.evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
+                            const revNum = Number(ps.revision_count || 0);
+                            return `
+                                <div class="relative">
+                                    <span class="absolute -left-6 top-3.5 w-4 h-4 rounded-full border-2 border-white ring-4 ${dotCls}"></span>
+                                    <div class="rounded-xl border p-3.5 space-y-1.5 ${cardCls}">
+                                        <div class="flex flex-wrap items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${idx + 1}. ${esc(t.pipeline_stage)}${t.due_date ? ` • Deadline ${esc(A.formatDateOnly(t.due_date))}` : ''}</div>
+                                                <div class="text-sm font-extrabold text-[#1E293B]">${esc(t.title)}</div>
+                                            </div>
+                                            <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${isDone ? tm.badgeClass : stObj.badge}">
+                                                ${isDone ? esc(tm.label) : esc(stObj.label)}
+                                            </span>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                            ${ps.updated_at ? `<span>⏱ Update: ${esc(A.formatDateTime(ps.updated_at))}</span>` : `<span>Belum dikumpulkan</span>`}
+                                            ${revNum > 0 ? `<span class="px-1.5 py-0.5 rounded bg-[#FFF0F4] text-[#E11D48] font-bold">Revisi ke-${revNum}</span>` : ''}
+                                            ${ps.proof_image ? `<button type="button" onclick="openProofLightbox('${esc(ps.proof_image)}', '${esc(t.title)} — ${esc(student.full_name)}')" class="font-bold text-[#0082E6] hover:underline cursor-pointer">📷 Lihat Bukti Karya</button>` : ''}
+                                        </div>
+                                        ${ps.mentor_feedback ? `
+                                            <div class="mt-2 p-2.5 rounded-lg bg-white border border-[#E2E8F0] text-xs text-slate-700">
+                                                <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Catatan Pembimbing:</div>
+                                                ${A.formatFeedbackWithImages(ps.mentor_feedback)}
+                                            </div>` : ''}
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>` : `<div class="p-6 text-center text-xs text-slate-400">Belum ada tugas project.</div>`}
+                </div>
+
+                <!-- Riwayat Daily Task Terbaru -->
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-3">
+                    <h2 class="text-base font-extrabold text-[#1E293B]">✅ Aktivitas Daily Task Terbaru</h2>
+                    ${dailyList.length ? `
+                    <div class="divide-y divide-[#F1F5F9] text-xs">
+                        ${dailyList.map((dt) => {
+                            const stObj = STATUS_OPTIONS.find((o) => o.value === dt.status) || STATUS_OPTIONS[0];
+                            return `
+                                <div class="py-2.5 flex items-center justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-[#1E293B] truncate">${esc(dt.task_title || 'Aktivitas Harian')}</div>
+                                        <div class="text-[10.5px] text-slate-400">${esc(A.formatDateTime(dt.created_at))}</div>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span class="font-mono font-bold text-[#0082E6]">${Number(dt.progress_percent || 0)}%</span>
+                                        <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${stObj.badge}">${esc(stObj.label)}</span>
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>` : `<div class="p-6 text-center text-xs text-slate-400">Belum ada catatan Daily Task.</div>`}
+                </div>`;
+        })();
+    </script>
+</body>
+
+</html>

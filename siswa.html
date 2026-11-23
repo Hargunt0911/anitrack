@@ -178,12 +178,17 @@
                             </svg>
                         </button>
 
-                        <button onclick="switchTab('tasks')" title="Daily Task"
-                            class="relative hidden sm:flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
+                        <button type="button" data-notif-trigger onclick="toggleNotificationCenter()" title="Pusat Notifikasi Aktivitas"
+                            class="relative flex w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] items-center justify-center transition cursor-pointer">
                             <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                             </svg>
                             <span id="notifDot" class="hidden absolute top-1.5 right-2 w-2 h-2 rounded-full bg-[#F13B6E] ring-2 ring-white"></span>
+                        </button>
+
+                        <button type="button" data-dark-toggle onclick="toggleDarkMode()" title="Ganti Mode Gelap / Terang"
+                            class="w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#1E293B] flex items-center justify-center text-sm transition cursor-pointer">
+                            <span data-dark-icon>🌙</span>
                         </button>
 
                         <button onclick="toggleFullscreen()" title="Layar Penuh"
@@ -1007,7 +1012,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261123a"></script>
+    <script src="./anitrack-core.js?v=20261123b"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2126,9 +2131,26 @@
                 A.openFeedbackHistoryModal(`${currentUser.full_name} (${currentUser.class_name || '-'})`, studentFeedbackLogsCache);
             };
 
-            let studentProjectCache = { tasks: [], subMapComposite: {}, checklistColsMap: {}, myChecklistData: { items: {}, notes: '' } };
+            let studentProjectCache = { tasks: [], subMap: {}, subMapComposite: {}, checklistColsMap: {}, myChecklistData: { items: {}, notes: '' } };
             window.openMyFlowchart = function () {
                 A.openStudentFlowchartModal(currentUser, studentProjectCache.tasks, studentProjectCache.subMapComposite, null, studentFeedbackLogsCache);
+            };
+            window.openMyCalendar = function () {
+                A.openStudentCalendarModal(studentProjectCache.tasks, studentProjectCache.subMap);
+            };
+            window.openStudentLeaderboard = async function () {
+                A.showToast('Memuat Papan Peringkat Siswa...');
+                const [{ data: allStu }, { data: allTasks }, { data: allSubs }] = await Promise.all([
+                    supabase.from('profiles').select('id, full_name, class_name, sub_concentration, avatar_url').eq('role', 'student'),
+                    supabase.from('project_tasks').select('*'),
+                    supabase.from('project_submissions').select('project_task_id, student_id, status, revision_count, updated_at')
+                ]);
+                const sMap = {};
+                (allSubs || []).forEach((ps) => { sMap[`${ps.project_task_id}__${ps.student_id}`] = ps; });
+                A.openLeaderboardModal(allStu || [], allTasks || [], sMap);
+            };
+            window.openShowcaseGallery = function () {
+                A.openShowcaseGalleryModal(currentUser);
             };
             window.printStudentReportPdf = function () {
                 A.printStudentsReportPdf([currentUser], {
@@ -2185,7 +2207,64 @@
                 const myTasks = A.sortMaterialsByPipeline(projTasks || []).filter((t) =>
                     !currentUser.sub_concentration || !t.sub_concentration || t.sub_concentration === currentUser.sub_concentration
                 );
-                studentProjectCache = { tasks: myTasks, subMapComposite, checklistColsMap, myChecklistData };
+                studentProjectCache = { tasks: myTasks, subMap, subMapComposite, checklistColsMap, myChecklistData };
+
+                // Isi Pusat Notifikasi Aktivitas Siswa (Ikon Lonceng Header)
+                const stuNotifs = [];
+                myTasks.forEach((t) => {
+                    const ps = subMap[t.id];
+                    const stVal = ps?.status || 'belum_mulai';
+                    if (stVal === 'revisi') {
+                        stuNotifs.push({
+                            icon: '⚠️',
+                            iconBg: 'bg-[#FFF0F4] text-[#E11D48]',
+                            title: `Revisi ke-${Number(ps.revision_count || 1)}: ${t.title}`,
+                            desc: A.stripFeedbackImageTags(ps.mentor_feedback || 'Silakan cek catatan pembimbing dan perbaiki tugas.'),
+                            timeLabel: ps.updated_at ? A.formatDateTime(ps.updated_at) : '',
+                            ts: ps.updated_at ? Date.parse(ps.updated_at) || Date.now() : Date.now(),
+                            urgent: true,
+                            onClick: () => switchTab('projects')
+                        });
+                    } else if (stVal !== 'selesai' && t.due_date) {
+                        const dl = A.getDeadlineMeta(t.due_date, false);
+                        if (dl.overdue || dl.soon) {
+                            stuNotifs.push({
+                                icon: dl.overdue ? '🔴' : '⏳',
+                                iconBg: dl.overdue ? 'bg-[#FFF0F4] text-[#E11D48]' : 'bg-[#FFF6D6] text-[#B88600]',
+                                title: `${dl.overdue ? 'Terlambat' : 'Mendekati Deadline'}: ${t.title}`,
+                                desc: dl.label,
+                                timeLabel: `Deadline ${A.formatDateOnly(t.due_date)}`,
+                                ts: Date.now() - 1000,
+                                urgent: dl.overdue,
+                                onClick: () => switchTab('projects')
+                            });
+                        }
+                    } else if (stVal === 'selesai') {
+                        const tm = A.evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
+                        stuNotifs.push({
+                            icon: tm.tier === 'gold' ? '🌟' : '✅',
+                            iconBg: tm.tier === 'gold' ? 'bg-[#FFF6D6] text-[#9A6F00]' : 'bg-[#E3F6F3] text-[#1D5E55]',
+                            title: `${tm.tier === 'gold' ? 'Lencana Emas diraih!' : 'Tugas di-ACC'}: ${t.title}`,
+                            desc: A.stripFeedbackImageTags(ps.mentor_feedback || tm.label),
+                            timeLabel: ps.updated_at ? A.formatDateTime(ps.updated_at) : '',
+                            ts: ps.updated_at ? Date.parse(ps.updated_at) || 0 : 0,
+                            onClick: () => switchTab('projects')
+                        });
+                    }
+                });
+                if (myChecklistData.updated_at) {
+                    stuNotifs.push({
+                        icon: '📊',
+                        iconBg: 'bg-[#EAF4FF] text-[#0082E6]',
+                        title: `Project Update diperbarui (${myChecklistData.updated_by || 'PJ Subkon'})`,
+                        desc: myChecklistData.notes || 'Status tahapan produksi sub-konsentrasi kamu telah diperbarui.',
+                        timeLabel: A.formatDateTime(myChecklistData.updated_at),
+                        ts: Date.parse(myChecklistData.updated_at) || 0,
+                        onClick: () => switchTab('projects')
+                    });
+                }
+                stuNotifs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+                A.updateNotificationCenter(stuNotifs, `student_${currentUser.id}`);
 
                 const myIssueStats = A.computeStudentIssueStats(currentUser, myTasks, subMapComposite);
                 const total = myTasks.length;
@@ -2218,16 +2297,28 @@
                                 <div class="flex flex-wrap items-center gap-2 pt-1">
                                     <button type="button" onclick="openMyFlowchart()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer">
-                                        🗺️ Timeline Flowchart
+                                        🗺️ Flowchart
+                                    </button>
+                                    <button type="button" onclick="openMyCalendar()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
+                                        🗓️ Kalender &amp; Gantt
+                                    </button>
+                                    <button type="button" onclick="openStudentLeaderboard()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF6D6] text-[#9A6F00] hover:bg-[#F7C200] hover:text-white text-[11px] font-extrabold shadow-xs transition cursor-pointer">
+                                        🏆 Leaderboard
+                                    </button>
+                                    <button type="button" onclick="openShowcaseGallery()"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
+                                        🎬 Galeri Karya
                                     </button>
                                     <button type="button" onclick="printStudentReportPdf()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                        🖨️ Cetak PDF Rapor
+                                        🖨️ Cetak PDF
                                     </button>
                                     ${studentFeedbackLogsCache.length ? `
                                     <button type="button" onclick="openMyFeedbackHistory()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                        📜 Riwayat Catatan Guru (${studentFeedbackLogsCache.length})
+                                        📜 Riwayat Catatan (${studentFeedbackLogsCache.length})
                                     </button>` : ''}
                                 </div>
                             </div>
