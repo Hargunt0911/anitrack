@@ -802,6 +802,8 @@
         const clean = String(text || '').trim();
         const inp = document.getElementById('globalAnnouncementInput');
         if (inp && document.activeElement !== inp) inp.value = clean;
+        const dot = document.getElementById('broadcastActiveDot');
+        if (dot) dot.classList.toggle('hidden', !clean);
 
         let bar = document.getElementById('anitrackGlobalAnnouncementBar');
         if (!clean) {
@@ -5109,6 +5111,13 @@
         };
 
         // ==================== PAPAN PENGUMUMAN GLOBAL (ADMIN BROADCAST) ====================
+        global.openGlobalAnnouncementModal = function () {
+            const modal = document.getElementById('adminBroadcastModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('globalAnnouncementInput')?.focus(), 60);
+        };
+
         global.saveGlobalAnnouncementUi = async function (btn) {
             if (!isAnyAdmin(currentUser)) {
                 showToast('Hanya Admin / Superadmin yang dapat mengatur pengumuman global.');
@@ -5128,6 +5137,7 @@
                 fb.textContent = text ? 'Pengumuman aktif disebarkan ✓' : 'Banner pengumuman dimatikan.';
                 setTimeout(() => { if (fb) fb.textContent = ''; }, 3000);
             }
+            document.getElementById('adminBroadcastModal')?.classList.add('hidden');
             showToast(text ? 'Pengumuman global aktif di semua portal ✓' : 'Banner pengumuman global dihapus.');
         };
 
@@ -5142,6 +5152,7 @@
             const { error } = await saveGlobalAnnouncement('');
             if (btn) btn.disabled = false;
             if (error) { showToast(`Gagal menghapus pengumuman: ${error.message}`); return; }
+            document.getElementById('adminBroadcastModal')?.classList.add('hidden');
             showToast('Banner pengumuman global dihapus ✓');
         };
 
