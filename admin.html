@@ -1303,21 +1303,36 @@
                             <!-- Konfigurasi Telegram Bot API -->
                             <div id="tgGatewaySettingsWrap" class="hidden pt-3 border-t border-[#DCEBFF] grid grid-cols-1 md:grid-cols-12 gap-3">
                                 <div class="md:col-span-12 flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-xs font-extrabold text-[#0369A1]">✈️ Konfigurasi Telegram Bot API (Gratis Resmi)</span>
-                                    <span class="text-[11px] text-slate-500">Buat bot di <code>@BotFather</code> → masukkan Bot ke grup → ambil Chat ID via <code>@userinfobot</code> / <code>@RawDataBot</code>.</span>
+                                    <span class="text-xs font-extrabold text-[#0369A1]">✈️ Konfigurasi Telegram Bot API (DM Pribadi Siswa + Opsional Grup)</span>
+                                    <span class="text-[11px] text-slate-500">Buat bot di <code>@BotFather</code> → isi Username &amp; Token → siswa tinggal 1-klik <strong>Hubungkan Telegram</strong> di portalnya!</span>
                                 </div>
-                                <div class="md:col-span-6">
+                                <div class="md:col-span-4">
+                                    <label for="tgBotUsernameInput" class="block text-xs font-semibold text-slate-600 mb-1">Username Bot Telegram (tanpa @)</label>
+                                    <input id="tgBotUsernameInput" type="text" placeholder="Contoh: AniTrackSMKN4Bot"
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="md:col-span-4">
                                     <label for="tgBotTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">Telegram Bot Token (dari @BotFather)</label>
                                     <input id="tgBotTokenInput" type="password" placeholder="Contoh: 7123456789:AAHxxx..."
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div class="md:col-span-6">
-                                    <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup / Channel Utama (Default)</label>
-                                    <input id="tgChatIdInput" type="text" placeholder="Contoh: -1001234567890 atau ID pribadi"
+                                <div class="md:col-span-4">
+                                    <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup Utama (Opsional)</label>
+                                    <input id="tgChatIdInput" type="text" placeholder="Kosongkan jika DM pribadi saja"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
+                                <div class="md:col-span-12 flex flex-wrap items-center justify-between gap-2 bg-white border border-[#BAE6FD] rounded-xl px-3.5 py-2.5">
+                                    <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                        <input id="tgSendDmEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#0284C7]" />
+                                        <span class="text-xs font-bold text-[#0369A1]">Kirim DM Pribadi langsung ke Telegram masing-masing siswa (mirip WA)</span>
+                                    </label>
+                                    <button id="syncTgStudentsBtn" type="button" onclick="syncTelegramStudentsNow()"
+                                        class="px-3 py-1.5 rounded-lg bg-[#E0F2FE] hover:bg-[#0284C7] text-[#0369A1] hover:text-white text-[11px] font-bold transition cursor-pointer">
+                                        ↻ Sinkronkan Akun Telegram Siswa
+                                    </button>
+                                </div>
                                 <div class="md:col-span-12">
-                                    <label for="tgClassChatMapInput" class="block text-xs font-semibold text-slate-600 mb-1">Mapping Chat ID Per Kelas (Opsional — 1 baris per kelas: <code class="font-mono">Nama Kelas = ChatID</code>)</label>
+                                    <label for="tgClassChatMapInput" class="block text-xs font-semibold text-slate-600 mb-1">Mapping Chat ID Grup Per Kelas (Opsional — 1 baris per kelas: <code class="font-mono">Nama Kelas = ChatID</code>)</label>
                                     <textarea id="tgClassChatMapInput" rows="2" placeholder="X ANI A = -1001111111111&#10;X ANI B = -1002222222222"
                                         class="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]"></textarea>
                                 </div>
@@ -2645,7 +2660,9 @@
                     apiToken: (document.getElementById('waApiTokenInput')?.value || '').trim(),
                     customUrl: (document.getElementById('waCustomUrlInput')?.value || '').trim(),
                     tgEnabled: Boolean(document.getElementById('tgChannelEnabled')?.checked),
+                    tgBotUsername: (document.getElementById('tgBotUsernameInput')?.value || '').trim().replace(/^@+/, ''),
                     tgBotToken: (document.getElementById('tgBotTokenInput')?.value || '').trim(),
+                    tgSendDm: Boolean(document.getElementById('tgSendDmEnabled')?.checked),
                     tgChatId: (document.getElementById('tgChatIdInput')?.value || '').trim(),
                     tgClassChatMap: parseTgClassMapText(document.getElementById('tgClassChatMapInput')?.value || ''),
                     appUrl: (document.getElementById('waAppUrlInput')?.value || '').trim(),
@@ -2669,14 +2686,24 @@
                     { data: profiles },
                     { data: tasks },
                     { data: subs },
-                    { data: logs }
+                    { data: logs },
+                    { data: tgStudentRows }
                 ] = await Promise.all([
                     supabase.from('app_settings').select('value').eq('key', 'wa_gateway_config').maybeSingle(),
                     supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number'),
                     supabase.from('project_tasks').select('id, title, pipeline_stage, sub_concentration, due_date'),
                     supabase.from('project_submissions').select('project_task_id, student_id, status'),
-                    supabase.from('wa_notification_logs').select('*').order('created_at', { ascending: false }).limit(15)
+                    supabase.from('wa_notification_logs').select('*').order('created_at', { ascending: false }).limit(15),
+                    supabase.from('app_settings').select('key, value').like('key', 'student_telegram::%')
                 ]);
+
+                const studentTgMap = {};
+                (tgStudentRows || []).forEach((r) => {
+                    try {
+                        const p = JSON.parse(r.value || '{}');
+                        if (p?.student_id && p?.chat_id) studentTgMap[p.student_id] = p;
+                    } catch { /* ignore */ }
+                });
 
                 // Muat konfigurasi tersimpan (untuk Admin & Superadmin)
                 const isAdminStaff = A.isAnyAdmin(A.getUser());
@@ -2693,7 +2720,10 @@
                             if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
                             if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
                             if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
+                            if (cfg.tgBotUsername) document.getElementById('tgBotUsernameInput').value = cfg.tgBotUsername;
                             if (cfg.tgBotToken) document.getElementById('tgBotTokenInput').value = cfg.tgBotToken;
+                            const tgDmChk = document.getElementById('tgSendDmEnabled');
+                            if (tgDmChk) tgDmChk.checked = cfg.tgSendDm !== undefined ? Boolean(cfg.tgSendDm) : true;
                             if (cfg.tgChatId) document.getElementById('tgChatIdInput').value = cfg.tgChatId;
                             const tgMapEl = document.getElementById('tgClassChatMapInput');
                             if (tgMapEl) tgMapEl.value = formatTgClassMapText(cfg.tgClassChatMap);
@@ -2706,7 +2736,7 @@
                         }
                         if (badgeEl) {
                             const waReady = (cfg.waEnabled !== false) && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
-                            const tgReady = Boolean(cfg.tgEnabled && cfg.tgBotToken && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                            const tgReady = Boolean(cfg.tgEnabled && cfg.tgBotToken && (cfg.tgSendDm !== false || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
                             const chList = [];
                             if (waReady) chList.push('WA');
                             if (tgReady) chList.push('Telegram');
@@ -2730,11 +2760,13 @@
                 const overdueCnt = queue.filter((q) => q.overdue.length > 0).length;
                 const upcomingCnt = queue.filter((q) => q.upcoming.length > 0 && q.overdue.length === 0).length;
                 const noWaCnt = queue.filter((q) => !q.hasWa).length;
+                const tgConnectedTotal = students.filter((s) => Boolean(studentTgMap[s.id]?.chat_id)).length;
 
                 if (queueSummaryEl) {
                     queueSummaryEl.innerHTML = `
                         <span class="px-2.5 py-1 rounded-lg bg-[#FFF0F4] text-[#E11D48] font-bold num-tabular">🔴 ${overdueCnt} Lewat Deadline</span>
                         <span class="px-2.5 py-1 rounded-lg bg-[#FFF6D6] text-[#B88600] font-bold num-tabular">🟡 ${upcomingCnt} H-2 s/d Hari-H</span>
+                        <span class="px-2.5 py-1 rounded-lg bg-[#E0F2FE] text-[#0369A1] font-bold num-tabular">✈️ ${tgConnectedTotal}/${students.length} Terhubung Telegram</span>
                         ${noWaCnt ? `<span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 font-semibold num-tabular">${noWaCnt} belum isi WA</span>` : ''}
                     `;
                 }
@@ -2767,7 +2799,10 @@
                                             <tr class="hover:bg-[#F8FBFF]">
                                                 <td class="py-2.5 px-3">
                                                     <div class="font-bold text-[#1E293B]">${A.esc(q.student.full_name)}</div>
-                                                    <div class="text-[10.5px] text-slate-400">${A.esc(q.student.class_name || '-')} • ${q.hasWa ? A.formatWhatsappDisplay(q.student.whatsapp_number) : 'WA belum diisi'}</div>
+                                                    <div class="text-[10.5px] text-slate-400">
+                                                        ${A.esc(q.student.class_name || '-')} • ${q.hasWa ? A.formatWhatsappDisplay(q.student.whatsapp_number) : 'WA belum diisi'}
+                                                        ${studentTgMap[q.student.id] ? ` • <span class="text-[#0369A1] font-bold">✈️ ${A.esc(studentTgMap[q.student.id].username ? '@' + studentTgMap[q.student.id].username : 'TG Aktif')}</span>` : ' • TG belum hubung'}
+                                                    </div>
                                                 </td>
                                                 <td class="py-2.5 px-3">${catBadge}</td>
                                                 <td class="py-2.5 px-3 text-slate-600 max-w-xs truncate" title="${A.esc(itemsText)}">${A.esc(itemsText)}</td>
@@ -2835,19 +2870,25 @@
                 const cfg = readWaConfigForm();
                 const btn = document.getElementById('saveWaConfigBtn');
                 const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
-                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgSendDm || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
                 if (cfg.enabled && !waReady && !tgReady) {
-                    setWaConfigFeedback('Pilih dan lengkapi minimal 1 kanal pengiriman (API Token WA atau Bot Token + Chat ID Telegram) sebelum mengaktifkan jadwal otomatis.', true);
+                    setWaConfigFeedback('Pilih dan lengkapi minimal 1 kanal pengiriman (API Token WA atau Bot Token Telegram) sebelum mengaktifkan jadwal otomatis.', true);
                     return;
                 }
 
                 btn.disabled = true;
                 btn.textContent = 'Menyimpan...';
 
-                // 1. Simpan ke app_settings Supabase
-                const { error: dbErr } = await supabase
-                    .from('app_settings')
-                    .upsert({ key: 'wa_gateway_config', value: JSON.stringify(cfg), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+                // 1. Simpan ke app_settings Supabase (+ metadata publik tg_public_bot tanpa token rahasia untuk portal siswa)
+                const nowIso = new Date().toISOString();
+                const [{ error: dbErr }] = await Promise.all([
+                    supabase.from('app_settings').upsert({ key: 'wa_gateway_config', value: JSON.stringify(cfg), updated_at: nowIso }, { onConflict: 'key' }),
+                    supabase.from('app_settings').upsert({
+                        key: 'tg_public_bot',
+                        value: JSON.stringify({ botUsername: cfg.tgBotUsername || '', enabled: Boolean(cfg.tgEnabled && cfg.tgSendDm && cfg.tgBotUsername) }),
+                        updated_at: nowIso
+                    }, { onConflict: 'key' })
+                ]);
 
                 if (dbErr) {
                     btn.disabled = false;
@@ -2957,6 +2998,26 @@
                 }
             };
 
+            window.syncTelegramStudentsNow = async function () {
+                if (!A.isAnyAdmin(A.getUser())) return;
+                const cfg = readWaConfigForm();
+                if (!A.getGasUrl()) { setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true); return; }
+                if (!cfg.tgBotToken) { setWaConfigFeedback('Masukkan Telegram Bot Token terlebih dahulu.', true); return; }
+                const btn = document.getElementById('syncTgStudentsBtn');
+                if (btn) { btn.disabled = true; btn.textContent = 'Menyinkronkan...'; }
+                try {
+                    const res = await A.postToGas({ action: 'sync_telegram_students', config: cfg });
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Sinkronkan Akun Telegram Siswa'; }
+                    if (!res?.ok) throw new Error(res?.error || 'Sinkronisasi gagal.');
+                    setWaConfigFeedback(`Sinkronisasi Telegram selesai: ${res.linkedCount || 0} akun siswa baru terhubung (dari ${res.checkedUpdates || 0} pesan /start).`);
+                    A.showToast(`${res.linkedCount || 0} akun Telegram siswa tersinkron ✓`);
+                    loadWaAutomationPanel();
+                } catch (err) {
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Sinkronkan Akun Telegram Siswa'; }
+                    setWaConfigFeedback(`Gagal sinkron Telegram: ${err.message}`, true);
+                }
+            };
+
             window.runWaReminderNow = async function () {
                 if (!A.isAnyAdmin(A.getUser())) {
                     setWaConfigFeedback('Hanya Admin / Superadmin yang dapat memicu pengiriman massal WA/Telegram.', true);
@@ -2968,7 +3029,7 @@
                     return;
                 }
                 const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
-                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgSendDm || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
                 if (!waReady && !tgReady) {
                     setWaConfigFeedback('Aktifkan dan lengkapi minimal 1 kanal (WhatsApp atau Telegram Bot) terlebih dahulu.', true);
                     return;
@@ -2986,7 +3047,8 @@
                     if (!res?.ok) throw new Error(res?.error || 'Gagal menjalankan pengingat.');
                     const parts = [];
                     if (waReady) parts.push(`WA: ${res.sentCount || 0} terkirim, ${res.failedCount || 0} gagal, ${res.skippedNoWa || 0} belum isi WA`);
-                    if (tgReady) parts.push(`Telegram: ${res.tgSentCount || 0} grup/chat terkirim, ${res.tgFailedCount || 0} gagal`);
+                    if (tgReady && cfg.tgSendDm) parts.push(`Telegram DM: ${res.tgDmSentCount || 0} terkirim, ${res.skippedNoTg || 0} belum hubung`);
+                    if (tgReady && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length)) parts.push(`Telegram Grup: ${res.tgSentCount || 0} terkirim`);
                     setWaConfigFeedback(`Selesai (${res.sentDate}) — ${parts.join(' | ')} (dari ${res.eligibleStudents} siswa memenuhi syarat).`);
                     A.showToast(`Notifikasi ${chLabel} berhasil dijalankan ✓`);
                     loadWaAutomationPanel();

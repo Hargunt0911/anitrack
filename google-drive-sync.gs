@@ -338,7 +338,9 @@ function doPost(e) {
         apiToken: String(payload.apiToken || '').trim(),
         customUrl: String(payload.customUrl || '').trim(),
         tgEnabled: Boolean(payload.tgEnabled),
+        tgBotUsername: String(payload.tgBotUsername || '').trim().replace(/^@+/, ''),
         tgBotToken: String(payload.tgBotToken || '').trim(),
+        tgSendDm: payload.tgSendDm !== undefined ? Boolean(payload.tgSendDm) : true,
         tgChatId: String(payload.tgChatId || '').trim(),
         tgClassChatMap: payload.tgClassChatMap && typeof payload.tgClassChatMap === 'object' ? payload.tgClassChatMap : {},
         appUrl: String(payload.appUrl || '').trim(),
@@ -450,6 +452,14 @@ function doPost(e) {
         detail: sendRes.detail,
         error: sendRes.ok ? null : sendRes.detail
       });
+    }
+
+    // 4c-3. Sinkronkan Akun Telegram Siswa dari perintah /start <studentId>
+    if (action === 'sync_telegram_students') {
+      const cfg = payload.config ? payload.config : getWaConfigFromProperties();
+      const targetStudentId = String(payload.targetStudentId || '').trim();
+      const syncRes = syncTelegramStudentsFromUpdates(cfg, targetStudentId);
+      return jsonResponse(syncRes);
     }
 
     // 4d. Jalankan Pengingat WA Deadline Sekarang (Manual Trigger dari Admin)
@@ -644,6 +654,113 @@ function sendWaMessageViaGateway(cfg, phone, message) {
   }
 }
 
+function upsertAppSettingSupabase(key, valueObj) {
+  const res = UrlFetchApp.fetch(`${SUPABASE_URL}/rest/v1/app_settings?on_conflict=key`, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Prefer: 'resolution=merge-duplicates,return=minimal'
+    },
+    payload: JSON.stringify({
+      key: key,
+      value: typeof valueObj === 'string' ? valueObj : JSON.stringify(valueObj),
+      updated_at: new Date().toISOString()
+    }),
+    muteHttpExceptions: true
+  });
+  return res.getResponseCode() >= 200 && res.getResponseCode() < 300;
+}
+
+function syncTelegramStudentsFromUpdates(cfg, targetStudentId) {
+  const token = String((cfg && cfg.tgBotToken) || '').trim();
+  if (!token) {
+    return { ok: false, error: 'Bot Token Telegram belum diatur oleh Admin.' };
+  }
+  const props = PropertiesService.getScriptProperties();
+  const lastOffset = Number(props.getProperty('ANITRACK_TG_LAST_UPDATE_ID') || 0);
+  const url = `https://api.telegram.org/bot${token}/getUpdates?limit=100${lastOffset > 0 ? `&offset=${lastOffset}` : ''}`;
+
+  try {
+    const res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+    const code = res.getResponseCode();
+    if (code >= 300) {
+      return { ok: false, error: `Telegram getUpdates gagal (HTTP ${code}): ${res.getContentText().slice(0, 200)}` };
+    }
+    const body = JSON.parse(res.getContentText() || '{}');
+    if (!body.ok) {
+      return { ok: false, error: body.description || 'Gagal membaca update dari Telegram Bot.' };
+    }
+
+    const updates = Array.isArray(body.result) ? body.result : [];
+    let maxUpdateId = lastOffset - 1;
+    const profiles = fetchSupabaseRest('profiles?select=id,full_name,username,class_name,role&role=eq.student');
+    const byId = {};
+    const byUsername = {};
+    profiles.forEach(function (p) {
+      byId[String(p.id)] = p;
+      if (p.username) byUsername[String(p.username).toLowerCase()] = p;
+    });
+
+    let linkedCount = 0;
+    let targetRecord = null;
+
+    updates.forEach(function (u) {
+      if (typeof u.update_id === 'number' && u.update_id > maxUpdateId) maxUpdateId = u.update_id;
+      const msg = u.message || u.edited_message;
+      if (!msg || !msg.text || !msg.chat) return;
+      const text = String(msg.text).trim();
+      const match = text.match(/^\/start(?:@\w+)?\s+([^\s]+)/i);
+      if (!match) return;
+      const param = String(match[1] || '').trim();
+      const student = byId[param] || byUsername[param.toLowerCase()];
+      if (!student) return;
+
+      const rec = {
+        student_id: student.id,
+        chat_id: String(msg.chat.id),
+        username: (msg.from && msg.from.username) ? String(msg.from.username) : '',
+        first_name: (msg.from && msg.from.first_name) ? String(msg.from.first_name) : (student.full_name || ''),
+        connected_at: new Date().toISOString()
+      };
+      const saved = upsertAppSettingSupabase(`student_telegram::${student.id}`, rec);
+      if (saved) {
+        linkedCount++;
+        if (targetStudentId && student.id === targetStudentId) targetRecord = rec;
+        sendTelegramMessageGas(
+          token,
+          rec.chat_id,
+          `✅ Halo ${student.full_name} (${student.class_name || 'Animasi'}),\n\nAkun Telegram kamu berhasil terhubung ke AniTrack SMKN 4 Malang! Mulai sekarang kamu akan otomatis menerima pengingat deadline Project Tracker setiap pagi pukul 07:00 WIB.`
+        );
+      }
+    });
+
+    if (maxUpdateId >= lastOffset && updates.length) {
+      props.setProperty('ANITRACK_TG_LAST_UPDATE_ID', String(maxUpdateId + 1));
+    }
+
+    if (targetStudentId && !targetRecord) {
+      try {
+        const existing = fetchSupabaseRest(`app_settings?select=value&key=eq.${encodeURIComponent(`student_telegram::${targetStudentId}`)}`);
+        if (existing && existing.length && existing[0].value) {
+          targetRecord = JSON.parse(existing[0].value);
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    return {
+      ok: true,
+      linkedCount: linkedCount,
+      checkedUpdates: updates.length,
+      connected: Boolean(targetRecord && targetRecord.chat_id),
+      telegram: targetRecord
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 function sendTelegramMessageGas(botToken, chatId, text) {
   const token = String(botToken || '').trim();
   const cid = String(chatId || '').trim();
@@ -716,11 +833,18 @@ function executeDailyWaDeadlineReminder(forceRun) {
 
   const useWa = (cfg.waEnabled !== false) && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
   const classChatMap = (cfg.tgClassChatMap && typeof cfg.tgClassChatMap === 'object') ? cfg.tgClassChatMap : {};
-  const hasAnyTgTarget = Boolean(String(cfg.tgChatId || '').trim()) || Object.keys(classChatMap).length > 0;
-  const useTg = Boolean(cfg.tgEnabled && String(cfg.tgBotToken || '').trim() && hasAnyTgTarget);
+  const hasAnyTgGroup = Boolean(String(cfg.tgChatId || '').trim()) || Object.keys(classChatMap).length > 0;
+  const useTgDm = Boolean(cfg.tgEnabled && String(cfg.tgBotToken || '').trim() && cfg.tgSendDm !== false);
+  const useTgGroup = Boolean(cfg.tgEnabled && String(cfg.tgBotToken || '').trim() && hasAnyTgGroup);
+  const useTg = useTgDm || useTgGroup;
 
   if (!useWa && !useTg) {
     return { ok: false, error: 'Aktifkan dan lengkapi minimal 1 kanal pengiriman (WhatsApp atau Telegram Bot) di Portal Admin.' };
+  }
+
+  // Otomatis sinkronkan siswa yang baru menekan /start di Bot Telegram sebelum mengirim
+  if (useTgDm) {
+    try { syncTelegramStudentsFromUpdates(cfg, ''); } catch (e) { /* ignore */ }
   }
 
   const todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
@@ -729,6 +853,18 @@ function executeDailyWaDeadlineReminder(forceRun) {
   const profiles = fetchSupabaseRest('profiles?select=id,full_name,username,class_name,sub_concentration,role,mentor_id,whatsapp_number');
   const tasks = fetchSupabaseRest('project_tasks?select=id,title,pipeline_stage,sub_concentration,due_date');
   const subs = fetchSupabaseRest('project_submissions?select=project_task_id,student_id,status');
+  const studentTgMap = {};
+  if (useTgDm) {
+    try {
+      const tgRows = fetchSupabaseRest('app_settings?select=key,value&key=like.student_telegram::*');
+      tgRows.forEach(function (r) {
+        try {
+          const parsed = JSON.parse(r.value || '{}');
+          if (parsed && parsed.student_id && parsed.chat_id) studentTgMap[parsed.student_id] = parsed;
+        } catch (e) { /* ignore */ }
+      });
+    } catch (e) { /* ignore */ }
+  }
 
   const mentorMap = {};
   const students = [];
@@ -746,6 +882,9 @@ function executeDailyWaDeadlineReminder(forceRun) {
   let sentCount = 0;
   let failedCount = 0;
   let skippedNoWa = 0;
+  let tgDmSentCount = 0;
+  let tgDmFailedCount = 0;
+  let skippedNoTg = 0;
   let tgSentCount = 0;
   let tgFailedCount = 0;
   const tgBuckets = {}; // chatId -> array of student digest lines
@@ -793,8 +932,51 @@ function executeDailyWaDeadlineReminder(forceRun) {
       .concat(upcomingList.map(function (x) { return `[${x.diffDays === 0 ? 'Hari Ini' : `H-${x.diffDays}`}] ${x.title}`; }))
       .join('; ');
 
-    // Kumpulkan untuk rekap Telegram (Grup Kelas / Grup Utama)
-    if (useTg) {
+    const overdueLines = [];
+    if (overdueList.length) {
+      overdueLines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
+      overdueList.forEach(function (item, idx) {
+        const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
+        overdueLines.push(`${idx + 1}. *${item.title}*${revTag} — Terlambat *${item.lateDays} hari* (Deadline: ${item.dueDate})`);
+      });
+      overdueLines.push('_Notifikasi ini akan dikirim setiap hari pukul 07:00 WIB sampai kamu melapor selesai di AniTrack._');
+    }
+
+    const upcomingLines = [];
+    if (upcomingList.length) {
+      upcomingLines.push('🟡 *MENDEKATI DEADLINE:*');
+      upcomingList.forEach(function (item, idx) {
+        const whenLabel = item.diffDays === 0 ? 'HARI INI' : (item.diffDays === 1 ? 'Besok (H-1)' : '2 Hari Lagi (H-2)');
+        const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
+        upcomingLines.push(`${idx + 1}. *${item.title}*${revTag} — *${whenLabel}* (${item.dueDate})`);
+      });
+    }
+
+    const overdueBlock = overdueLines.join('\n');
+    const upcomingBlock = upcomingLines.join('\n');
+    const combinedTasks = [overdueBlock, upcomingBlock].filter(Boolean).join('\n\n');
+    const mentorLine = mentor
+      ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWaLocalGas(mentor.whatsapp_number) !== '-' ? ` (WA: ${formatWaLocalGas(mentor.whatsapp_number)})` : ''}`
+      : '';
+    const appUrlLine = cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : '';
+
+    const messageText = renderWaTemplateGas(cfg.messageTemplate || '', {
+      nama: s.full_name || 'Siswa',
+      kelas: s.class_name || 'Siswa Animasi',
+      subkonsentrasi: s.sub_concentration || 'Animasi',
+      daftar_tugas: combinedTasks,
+      tugas_terlambat: overdueBlock,
+      tugas_mendekati: upcomingBlock,
+      pembimbing: mentorLine,
+      link_anitrack: appUrlLine
+    });
+
+    const reminderType = (overdueList.length && upcomingList.length)
+      ? 'mixed'
+      : (overdueList.length ? 'overdue' : 'h_minus_2');
+
+    // 1. Kumpulkan untuk rekap Grup Telegram (opsional)
+    if (useTgGroup) {
       const clsKey = String(s.class_name || '').trim();
       const targetChat = String(classChatMap[clsKey] || cfg.tgChatId || '').trim();
       if (targetChat) {
@@ -806,79 +988,59 @@ function executeDailyWaDeadlineReminder(forceRun) {
       }
     }
 
-    // Kirim WA personal jika kanal WA aktif
+    // 2. Kirim DM Pribadi ke Akun Telegram Siswa (mirip WA)
+    if (useTgDm) {
+      const tgRec = studentTgMap[s.id];
+      if (!tgRec || !tgRec.chat_id) {
+        skippedNoTg++;
+      } else {
+        const cleanTgMsg = messageText.replace(/\*([^*\n]+)\*/g, '$1').replace(/_([^_\n]+)_/g, '$1');
+        const dmRes = sendTelegramMessageGas(cfg.tgBotToken, tgRec.chat_id, cleanTgMsg);
+        if (dmRes.ok) tgDmSentCount++;
+        else tgDmFailedCount++;
+        insertWaLogToSupabase({
+          sent_date: todayStr,
+          student_id: s.id,
+          student_name: s.full_name,
+          whatsapp_number: tgRec.username ? `@${tgRec.username}` : `TG:${tgRec.chat_id}`,
+          reminder_type: `${reminderType}_tg`,
+          task_summary: summaryTitles.slice(0, 400),
+          provider: 'telegram_dm',
+          status: dmRes.ok ? 'sent' : 'failed',
+          response_detail: dmRes.detail
+        });
+        Utilities.sleep(350);
+      }
+    }
+
+    // 3. Kirim WA personal jika kanal WA aktif
     if (useWa) {
       const phone = normalizeWaPhoneGas(s.whatsapp_number);
       if (!phone) {
         skippedNoWa++;
-        return;
-      }
+      } else {
+        const sendRes = sendWaMessageViaGateway(cfg, phone, messageText);
+        if (sendRes.ok) sentCount++;
+        else failedCount++;
 
-      const overdueLines = [];
-      if (overdueList.length) {
-        overdueLines.push('🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*');
-        overdueList.forEach(function (item, idx) {
-          const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
-          overdueLines.push(`${idx + 1}. *${item.title}*${revTag} — Terlambat *${item.lateDays} hari* (Deadline: ${item.dueDate})`);
+        insertWaLogToSupabase({
+          sent_date: todayStr,
+          student_id: s.id,
+          student_name: s.full_name,
+          whatsapp_number: phone,
+          reminder_type: reminderType,
+          task_summary: summaryTitles.slice(0, 400),
+          provider: cfg.provider || 'fonnte',
+          status: sendRes.ok ? 'sent' : 'failed',
+          response_detail: sendRes.detail
         });
-        overdueLines.push('_Notifikasi ini akan dikirim setiap hari pukul 07:00 WIB sampai kamu melapor selesai di AniTrack._');
+        Utilities.sleep(1200);
       }
-
-      const upcomingLines = [];
-      if (upcomingList.length) {
-        upcomingLines.push('🟡 *MENDEKATI DEADLINE:*');
-        upcomingList.forEach(function (item, idx) {
-          const whenLabel = item.diffDays === 0 ? 'HARI INI' : (item.diffDays === 1 ? 'Besok (H-1)' : '2 Hari Lagi (H-2)');
-          const revTag = item.status === 'revisi' ? ' [Revisi]' : '';
-          upcomingLines.push(`${idx + 1}. *${item.title}*${revTag} — *${whenLabel}* (${item.dueDate})`);
-        });
-      }
-
-      const overdueBlock = overdueLines.join('\n');
-      const upcomingBlock = upcomingLines.join('\n');
-      const combinedTasks = [overdueBlock, upcomingBlock].filter(Boolean).join('\n\n');
-      const mentorLine = mentor
-        ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWaLocalGas(mentor.whatsapp_number) !== '-' ? ` (WA: ${formatWaLocalGas(mentor.whatsapp_number)})` : ''}`
-        : '';
-      const appUrlLine = cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : '';
-
-      const messageText = renderWaTemplateGas(cfg.messageTemplate || '', {
-        nama: s.full_name || 'Siswa',
-        kelas: s.class_name || 'Siswa Animasi',
-        subkonsentrasi: s.sub_concentration || 'Animasi',
-        daftar_tugas: combinedTasks,
-        tugas_terlambat: overdueBlock,
-        tugas_mendekati: upcomingBlock,
-        pembimbing: mentorLine,
-        link_anitrack: appUrlLine
-      });
-
-      const reminderType = (overdueList.length && upcomingList.length)
-        ? 'mixed'
-        : (overdueList.length ? 'overdue' : 'h_minus_2');
-
-      const sendRes = sendWaMessageViaGateway(cfg, phone, messageText);
-      if (sendRes.ok) sentCount++;
-      else failedCount++;
-
-      insertWaLogToSupabase({
-        sent_date: todayStr,
-        student_id: s.id,
-        student_name: s.full_name,
-        whatsapp_number: phone,
-        reminder_type: reminderType,
-        task_summary: summaryTitles.slice(0, 400),
-        provider: cfg.provider || 'fonnte',
-        status: sendRes.ok ? 'sent' : 'failed',
-        response_detail: sendRes.detail
-      });
-
-      Utilities.sleep(1200);
     }
   });
 
-  // Kirim Rekap Harian Telegram per Chat ID tujuan
-  if (useTg) {
+  // Kirim Rekap Harian Grup Telegram (opsional jika Chat ID Grup diisi)
+  if (useTgGroup) {
     Object.keys(tgBuckets).forEach(function (chatId) {
       const bucket = tgBuckets[chatId];
       if (!bucket.entries.length) return;
@@ -892,10 +1054,10 @@ function executeDailyWaDeadlineReminder(forceRun) {
       insertWaLogToSupabase({
         sent_date: todayStr,
         student_id: null,
-        student_name: `TELEGRAM (${bucket.label})`,
+        student_name: `TELEGRAM GRUP (${bucket.label})`,
         whatsapp_number: `TG:${chatId}`,
         reminder_type: 'telegram_digest',
-        task_summary: `${bucket.entries.length} siswa diingatkan via Telegram`,
+        task_summary: `${bucket.entries.length} siswa diingatkan via Grup Telegram`,
         provider: 'telegram',
         status: tgRes.ok ? 'sent' : 'failed',
         response_detail: tgRes.detail
@@ -911,6 +1073,9 @@ function executeDailyWaDeadlineReminder(forceRun) {
     sentCount: sentCount,
     failedCount: failedCount,
     skippedNoWa: skippedNoWa,
+    tgDmSentCount: tgDmSentCount,
+    tgDmFailedCount: tgDmFailedCount,
+    skippedNoTg: skippedNoTg,
     tgSentCount: tgSentCount,
     tgFailedCount: tgFailedCount
   };
