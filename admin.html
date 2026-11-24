@@ -1306,17 +1306,22 @@
                                     <span class="text-xs font-extrabold text-[#0369A1]">✈️ Konfigurasi Telegram Bot API (DM Pribadi Siswa + Opsional Grup)</span>
                                     <span class="text-[11px] text-slate-500">Buat bot di <code>@BotFather</code> → isi Username &amp; Token → siswa tinggal 1-klik <strong>Hubungkan Telegram</strong> di portalnya!</span>
                                 </div>
-                                <div class="md:col-span-4">
+                                <div class="md:col-span-3">
                                     <label for="tgBotUsernameInput" class="block text-xs font-semibold text-slate-600 mb-1">Username Bot Telegram (tanpa @)</label>
                                     <input id="tgBotUsernameInput" type="text" placeholder="Contoh: AniTrackSMKN4Bot"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div class="md:col-span-4">
+                                <div class="md:col-span-3">
                                     <label for="tgBotTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">Telegram Bot Token (dari @BotFather)</label>
                                     <input id="tgBotTokenInput" type="password" placeholder="Contoh: 7123456789:AAHxxx..."
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div class="md:col-span-4">
+                                <div class="md:col-span-3">
+                                    <label for="tgAdminChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Pribadi Saya (untuk Tes)</label>
+                                    <input id="tgAdminChatIdInput" type="text" placeholder="Angka dari @userinfobot"
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="md:col-span-3">
                                     <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup Utama (Opsional)</label>
                                     <input id="tgChatIdInput" type="text" placeholder="Kosongkan jika DM pribadi saja"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
@@ -2662,6 +2667,7 @@
                     tgEnabled: Boolean(document.getElementById('tgChannelEnabled')?.checked),
                     tgBotUsername: (document.getElementById('tgBotUsernameInput')?.value || '').trim().replace(/^@+/, ''),
                     tgBotToken: (document.getElementById('tgBotTokenInput')?.value || '').trim(),
+                    tgAdminChatId: (document.getElementById('tgAdminChatIdInput')?.value || '').trim(),
                     tgSendDm: Boolean(document.getElementById('tgSendDmEnabled')?.checked),
                     tgChatId: (document.getElementById('tgChatIdInput')?.value || '').trim(),
                     tgClassChatMap: parseTgClassMapText(document.getElementById('tgClassChatMapInput')?.value || ''),
@@ -2722,6 +2728,8 @@
                             if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
                             if (cfg.tgBotUsername) document.getElementById('tgBotUsernameInput').value = cfg.tgBotUsername;
                             if (cfg.tgBotToken) document.getElementById('tgBotTokenInput').value = cfg.tgBotToken;
+                            const myTgInp = document.getElementById('tgAdminChatIdInput');
+                            if (myTgInp) myTgInp.value = cfg.tgAdminChatId || localStorage.getItem('anitrack_my_tg_chat_id') || '';
                             const tgDmChk = document.getElementById('tgSendDmEnabled');
                             if (tgDmChk) tgDmChk.checked = cfg.tgSendDm !== undefined ? Boolean(cfg.tgSendDm) : true;
                             if (cfg.tgChatId) document.getElementById('tgChatIdInput').value = cfg.tgChatId;
@@ -2977,18 +2985,25 @@
                     document.getElementById('tgBotTokenInput')?.focus();
                     return;
                 }
-                const targetChat = prompt('Masukkan Chat ID Grup / Pribadi Telegram untuk tes kirim:', cfg.tgChatId || '-100');
-                if (!targetChat || !targetChat.trim()) return;
+                let targetChat = (cfg.tgAdminChatId || localStorage.getItem('anitrack_my_tg_chat_id') || '').trim();
+                if (!targetChat) {
+                    const entered = prompt('Masukkan Telegram Chat ID pribadi Anda (angka dari @userinfobot, tanpa -100):', '');
+                    if (!entered || !entered.trim()) return;
+                    targetChat = entered.trim();
+                    const myTgInp = document.getElementById('tgAdminChatIdInput');
+                    if (myTgInp) myTgInp.value = targetChat;
+                }
+                try { localStorage.setItem('anitrack_my_tg_chat_id', targetChat); } catch { /* ignore */ }
 
                 const btn = document.getElementById('testTgBtn');
                 btn.disabled = true;
                 btn.textContent = 'Mengirim...';
                 try {
-                    const res = await A.postToGas({ action: 'test_send_telegram', tgBotToken: cfg.tgBotToken, chatId: targetChat.trim(), config: cfg });
+                    const res = await A.postToGas({ action: 'test_send_telegram', tgBotToken: cfg.tgBotToken, chatId: targetChat, config: cfg });
                     btn.disabled = false;
                     btn.textContent = '✈️ Tes Telegram';
                     if (!res?.ok) throw new Error(res?.error || res?.detail || 'Pengiriman Telegram gagal.');
-                    setWaConfigFeedback(`Pesan tes Telegram berhasil dikirim ke Chat ID ${targetChat.trim()} ✓`);
+                    setWaConfigFeedback(`Pesan tes Telegram berhasil dikirim ke Chat ID pribadi Anda (${targetChat}) ✓`);
                     A.showToast('Pesan Telegram tes terkirim ✓');
                     loadWaAutomationPanel();
                 } catch (err) {

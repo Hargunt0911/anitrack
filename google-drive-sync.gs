@@ -695,7 +695,7 @@ function syncTelegramStudentsFromUpdates(cfg, targetStudentId) {
 
     const updates = Array.isArray(body.result) ? body.result : [];
     let maxUpdateId = lastOffset - 1;
-    const profiles = fetchSupabaseRest('profiles?select=id,full_name,username,class_name,role&role=eq.student');
+    const profiles = fetchSupabaseRest('profiles?select=id,full_name,username,class_name,role');
     const byId = {};
     const byUsername = {};
     profiles.forEach(function (p) {
