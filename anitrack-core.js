@@ -2752,11 +2752,9 @@
             let normalizedWa = undefined;
             if (waEl) {
                 const rawWa = waEl.value.trim();
-                if ((user.role === 'student' || user.role === 'mentor') && !rawWa) {
+                if (user.role === 'student' && !rawWa) {
                     fb.className = 'text-xs font-semibold text-[#E11D48]';
-                    fb.textContent = user.role === 'mentor'
-                        ? 'Nomor WhatsApp aktif wajib diisi oleh setiap guru pembimbing.'
-                        : 'Nomor WhatsApp aktif wajib diisi oleh setiap siswa.';
+                    fb.textContent = 'Nomor WhatsApp aktif wajib diisi oleh setiap siswa.';
                     waEl.focus();
                     return;
                 }
@@ -3278,8 +3276,7 @@
         function updateMentorWaBanner() {
             const banner = document.getElementById('mentorWaRequiredBanner');
             if (!banner) return;
-            const hasWa = Boolean(normalizeWhatsapp(currentUser?.whatsapp_number));
-            banner.classList.toggle('hidden', expectedRole !== 'mentor' || hasWa);
+            banner.classList.add('hidden');
         }
 
         global.saveQuickMentorWhatsapp = async function () {

@@ -1039,7 +1039,7 @@
                             </div>
 
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
-                                <span id="newAccRoleHint" class="text-[11px] text-slate-500">Akun Guru Pembimbing wajib mencantumkan Nomor WA aktif.</span>
+                                <span id="newAccRoleHint" class="text-[11px] text-slate-500">Nomor WA opsional untuk Guru Pembimbing (bisa diisi belakangan di Akun Saya).</span>
                                 <button id="addAccountBtn" type="submit"
                                     class="px-5 py-2.5 bg-[#4CB6A7] hover:bg-[#3FA496] text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer shrink-0">
                                     + Tambah Akun
@@ -1523,7 +1523,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261123c"></script>
+    <script src="./anitrack-core.js?v=20261124d"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -1577,14 +1577,14 @@
                 const btn = document.getElementById('addAccountBtn');
                 studentBox?.classList.toggle('hidden', role !== 'student');
                 mentorBox?.classList.toggle('hidden', !isStaffRole(role));
-                waStar?.classList.toggle('hidden', role !== 'mentor');
+                waStar?.classList.add('hidden');
                 if (hint) {
                     hint.textContent = role === 'superadmin'
                         ? 'Superadmin punya akses penuh seluruh sistem (kelola akun, role, Apps Script, WA Gateway/Fonnte, reset data, & merangkap pembimbing).'
                         : role === 'admin'
                             ? 'Admin (Operasional) dapat mengakses seluruh fitur dashboard admin (monitoring, plotting, project, checklist, WA Gateway, reset/hapus data, & export .xlsx) — KECUALI Kelola Akun/Role & Setting URL Google Apps Script (khusus Superadmin).'
                             : role === 'mentor'
-                                ? 'Akun Guru Pembimbing wajib mencantumkan Nomor WA aktif (bisa sekaligus ditugaskan sebagai Wali Kelas / PJ Sub-Konsentrasi).'
+                                ? 'Akun Guru Pembimbing (Nomor WA opsional — bisa sekaligus ditugaskan sebagai Wali Kelas / PJ Sub-Konsentrasi).'
                                 : 'Akun Siswa dapat langsung login; lengkapi Kelas (wajib), Sub-Konsentrasi & Pembimbing (opsional).';
                 }
                 if (btn) {
@@ -1772,9 +1772,7 @@
                             <div class="flex flex-wrap items-center gap-1.5">
                                 ${hasWa
                                     ? A.renderWhatsappLink(u.whatsapp_number, false)
-                                    : (effRole === 'mentor'
-                                        ? `<span class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ Belum ada Nomor WA (Wajib)</span>`
-                                        : `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400">WA belum diisi</span>`)}
+                                    : `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-400">WA belum diisi</span>`}
                                 ${isStaffRole(effRole) && homeroomMap[u.id] ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${A.esc(homeroomMap[u.id])}</span>` : ''}
                                 ${isStaffRole(effRole) && Array.isArray(subconcPjMap[u.id]) && subconcPjMap[u.id].length ? `<span class="text-[10.5px] font-extrabold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">🎨 PJ: ${A.esc(subconcPjMap[u.id].join(', '))}</span>` : ''}
                                 ${effRole === 'superadmin' ? `<span class="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#2F8F81]">Merangkap Pembimbing</span>` : ''}
@@ -1886,10 +1884,6 @@
                         document.getElementById('newAccWhatsapp')?.focus();
                         return;
                     }
-                } else if (role === 'mentor') {
-                    setAccountManageFeedback('Nomor WhatsApp aktif wajib diisi untuk akun Guru Pembimbing.', true);
-                    document.getElementById('newAccWhatsapp')?.focus();
-                    return;
                 }
 
                 if (role === 'student' && !className) {
