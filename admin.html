@@ -1657,9 +1657,11 @@
 
             function setAccountManageFeedback(msg, isError = false) {
                 const el = document.getElementById('accountManageFeedback');
-                if (!el) return;
-                el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#3FA496]'}`;
-                el.textContent = msg;
+                if (el) {
+                    el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#3FA496]'}`;
+                    el.textContent = msg;
+                }
+                if (isError && msg) A.showToast(msg);
             }
 
             window.setAccountRoleFilter = function (filterVal) {
@@ -1988,9 +1990,6 @@
                         setAccountManageFeedback('Format Nomor WA tidak valid (awalan 08 atau 628).', true);
                         return;
                     }
-                } else if (role === 'mentor') {
-                    setAccountManageFeedback('Guru Pembimbing wajib memiliki Nomor WA aktif.', true);
-                    return;
                 }
 
                 if (role === 'student' && !className) {
@@ -2038,9 +2037,10 @@
 
                 editingAccountId = null;
                 setAccountManageFeedback(`Akun "${name}" (${A.roleLabel(role)}) berhasil diperbarui ✓`);
-                A.showToast('Perubahan akun tersimpan ✓');
+                A.showToast('Perubahan akun & PJ Sub-Konsentrasi tersimpan ✓');
                 await loadPlottingStudents();
                 portal.refreshMetrics();
+                portal.loadProjectTracker();
             };
 
             window.deleteUserAccount = async function (accountId, fullName, role) {
