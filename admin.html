@@ -1300,6 +1300,17 @@
                                     <input id="waCustomUrlInput" type="url" placeholder="https://pati.wablas.com/api/send-message"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
+                                <div class="md:col-span-4">
+                                    <label for="waTestPhoneInput" class="block text-xs font-semibold text-slate-600 mb-1">Nomor WA Tes / Dummy</label>
+                                    <input id="waTestPhoneInput" type="tel" value="081259699623" placeholder="081259699623"
+                                        class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+                                <div class="md:col-span-8 flex items-end">
+                                    <label class="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-[#FFFDF5] border border-[#FDE68A] cursor-pointer select-none">
+                                        <input id="waDummyModeEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#D97706] shrink-0" />
+                                        <span class="text-[11.5px] font-bold text-[#92400E]">🧪 Mode Percobaan Dummy (Kirim WA hanya ke nomor tes di samping, TIDAK kirim ke 103 siswa asli)</span>
+                                    </label>
+                                </div>
                             </div>
 
                             <!-- Konfigurasi Telegram Bot API -->
@@ -2666,6 +2677,8 @@
                     provider: document.getElementById('waProviderSelect')?.value || 'fonnte',
                     apiToken: (document.getElementById('waApiTokenInput')?.value || '').trim(),
                     customUrl: (document.getElementById('waCustomUrlInput')?.value || '').trim(),
+                    waTestPhone: (document.getElementById('waTestPhoneInput')?.value || '081259699623').trim(),
+                    waDummyMode: Boolean(document.getElementById('waDummyModeEnabled')?.checked),
                     tgEnabled: Boolean(document.getElementById('tgChannelEnabled')?.checked),
                     tgBotUsername: (document.getElementById('tgBotUsernameInput')?.value || '').trim().replace(/^@+/, ''),
                     tgBotToken: (document.getElementById('tgBotTokenInput')?.value || '').trim(),
@@ -2728,6 +2741,10 @@
                             if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
                             if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
                             if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
+                            const waTestInp = document.getElementById('waTestPhoneInput');
+                            if (waTestInp) waTestInp.value = cfg.waTestPhone || '081259699623';
+                            const waDummyChk = document.getElementById('waDummyModeEnabled');
+                            if (waDummyChk) waDummyChk.checked = cfg.waDummyMode !== undefined ? Boolean(cfg.waDummyMode) : true;
                             if (cfg.tgBotUsername) document.getElementById('tgBotUsernameInput').value = cfg.tgBotUsername;
                             if (cfg.tgBotToken) document.getElementById('tgBotTokenInput').value = cfg.tgBotToken;
                             const myTgInp = document.getElementById('tgAdminChatIdInput');
@@ -2945,12 +2962,11 @@
                     setWaConfigFeedback('Masukkan API Token WA Gateway terlebih dahulu.', true);
                     return;
                 }
-                const defaultWa = A.formatWhatsappDisplay(A.getUser()?.whatsapp_number || '').replaceAll('-', '');
-                const target = prompt('Masukkan Nomor WhatsApp tujuan untuk tes kirim pesan:', defaultWa || '08');
-                if (!target) return;
-                const cleanWa = A.normalizeWhatsapp(target);
+                const rawTarget = (cfg.waTestPhone || document.getElementById('waTestPhoneInput')?.value || '081259699623').trim();
+                const cleanWa = A.normalizeWhatsapp(rawTarget);
                 if (!cleanWa) {
                     setWaConfigFeedback('Nomor WA tes tidak valid (gunakan awalan 08 atau 628).', true);
+                    document.getElementById('waTestPhoneInput')?.focus();
                     return;
                 }
 
@@ -2960,14 +2976,14 @@
                 try {
                     const res = await A.postToGas({ action: 'test_send_wa', phone: cleanWa, config: cfg });
                     btn.disabled = false;
-                    btn.textContent = '🧪 Tes Kirim WA';
+                    btn.textContent = '🧪 Tes WA';
                     if (!res?.ok) throw new Error(res?.error || res?.detail || 'Pengiriman WA gagal.');
                     setWaConfigFeedback(`Pesan tes berhasil dikirim ke ${A.formatWhatsappDisplay(cleanWa)} ✓`);
-                    A.showToast('Pesan WA tes terkirim ✓');
+                    A.showToast(`Pesan WA tes terkirim ke ${A.formatWhatsappDisplay(cleanWa)} ✓`);
                     loadWaAutomationPanel();
                 } catch (err) {
                     btn.disabled = false;
-                    btn.textContent = '🧪 Tes Kirim WA';
+                    btn.textContent = '🧪 Tes WA';
                     setWaConfigFeedback(`Tes WA gagal: ${err.message}`, true);
                 }
             };

@@ -337,6 +337,8 @@ function doPost(e) {
         provider: String(payload.provider || 'fonnte'),
         apiToken: String(payload.apiToken || '').trim(),
         customUrl: String(payload.customUrl || '').trim(),
+        waTestPhone: String(payload.waTestPhone || '081259699623').trim(),
+        waDummyMode: Boolean(payload.waDummyMode),
         tgEnabled: Boolean(payload.tgEnabled),
         tgBotUsername: String(payload.tgBotUsername || '').trim().replace(/^@+/, ''),
         tgBotToken: String(payload.tgBotToken || '').trim(),
@@ -898,6 +900,9 @@ function executeDailyWaDeadlineReminder(forceRun) {
   let skippedNoTg = 0;
   let tgSentCount = 0;
   let tgFailedCount = 0;
+  let dummyWaSentAlready = false;
+  const isDummyWa = Boolean(cfg.waDummyMode);
+  const dummyWaTarget = normalizeWaPhoneGas(cfg.waTestPhone || '081259699623');
   const tgBuckets = {}; // chatId -> array of student digest lines
 
   students.forEach(function (s) {
@@ -1024,28 +1029,49 @@ function executeDailyWaDeadlineReminder(forceRun) {
       }
     }
 
-    // 3. Kirim WA personal jika kanal WA aktif
+    // 3. Kirim WA personal jika kanal WA aktif (jika Mode Dummy aktif, hanya kirim 1 sampel ke nomor tes agar tidak spam siswa asli)
     if (useWa) {
-      const phone = normalizeWaPhoneGas(s.whatsapp_number);
-      if (!phone) {
-        skippedNoWa++;
+      if (isDummyWa) {
+        if (!dummyWaSentAlready && dummyWaTarget) {
+          dummyWaSentAlready = true;
+          const dummyMsg = `🧪 *[MODE PERCOBAAN DUMMY WA]*\n_(Dialihkan ke nomor tes — tidak dikirim ke siswa asli)_\n\n${messageText}`;
+          const sendRes = sendWaMessageViaGateway(cfg, dummyWaTarget, dummyMsg);
+          if (sendRes.ok) sentCount++;
+          else failedCount++;
+          insertWaLogToSupabase({
+            sent_date: todayStr,
+            student_id: s.id,
+            student_name: `[DUMMY] ${s.full_name}`,
+            whatsapp_number: dummyWaTarget,
+            reminder_type: `${reminderType}_dummy`,
+            task_summary: summaryTitles.slice(0, 400),
+            provider: cfg.provider || 'fonnte',
+            status: sendRes.ok ? 'sent' : 'failed',
+            response_detail: sendRes.detail
+          });
+        }
       } else {
-        const sendRes = sendWaMessageViaGateway(cfg, phone, messageText);
-        if (sendRes.ok) sentCount++;
-        else failedCount++;
+        const phone = normalizeWaPhoneGas(s.whatsapp_number);
+        if (!phone) {
+          skippedNoWa++;
+        } else {
+          const sendRes = sendWaMessageViaGateway(cfg, phone, messageText);
+          if (sendRes.ok) sentCount++;
+          else failedCount++;
 
-        insertWaLogToSupabase({
-          sent_date: todayStr,
-          student_id: s.id,
-          student_name: s.full_name,
-          whatsapp_number: phone,
-          reminder_type: reminderType,
-          task_summary: summaryTitles.slice(0, 400),
-          provider: cfg.provider || 'fonnte',
-          status: sendRes.ok ? 'sent' : 'failed',
-          response_detail: sendRes.detail
-        });
-        Utilities.sleep(1200);
+          insertWaLogToSupabase({
+            sent_date: todayStr,
+            student_id: s.id,
+            student_name: s.full_name,
+            whatsapp_number: phone,
+            reminder_type: reminderType,
+            task_summary: summaryTitles.slice(0, 400),
+            provider: cfg.provider || 'fonnte',
+            status: sendRes.ok ? 'sent' : 'failed',
+            response_detail: sendRes.detail
+          });
+          Utilities.sleep(1200);
+        }
       }
     }
   });
