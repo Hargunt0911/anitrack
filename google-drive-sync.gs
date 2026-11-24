@@ -421,19 +421,30 @@ function doPost(e) {
       });
     }
 
-    // 4c-2. Tes Kirim 1 Pesan Telegram Bot
+    // 4c-2. Tes Kirim 1 Pesan Telegram Bot (mengirimkan contoh pesan penuh sesuai template)
     if (action === 'test_send_telegram') {
       const cfg = payload.config ? payload.config : getWaConfigFromProperties();
       const botToken = String(payload.tgBotToken || cfg.tgBotToken || '').trim();
       const chatId = String(payload.chatId || cfg.tgChatId || '').trim();
       if (!botToken) return jsonResponse({ ok: false, error: 'Bot Token Telegram belum diisi.' });
       if (!chatId) return jsonResponse({ ok: false, error: 'Chat ID Telegram tujuan belum diisi.' });
-      const appLink = cfg.appUrl ? `\n🔗 Portal: ${cfg.appUrl}` : '';
+      const sampleLate = '🔴 MELEBIHI DEADLINE (Belum Lapor Selesai):\n1. Storyline, Treatment & Storyboard — Terlambat 2 hari (Contoh Tes)';
+      const sampleSoon = '🟡 MENDEKATI DEADLINE:\n1. Character Turnaround & Model Sheet — Besok (H-1) (Contoh Tes)';
+      const renderedSample = renderWaTemplateGas(cfg.messageTemplate || '', {
+        nama: payload.sampleName || 'Zahira Aulia Putri (Contoh)',
+        kelas: 'X ANI A',
+        subkonsentrasi: '3D Modeller',
+        daftar_tugas: `${sampleLate}\n\n${sampleSoon}`,
+        tugas_terlambat: sampleLate,
+        tugas_mendekati: sampleSoon,
+        pembimbing: '👨‍🏫 Pembimbing: Guru Pembimbing (WA: 0812-3456-7890)',
+        link_anitrack: cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : '🔗 Buka AniTrack: https://anitrack.republikanimasi.my.id'
+      }).replace(/\*([^*\n]+)\*/g, '$1').replace(/_([^_\n]+)_/g, '$1');
       const msg = payload.message || (
-        '🔔 [TES BOT TELEGRAM ANITRACK — SMKN 4 MALANG]\n\n' +
-        '✅ Koneksi Bot Telegram berhasil!\n' +
-        'Sistem siap mengirim pengingat otomatis deadline Project Tracker setiap hari pukul 07:00 WIB.' +
-        appLink
+        '✅ [TES BOT TELEGRAM ANITRACK — BERHASIL]\n' +
+        'Berikut contoh pesan pengingat yang akan diterima siswa setiap jam 07:00 WIB:\n' +
+        '────────────────────────\n\n' +
+        renderedSample
       );
       const sendRes = sendTelegramMessageGas(botToken, chatId, msg);
       insertWaLogToSupabase({
