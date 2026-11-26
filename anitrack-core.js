@@ -348,6 +348,7 @@
         'Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:',
         '',
         '{daftar_tugas}',
+        '{project_update}',
         '📌 Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
         '{pembimbing}',
         '{link_anitrack}'
@@ -362,18 +363,21 @@
             daftar_tugas: vars.daftar_tugas || '-',
             tugas_terlambat: vars.tugas_terlambat || '',
             tugas_mendekati: vars.tugas_mendekati || '',
+            project_update: vars.project_update || '',
             pembimbing: vars.pembimbing || '',
             link_anitrack: vars.link_anitrack || ''
         };
         const hasTaskToken = /\{(daftar_tugas|tugas_terlambat|tugas_mendekati)\}/i.test(raw);
+        const hasProjectUpdateToken = /\{project_update\}/i.test(raw);
         const hasMentorToken = /\{pembimbing\}/i.test(raw);
         const hasLinkToken = /\{link_anitrack\}/i.test(raw);
-        let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|pembimbing|link_anitrack)\}/gi, (_, k) => {
+        let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|project_update|pembimbing|link_anitrack)\}/gi, (_, k) => {
             return map[String(k).toLowerCase()] ?? '';
         });
-        // Jika admin hanya menulis kalimat pembuka/salam tanpa placeholder tugas, sistem otomatis melampirkan rinciannya
+        // Jika admin hanya menulis kalimat pembuka/salam tanpa placeholder tugas/project_update, sistem otomatis melampirkan rinciannya
         const autoExtra = [];
         if (!hasTaskToken && map.daftar_tugas && map.daftar_tugas !== '-') autoExtra.push(map.daftar_tugas);
+        if (!hasProjectUpdateToken && map.project_update) autoExtra.push(map.project_update);
         if (!hasMentorToken && map.pembimbing) autoExtra.push(map.pembimbing);
         if (!hasLinkToken && map.link_anitrack) autoExtra.push(map.link_anitrack);
         if (autoExtra.length) rendered = `${rendered.trim()}\n\n${autoExtra.join('\n')}`;
@@ -2111,7 +2115,30 @@
         modal.classList.remove('hidden');
     }
 
-    function computeDeadlineReminderQueue(students, mentors, tasks, submissions, waConfig = {}) {
+    function formatStudentProjectUpdateText(student, checklistColsMap = {}, checklistRowMap = {}) {
+        if (!student) return '';
+        const sc = student.sub_concentration || '';
+        const cols = (sc && Array.isArray(checklistColsMap[sc]) && checklistColsMap[sc].length)
+            ? checklistColsMap[sc]
+            : DEFAULT_CHECKLIST_COLS;
+        const rd = checklistRowMap[student.id] || { items: {}, notes: '' };
+        const statusLabelMap = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+        const doneCnt = cols.filter((c) => normalizeChecklistStatus(rd.items?.[c]) === 'done').length;
+        const pct = cols.length ? Math.round((doneCnt / cols.length) * 100) : 0;
+        const lines = [`📊 *PROJECT UPDATE (${sc || 'Animasi'} — ${doneCnt}/${cols.length} Done • ${pct}%):*`];
+        cols.forEach((c) => {
+            const stVal = normalizeChecklistStatus(rd.items?.[c]);
+            const lbl = statusLabelMap[stVal] || 'None';
+            const icon = stVal === 'done' ? '✅' : (stVal === 'revisi' ? '🔴' : (stVal === 'wip' ? '🟡' : '⚪'));
+            lines.push(`${icon} ${c}: *${lbl}*`);
+        });
+        if (rd.notes && String(rd.notes).trim()) {
+            lines.push(`📝 Notes PJ Subkon: _${String(rd.notes).trim()}_`);
+        }
+        return lines.join('\n');
+    }
+
+    function computeDeadlineReminderQueue(students, mentors, tasks, submissions, waConfig = {}, checklistCtx = null) {
         const now = new Date();
         const todayMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
         const mentorMap = Object.fromEntries((mentors || []).map((m) => [m.id, m]));
@@ -2173,6 +2200,10 @@
                 : '';
             const appUrlLine = appUrl ? `🔗 Buka AniTrack: ${appUrl}` : '';
 
+            const projectUpdateBlock = checklistCtx
+                ? formatStudentProjectUpdateText(s, checklistCtx.checklistColsMap || {}, checklistCtx.checklistRowMap || {})
+                : '';
+
             const message = renderWaReminderMessage(template, {
                 nama: s.full_name || 'Siswa',
                 kelas: s.class_name || 'Siswa Animasi',
@@ -2180,6 +2211,7 @@
                 daftar_tugas: combinedTasks,
                 tugas_terlambat: overdueBlock,
                 tugas_mendekati: upcomingBlock,
+                project_update: projectUpdateBlock,
                 pembimbing: mentorLine,
                 link_anitrack: appUrlLine
             });
@@ -7645,6 +7677,7 @@
         saveChecklistColsMap,
         parseChecklistRowMap,
         normalizeChecklistStatus,
+        formatStudentProjectUpdateText,
         formatFeedbackWithImages,
         stripFeedbackImageTags,
         loadGlobalAnnouncement,

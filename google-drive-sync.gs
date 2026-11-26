@@ -391,6 +391,7 @@ function doPost(e) {
       const targetPhone = normalizeWaPhoneGas(payload.phone || '');
       if (!targetPhone) return jsonResponse({ ok: false, error: 'Nomor WA tujuan tidak valid.' });
       const sampleTasks = '🟡 *MENDEKATI DEADLINE:*\n1. *Storyline, Treatment & Storyboard* — *Besok (H-1)* (Contoh Tes)';
+      const sampleProjUpd = '📊 *PROJECT UPDATE (3D Animator — 1/3 Done • 33%):*\n✅ Compose & Audio Video: *Done*\n🟡 Grading: *WIP*\n🔴 Final Film + Credit Title: *Revisi*\n📝 Notes PJ Subkon: _Perbaiki timing animasi_';
       const msg = payload.message || (
         '🔔 *[TES TEMPLATE WA ANITRACK]*\n\n' +
         renderWaTemplateGas(cfg.messageTemplate || '', {
@@ -400,6 +401,7 @@ function doPost(e) {
           daftar_tugas: sampleTasks,
           tugas_terlambat: '',
           tugas_mendekati: sampleTasks,
+          project_update: sampleProjUpd,
           pembimbing: '👨‍🏫 Pembimbing: *Guru Pembimbing*',
           link_anitrack: cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : ''
         })
@@ -432,6 +434,7 @@ function doPost(e) {
       if (!chatId) return jsonResponse({ ok: false, error: 'Chat ID Telegram tujuan belum diisi.' });
       const sampleLate = '🔴 MELEBIHI DEADLINE (Belum Lapor Selesai):\n1. Storyline, Treatment & Storyboard — Terlambat 2 hari (Contoh Tes)';
       const sampleSoon = '🟡 MENDEKATI DEADLINE:\n1. Character Turnaround & Model Sheet — Besok (H-1) (Contoh Tes)';
+      const sampleProjUpd = '📊 PROJECT UPDATE (3D Modeller — 1/3 Done • 33%):\n✅ Compose & Audio Video: Done\n🟡 Grading: WIP\n🔴 Final Film + Credit Title: Revisi\n📝 Notes PJ Subkon: Perbaiki lighting scene 02';
       const renderedSample = renderWaTemplateGas(cfg.messageTemplate || '', {
         nama: payload.sampleName || 'Zahira Aulia Putri (Contoh)',
         kelas: 'X ANI A',
@@ -439,6 +442,7 @@ function doPost(e) {
         daftar_tugas: `${sampleLate}\n\n${sampleSoon}`,
         tugas_terlambat: sampleLate,
         tugas_mendekati: sampleSoon,
+        project_update: sampleProjUpd,
         pembimbing: '👨‍🏫 Pembimbing: Guru Pembimbing (WA: 0812-3456-7890)',
         link_anitrack: cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : '🔗 Buka AniTrack: https://anitrack.republikanimasi.my.id'
       }).replace(/\*([^*\n]+)\*/g, '$1').replace(/_([^_\n]+)_/g, '$1');
@@ -497,10 +501,42 @@ const DEFAULT_WA_TEMPLATE_GAS = [
   'Pengingat Project Tracker *AniTrack — SMKN 4 Malang*:',
   '',
   '{daftar_tugas}',
+  '{project_update}',
   '📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
   '{pembimbing}',
   '{link_anitrack}'
 ].join('\n');
+
+const DEFAULT_CHECKLIST_COLS_GAS = ['Compose & Audio Video', 'Grading', 'Final Film + Credit Title'];
+
+function normalizeChecklistStatusGas(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (v === 'done' || v === 'selesai' || v === 'acc') return 'done';
+  if (v === 'revisi' || v === 'revision') return 'revisi';
+  if (v === 'wip' || v === 'proses' || v === 'in progress' || v === 'sedang_dikerjakan') return 'wip';
+  return 'none';
+}
+
+function formatProjectUpdateBlockGas(student, colsMap, rowMap) {
+  if (!student) return '';
+  const sc = student.sub_concentration || '';
+  const cols = (sc && Array.isArray(colsMap[sc]) && colsMap[sc].length) ? colsMap[sc] : DEFAULT_CHECKLIST_COLS_GAS;
+  const rd = rowMap[student.id] || { items: {}, notes: '' };
+  const labelMap = { none: 'None', wip: 'WIP', revisi: 'Revisi', done: 'Done' };
+  let doneCnt = 0;
+  cols.forEach(function (c) { if (normalizeChecklistStatusGas(rd.items && rd.items[c]) === 'done') doneCnt++; });
+  const pct = cols.length ? Math.round((doneCnt / cols.length) * 100) : 0;
+  const lines = [`📊 *PROJECT UPDATE (${sc || 'Animasi'} — ${doneCnt}/${cols.length} Done • ${pct}%):*`];
+  cols.forEach(function (c) {
+    const st = normalizeChecklistStatusGas(rd.items && rd.items[c]);
+    const icon = st === 'done' ? '✅' : (st === 'revisi' ? '🔴' : (st === 'wip' ? '🟡' : '⚪'));
+    lines.push(`${icon} ${c}: *${labelMap[st] || 'None'}*`);
+  });
+  if (rd.notes && String(rd.notes).trim()) {
+    lines.push(`📝 Notes PJ Subkon: _${String(rd.notes).trim()}_`);
+  }
+  return lines.join('\n');
+}
 
 function renderWaTemplateGas(template, vars) {
   const raw = (template && String(template).trim()) ? String(template) : DEFAULT_WA_TEMPLATE_GAS;
@@ -511,18 +547,21 @@ function renderWaTemplateGas(template, vars) {
     daftar_tugas: vars.daftar_tugas || '-',
     tugas_terlambat: vars.tugas_terlambat || '',
     tugas_mendekati: vars.tugas_mendekati || '',
+    project_update: vars.project_update || '',
     pembimbing: vars.pembimbing || '',
     link_anitrack: vars.link_anitrack || ''
   };
   const hasTaskToken = /\{(daftar_tugas|tugas_terlambat|tugas_mendekati)\}/i.test(raw);
+  const hasProjectUpdateToken = /\{project_update\}/i.test(raw);
   const hasMentorToken = /\{pembimbing\}/i.test(raw);
   const hasLinkToken = /\{link_anitrack\}/i.test(raw);
-  let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|pembimbing|link_anitrack)\}/gi, function (_, k) {
+  let rendered = raw.replace(/\{(nama|kelas|subkonsentrasi|daftar_tugas|tugas_terlambat|tugas_mendekati|project_update|pembimbing|link_anitrack)\}/gi, function (_, k) {
     const key = String(k).toLowerCase();
     return map[key] !== undefined ? map[key] : '';
   });
   const autoExtra = [];
   if (!hasTaskToken && map.daftar_tugas && map.daftar_tugas !== '-') autoExtra.push(map.daftar_tugas);
+  if (!hasProjectUpdateToken && map.project_update) autoExtra.push(map.project_update);
   if (!hasMentorToken && map.pembimbing) autoExtra.push(map.pembimbing);
   if (!hasLinkToken && map.link_anitrack) autoExtra.push(map.link_anitrack);
   if (autoExtra.length) rendered = rendered.trim() + '\n\n' + autoExtra.join('\n');
@@ -866,6 +905,22 @@ function executeDailyWaDeadlineReminder(forceRun) {
   const profiles = fetchSupabaseRest('profiles?select=id,full_name,username,class_name,sub_concentration,role,mentor_id,whatsapp_number');
   const tasks = fetchSupabaseRest('project_tasks?select=id,title,pipeline_stage,sub_concentration,due_date');
   const subs = fetchSupabaseRest('project_submissions?select=project_task_id,student_id,status');
+  let checklistColsMap = {};
+  const checklistRowMap = {};
+  try {
+    const colsRows = fetchSupabaseRest('app_settings?select=value&key=eq.proj_checklist_cols');
+    if (colsRows && colsRows.length && colsRows[0].value) checklistColsMap = JSON.parse(colsRows[0].value) || {};
+  } catch (e) { /* ignore */ }
+  try {
+    const ckRows = fetchSupabaseRest('app_settings?select=key,value&key=like.proj_checklist_row::*');
+    ckRows.forEach(function (r) {
+      try {
+        const p = JSON.parse(r.value || '{}');
+        const sid = p.student_id || String(r.key || '').replace('proj_checklist_row::', '');
+        if (sid) checklistRowMap[sid] = p;
+      } catch (e) { /* ignore */ }
+    });
+  } catch (e) { /* ignore */ }
   const studentTgMap = {};
   if (useTgDm) {
     try {
@@ -976,6 +1031,8 @@ function executeDailyWaDeadlineReminder(forceRun) {
       : '';
     const appUrlLine = cfg.appUrl ? `🔗 Buka AniTrack: ${cfg.appUrl}` : '';
 
+    const projectUpdateBlock = formatProjectUpdateBlockGas(s, checklistColsMap, checklistRowMap);
+
     const messageText = renderWaTemplateGas(cfg.messageTemplate || '', {
       nama: s.full_name || 'Siswa',
       kelas: s.class_name || 'Siswa Animasi',
@@ -983,6 +1040,7 @@ function executeDailyWaDeadlineReminder(forceRun) {
       daftar_tugas: combinedTasks,
       tugas_terlambat: overdueBlock,
       tugas_mendekati: upcomingBlock,
+      project_update: projectUpdateBlock,
       pembimbing: mentorLine,
       link_anitrack: appUrlLine
     });

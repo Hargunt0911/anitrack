@@ -414,6 +414,9 @@
                         </div>
                     </div>
 
+                    <!-- Ringkasan Project Update per Sub-Konsentrasi Langsung di Dashboard Siswa -->
+                    <div id="dashboardProjectUpdateCard" class="hidden"></div>
+
                     <!-- ROW 2: 3-Column Bento Grid -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
                         <div class="lg:col-span-4 space-y-3.5">
@@ -1052,7 +1055,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261123c"></script>
+    <script src="./anitrack-core.js?v=20261126c"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2415,6 +2418,39 @@
                         ${(() => {
                             const doneCk = myChecklistCols.filter((c) => A.normalizeChecklistStatus(myChecklistData.items?.[c]) === 'done').length;
                             const ckPct = myChecklistCols.length ? Math.round((doneCk / myChecklistCols.length) * 100) : 0;
+                            const dashCkEl = document.getElementById('dashboardProjectUpdateCard');
+                            if (dashCkEl) {
+                                dashCkEl.classList.remove('hidden');
+                                dashCkEl.innerHTML = `
+                                    <div class="bg-white border border-[#DCEBFF] rounded-2xl shadow-card p-4 sm:p-5 space-y-3">
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                            <div>
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <span class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">📊 Project Update • ${A.esc(currentUser.sub_concentration || 'Sub-Konsentrasi Belum Diatur')}</span>
+                                                    <button type="button" onclick="switchTab('projects')" class="text-[11px] font-bold text-[#0095FF] hover:underline cursor-pointer">Buka Project Tracker →</button>
+                                                </div>
+                                                <p class="text-[11px] text-slate-500 mt-0.5">Status tahapan produksi resmi dari Guru PJ Sub-Konsentrasi.</p>
+                                            </div>
+                                            <div class="w-full sm:w-52 shrink-0 num-tabular">
+                                                <div class="flex items-center justify-between text-[11px] font-bold mb-1">
+                                                    <span class="${ckPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCk}/${myChecklistCols.length} Done</span>
+                                                    <span class="font-mono ${ckPct === 100 ? 'text-[#15803D]' : 'text-slate-500'}">${ckPct}%</span>
+                                                </div>
+                                                <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
+                                                    <div class="h-full rounded-full transition-all duration-300" style="width:${ckPct}%;background:#4CAF50;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            ${myChecklistCols.map((col) => {
+                                                const stVal = A.normalizeChecklistStatus(myChecklistData.items?.[col]);
+                                                const stOpt = A.CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || A.CHECKLIST_STATUS_OPTIONS[0];
+                                                return `<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${stOpt.cls} text-xs font-bold"><span>${A.esc(col)}:</span><span>${stOpt.label}</span></div>`;
+                                            }).join('')}
+                                        </div>
+                                        ${myChecklistData.notes ? `<div class="rounded-xl bg-[#FFFDF5] border border-[#FDE68A] px-3 py-2 text-xs text-[#92400E]"><strong>📝 Notes PJ Subkon:</strong> ${A.esc(myChecklistData.notes)}</div>` : ''}
+                                    </div>`;
+                            }
                             return `
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                                 <div>
