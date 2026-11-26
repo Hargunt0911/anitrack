@@ -1546,7 +1546,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126e"></script>
+    <script src="./anitrack-core.js?v=20261126f"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2080,7 +2080,7 @@
                 const extraWarn = (role === 'mentor' || role === 'admin')
                     ? '\n\nSeluruh siswa yang di-plot ke akun ini akan dilepas pembimbingnya (akun siswa tidak terhapus).'
                     : role === 'student'
-                        ? '\n\nSeluruh data progres, daily task, dan update mingguan siswa ini juga akan dihapus.'
+                        ? '\n\nSeluruh data progres, daily task, project, dan Project Update siswa ini juga akan dihapus.'
                         : '';
                 if (!confirm(`Hapus akun ${A.roleLabel(role)} "${fullName}" secara permanen?${extraWarn}`)) return;
 

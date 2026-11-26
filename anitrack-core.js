@@ -3109,14 +3109,15 @@
     async function buildExportWorkbooks() {
         if (typeof global.XLSX === 'undefined') throw new Error('Library Excel (.xlsx) belum termuat.');
 
-        const [{ data: profiles }, { data: materials }, { data: tasks }, { data: progress }, { data: projTasks }, { data: projSubs }, { data: weeklyRaw }, { data: fbLogRaw }] = await Promise.all([
+        const [{ data: profiles }, { data: materials }, { data: tasks }, { data: progress }, { data: projTasks }, { data: projSubs }, checklistColsMap, { data: checklistRowsRaw }, { data: fbLogRaw }] = await Promise.all([
             supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number, project_drive_url').order('role').order('full_name'),
             supabase.from('learning_materials').select('*').order('id', { ascending: false }),
             supabase.from('daily_tasks').select('*').order('id', { ascending: false }),
             supabase.from('student_progress').select('*').order('updated_at', { ascending: false }),
             supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
             supabase.from('project_submissions').select('*').order('updated_at', { ascending: false }),
-            supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_WEEKLY_PREFIX}%`),
+            loadChecklistColsMap(),
+            supabase.from('app_settings').select('key, value, updated_at').like('key', `${CHECKLIST_ROW_PREFIX}%`),
             supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`)
         ]);
 
@@ -3223,26 +3224,26 @@
             };
         });
 
-        const weeklyList = parseWeeklyUpdateRows(weeklyRaw || []);
-        const weeklyRows = weeklyList.map((u, i) => {
-            const s = pMap[u.student_id] || {};
-            const pt = ptMap[u.project_task_id] || {};
+        const checklistRowMap = parseChecklistRowMap(checklistRowsRaw || []);
+        const ckStatusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+        const projectUpdateRows = pList.filter((p) => p.role === 'student').map((s, i) => {
+            const cols = (s.sub_concentration && checklistColsMap[s.sub_concentration]) || DEFAULT_CHECKLIST_COLS;
+            const rd = checklistRowMap[s.id] || { items: {}, notes: '' };
+            const doneCnt = cols.filter((c) => normalizeChecklistStatus(rd.items?.[c]) === 'done').length;
+            const pct = cols.length ? Math.round((doneCnt / cols.length) * 100) : 0;
             const mentor = s.mentor_id ? pMap[s.mentor_id] : null;
+            const stageSummary = cols.map((c) => `${c}: ${ckStatusText[normalizeChecklistStatus(rd.items?.[c])] || 'None'}`).join(' | ');
             return {
                 No: i + 1,
-                Minggu: getWeekRangeInfo(u.week_key).label,
                 'Nama Siswa': s.full_name || '-',
                 Kelas: s.class_name || '-',
                 'Sub-Konsentrasi': s.sub_concentration || '-',
                 Pembimbing: mentor?.full_name || '-',
-                'Tugas Project': pt.title || '-',
-                'Progres (%)': `${u.progress_percent}%`,
-                'Ringkasan Progres Mingguan': u.summary || '-',
-                Kendala: u.blockers || '-',
-                'Bukti WIP': u.proof_image ? 'Ada Screenshot' : '-',
-                'Catatan Pembimbing': u.mentor_note || '-',
-                'Status Cek Pembimbing': u.checked_at ? `Dicek (${u.checked_by_name || 'Guru'})` : 'Belum Dicek',
-                'Diperbarui': formatDateTime(u.updated_at)
+                'Progress (%)': `${pct}%`,
+                'Selesai (Done)': `${doneCnt}/${cols.length}`,
+                'Status Tahapan': stageSummary,
+                'Notes PJ Subkon': rd.notes || '-',
+                'Diperbarui': rd.updated_at ? formatDateTime(rd.updated_at) : '-'
             };
         });
 
@@ -3250,7 +3251,7 @@
         const matCols = [5, 32, 16, 20, 16, 40, 38, 38, 30, 22];
         const profCols = [5, 26, 18, 12, 10, 20, 24, 18, 38];
         const projCols = [5, 30, 16, 16, 24, 10, 20, 18, 12, 16, 30, 32, 34, 18];
-        const weeklyCols = [5, 28, 24, 10, 20, 22, 28, 12, 36, 28, 14, 30, 20, 18];
+        const projUpdCols = [5, 26, 10, 20, 22, 12, 14, 52, 34, 18];
         const sumCols = [28, 48];
 
         const tasksWb = global.XLSX.utils.book_new();
@@ -3263,7 +3264,7 @@
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(summaryRows, sumCols), 'Ringkasan');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(taskRows, taskCols), 'Rekap Daily Task');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(projectRows, projCols), 'Project Tracker');
-        global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(weeklyRows, weeklyCols), 'Update Mingguan');
+        global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(projectUpdateRows, projUpdCols), 'Project Update');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(materialRows, matCols), 'Daftar Materi Ajar');
         global.XLSX.utils.book_append_sheet(fullWb, makeWorksheet(profileRows, profCols), 'Siswa & Mentor');
 
@@ -4295,7 +4296,7 @@
             const container = document.getElementById('projectTasksContainer');
             if (!container) return;
 
-            const { allTasks, subMap, studentList, weeklyUpdates = [], mentorsList = [] } = projectDataCache;
+            const { allTasks, subMap, studentList, mentorsList = [] } = projectDataCache;
             const stageF = document.getElementById('filterProjectStage')?.value || '';
             const subF = document.getElementById('filterProjectSubconc')?.value || '';
             const filteredTasks = allTasks.filter((t) => {
@@ -4308,23 +4309,6 @@
             });
 
             const classes = [...new Set(studentList.map((s) => s.class_name).filter(Boolean))].sort();
-            const currentWeekKey = getWeekKey();
-            const weeklyByKey = {};
-            weeklyUpdates.forEach((u) => {
-                weeklyByKey[`${u.week_key}__${u.project_task_id}__${u.student_id}`] = u;
-            });
-
-            // Hitung siswa yang belum update minggu ini untuk badge tombol tab
-            let missingWeeklyCount = 0;
-            studentList.forEach((s) => {
-                const activeTasks = allTasks.filter((t) => {
-                    if (t.sub_concentration && s.sub_concentration !== t.sub_concentration) return false;
-                    return (subMap[`${t.id}__${s.id}`]?.status || 'belum_mulai') !== 'selesai';
-                });
-                if (!activeTasks.length) return;
-                const hasAnyThisWeek = activeTasks.some((t) => Boolean(weeklyByKey[`${currentWeekKey}__${t.id}__${s.id}`]));
-                if (!hasAnyThisWeek) missingWeeklyCount++;
-            });
 
             const modeSwitcherHtml = `
                 <div class="flex flex-wrap items-center justify-between gap-2.5 bg-white border border-[#EDF1F7] rounded-2xl shadow-card px-4 py-2.5">
@@ -4332,11 +4316,6 @@
                         <button type="button" onclick="setProjectViewMode('tasks')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'tasks' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             📋 Daftar Tugas &amp; Review (${filteredTasks.length})
-                        </button>
-                        <button type="button" onclick="setProjectViewMode('weekly')"
-                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'weekly' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            <span>📅 Update Mingguan</span>
-                            ${missingWeeklyCount > 0 ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${projectViewMode === 'weekly' ? 'bg-white/25 text-white' : 'bg-[#FFF0F4] text-[#E11D48]'} num-tabular">${missingWeeklyCount} belum</span>` : ''}
                         </button>
                         <button type="button" onclick="setProjectViewMode('classes')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'classes' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
@@ -4356,9 +4335,7 @@
                             ? 'Kalender bulanan deadline & Timeline Gantt lintas Pre-Production, Production, hingga Post-Production.'
                             : (projectViewMode === 'classes'
                                 ? 'Akordion progres rata-rata tiap kelas, Link Pantau Ortu, Flowchart, & Cetak PDF Rapor.'
-                                : (projectViewMode === 'weekly'
-                                    ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
-                                    : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" untuk periksa bukti, coret langsung (✏️), atau kirim revisi bergambar.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.')))}
+                                : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" untuk periksa hasil di Drive, ACC, atau kirim catatan revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'))}
                     </span>
                 </div>`;
 
@@ -4545,297 +4522,8 @@
                 return;
             }
 
-            if (!filteredTasks.length && projectViewMode !== 'weekly') {
+            if (!filteredTasks.length) {
                 container.innerHTML = `${modeSwitcherHtml}<div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-10 text-center text-sm text-slate-400">Belum ada tugas project untuk filter ini. Tambahkan tugas project &amp; deadline di form atas atau Import Excel (.xlsx).</div>`;
-                return;
-            }
-
-            // ==================== MODE 3: PROJECT UPDATE MINGGUAN (PER MINGGU × TUGAS × SISWA) ====================
-            if (projectViewMode === 'weekly') {
-                const selectedWeek = projectWeeklyState.weekKey || currentWeekKey;
-                const weekInfo = getWeekRangeInfo(selectedWeek);
-                const weekOptions = getRecentWeekKeys(8, weeklyUpdates.map((u) => u.week_key));
-                const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
-                const wStatus = projectWeeklyState.status || 'all';
-                const wCls = projectWeeklyState.className || '';
-                const wTask = projectWeeklyState.taskId || '';
-                const wMentor = projectWeeklyState.mentorId || '';
-                const wSearch = (projectWeeklyState.search || '').trim().toLowerCase();
-
-                const scopedTasksForWeekly = wTask ? filteredTasks.filter((t) => t.id === wTask) : filteredTasks;
-
-                const studentWeeklyRows = studentList
-                    .filter((s) => {
-                        if (wCls && s.class_name !== wCls) return false;
-                        if (subF && s.sub_concentration !== subF) return false;
-                        if (expectedRole === 'superadmin' && wMentor && s.mentor_id !== wMentor) return false;
-                        if (!wSearch) return true;
-                        return (s.full_name || '').toLowerCase().includes(wSearch) ||
-                            (s.username || '').toLowerCase().includes(wSearch) ||
-                            (s.sub_concentration || '').toLowerCase().includes(wSearch) ||
-                            (s.class_name || '').toLowerCase().includes(wSearch);
-                    })
-                    .map((s) => {
-                        const relevantTasks = scopedTasksForWeekly.filter((t) => !t.sub_concentration || s.sub_concentration === t.sub_concentration);
-                        const taskEntries = relevantTasks.map((t) => {
-                            const ps = subMap[`${t.id}__${s.id}`] || {};
-                            const stVal = ps.status || 'belum_mulai';
-                            const upd = weeklyByKey[`${selectedWeek}__${t.id}__${s.id}`] || null;
-                            return { task: t, submission: ps, status: stVal, isAcc: stVal === 'selesai', update: upd };
-                        });
-                        const activeEntries = taskEntries.filter((e) => !e.isAcc);
-                        const updatedCount = taskEntries.filter((e) => Boolean(e.update)).length;
-                        const activeUpdatedCount = activeEntries.filter((e) => Boolean(e.update)).length;
-                        const uncheckedCount = taskEntries.filter((e) => e.update && !e.update.checked_at).length;
-
-                        let overallState = 'belum'; // 'sudah' | 'sebagian' | 'belum' | 'all_acc' | 'no_task'
-                        if (!taskEntries.length) overallState = 'no_task';
-                        else if (!activeEntries.length) overallState = 'all_acc';
-                        else if (activeUpdatedCount === activeEntries.length) overallState = 'sudah';
-                        else if (activeUpdatedCount > 0) overallState = 'sebagian';
-                        else overallState = 'belum';
-
-                        return {
-                            student: s,
-                            mentor: s.mentor_id ? mentorMap[s.mentor_id] : null,
-                            taskEntries,
-                            activeCount: activeEntries.length,
-                            updatedCount,
-                            activeUpdatedCount,
-                            uncheckedCount,
-                            overallState
-                        };
-                    });
-
-                const kpiTotal = studentWeeklyRows.filter((r) => r.overallState !== 'no_task').length;
-                const kpiSudah = studentWeeklyRows.filter((r) => r.overallState === 'sudah' || r.overallState === 'all_acc').length;
-                const kpiSebagian = studentWeeklyRows.filter((r) => r.overallState === 'sebagian').length;
-                const kpiBelum = studentWeeklyRows.filter((r) => r.overallState === 'belum').length;
-                const kpiUnchecked = studentWeeklyRows.reduce((sum, r) => sum + r.uncheckedCount, 0);
-
-                const displayRows = studentWeeklyRows.filter((r) => {
-                    if (r.overallState === 'no_task') return false;
-                    if (wStatus === 'belum') return r.overallState === 'belum' || r.overallState === 'sebagian';
-                    if (wStatus === 'sudah') return r.overallState === 'sudah' || r.overallState === 'all_acc';
-                    if (wStatus === 'unchecked') return r.uncheckedCount > 0;
-                    return true;
-                });
-
-                const perPage = 15;
-                const totalPages = Math.max(1, Math.ceil(displayRows.length / perPage));
-                if (projectWeeklyState.page > totalPages) projectWeeklyState.page = totalPages;
-                const startIdx = (projectWeeklyState.page - 1) * perPage;
-                const pageRows = displayRows.slice(startIdx, startIdx + perPage);
-
-                container.innerHTML = `
-                    ${modeSwitcherHtml}
-                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
-                        <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] space-y-4">
-                            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                                <div>
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#EAF4FF] text-[#0082E6]">Pantauan Mingguan Pembimbing &amp; Admin</span>
-                                        <span class="text-[11px] font-bold text-slate-500">${esc(weekInfo.label)}</span>
-                                    </div>
-                                    <h3 class="text-base font-extrabold text-[#1E293B] mt-1">📅 Project Update Mingguan Siswa (Lintas Sub-Konsentrasi)</h3>
-                                    <p class="text-xs text-slate-500 mt-0.5">Memudahkan pembimbing memantau apakah tiap siswa bimbingan sudah memberi update progres minggu ini pada masing-masing tugas, walau pembimbing bukan PJ sub-konsentrasi.</p>
-                                </div>
-                                <div class="shrink-0">
-                                    <select onchange="setProjectWeeklyWeek(this.value)"
-                                        class="w-full sm:w-auto px-3.5 py-2.5 bg-white border-2 border-[#0095FF] rounded-xl text-xs font-bold text-[#1E293B] focus:outline-none">
-                                        ${weekOptions.map((wk) => `<option value="${esc(wk)}" ${wk === selectedWeek ? 'selected' : ''}>${esc(getWeekRangeInfo(wk).label)}</option>`).join('')}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- 4 KPI Ringkasan Mingguan -->
-                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 num-tabular">
-                                <div class="bg-white border border-[#EDF1F7] rounded-xl px-3.5 py-2.5">
-                                    <div class="text-[11px] font-semibold text-slate-400">Siswa Dipantau</div>
-                                    <div class="text-lg font-extrabold text-[#1E293B]">${kpiTotal}</div>
-                                </div>
-                                <div class="bg-[#E7F9EE] border border-[#BBF7D0] rounded-xl px-3.5 py-2.5">
-                                    <div class="text-[11px] font-semibold text-[#15803D]">Sudah Update Lengkap</div>
-                                    <div class="text-lg font-extrabold text-[#15803D]">${kpiSudah}${kpiSebagian ? ` <span class="text-xs font-bold text-[#B88600]">(+${kpiSebagian} sebagian)</span>` : ''}</div>
-                                </div>
-                                <div class="bg-[#FFF0F4] border border-[#FECDD6] rounded-xl px-3.5 py-2.5">
-                                    <div class="text-[11px] font-semibold text-[#E11D48]">Belum Update Minggu Ini</div>
-                                    <div class="text-lg font-extrabold text-[#E11D48]">${kpiBelum}</div>
-                                </div>
-                                <div class="bg-[#FFFDF5] border border-[#FDE68A] rounded-xl px-3.5 py-2.5">
-                                    <div class="text-[11px] font-semibold text-[#B88600]">Update Belum Dicek Guru</div>
-                                    <div class="text-lg font-extrabold text-[#B88600]">${kpiUnchecked}</div>
-                                </div>
-                            </div>
-
-                            <!-- Toolbar Filter -->
-                            <div class="flex flex-wrap items-center gap-2">
-                                <div class="inline-flex p-1 bg-white border border-[#E2E8F0] rounded-xl gap-1">
-                                    ${[
-                                        { k: 'all', l: `Semua (${kpiTotal})` },
-                                        { k: 'belum', l: `Belum / Sebagian (${kpiBelum + kpiSebagian})` },
-                                        { k: 'sudah', l: `Sudah Update (${kpiSudah})` },
-                                        { k: 'unchecked', l: `Perlu Dicek (${kpiUnchecked})` }
-                                    ].map((t) => `
-                                        <button type="button" onclick="setProjectWeeklyStatus('${t.k}')"
-                                            class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${wStatus === t.k ? 'bg-[#0095FF] text-white' : 'text-slate-600 hover:bg-[#F4F8FF]'}">
-                                            ${t.l}
-                                        </button>`).join('')}
-                                </div>
-                                <select onchange="setProjectWeeklyClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
-                                    <option value="">Semua Kelas</option>
-                                    ${classes.map((c) => `<option value="${esc(c)}" ${wCls === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
-                                </select>
-                                <select onchange="setProjectWeeklyTask(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 max-w-[220px] focus:outline-none focus:border-[#0095FF]">
-                                    <option value="">Semua Tugas Project</option>
-                                    ${filteredTasks.map((t) => `<option value="${esc(t.id)}" ${wTask === t.id ? 'selected' : ''}>${esc(t.title)}</option>`).join('')}
-                                </select>
-                                ${expectedRole === 'superadmin' ? `
-                                <select onchange="setProjectWeeklyMentor(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
-                                    <option value="">Semua Pembimbing</option>
-                                    ${mentorsList.map((m) => `<option value="${esc(m.id)}" ${wMentor === m.id ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}
-                                </select>` : ''}
-                                <input id="projWeeklySearchInp" type="text" value="${esc(projectWeeklyState.search)}" oninput="setProjectWeeklySearch(this.value)"
-                                    placeholder="Cari nama siswa / sub-konsentrasi..."
-                                    class="flex-1 min-w-[180px] px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
-                            </div>
-                        </div>
-
-                        <!-- Daftar Siswa & Detail Update Mingguan Tiap Tugas -->
-                        <div class="divide-y divide-[#EDF1F7]">
-                            ${pageRows.length ? pageRows.map((row) => {
-                                const s = row.student;
-                                const stateBadge = row.overallState === 'all_acc'
-                                    ? `<span class="px-2.5 py-1 rounded-full bg-[#E3F6F3] text-[#1D5E55] text-[11px] font-extrabold">✓ Semua Tugas ACC</span>`
-                                    : row.overallState === 'sudah'
-                                        ? `<span class="px-2.5 py-1 rounded-full bg-[#E7F9EE] text-[#15803D] text-[11px] font-extrabold">✓ Sudah Update (${row.activeUpdatedCount}/${row.activeCount})</span>`
-                                        : row.overallState === 'sebagian'
-                                            ? `<span class="px-2.5 py-1 rounded-full bg-[#FFF6D6] text-[#B88600] text-[11px] font-extrabold">⚠️ Update Sebagian (${row.activeUpdatedCount}/${row.activeCount})</span>`
-                                            : `<span class="px-2.5 py-1 rounded-full bg-[#FFF0F4] text-[#E11D48] text-[11px] font-extrabold">✕ Belum Update Minggu Ini</span>`;
-
-                                const missingTaskTitles = row.taskEntries.filter((e) => !e.isAcc && !e.update).map((e) => e.task.title);
-                                const waReminderText = missingTaskTitles.length
-                                    ? `Halo ${s.full_name}, tolong segera isi Project Update Mingguan (${weekInfo.label}) di AniTrack untuk tugas: ${missingTaskTitles.join(', ')}. Terima kasih.`
-                                    : `Halo ${s.full_name}, terima kasih sudah mengisi Project Update Mingguan di AniTrack.`;
-
-                                return `
-                                    <div class="p-4 sm:p-5 space-y-3 hover:bg-[#FAFBFD]/70 transition">
-                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                            <div class="flex items-center gap-3 min-w-0">
-                                                <div class="w-10 h-10 rounded-full bg-[#EAF4FF] text-[#0095FF] font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
-                                                    ${renderAvatarMarkup(s.avatar_url, s.full_name)}
-                                                </div>
-                                                <div class="min-w-0">
-                                                    <div class="flex flex-wrap items-center gap-1.5">
-                                                        <span class="font-extrabold text-sm text-[#1E293B] truncate">${esc(s.full_name)}</span>
-                                                        <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600">${esc(s.class_name || '-')}</span>
-                                                        <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">${esc(s.sub_concentration || 'Umum')}</span>
-                                                        ${(() => {
-                                                            const st = computeStudentIssueStats(s, allTasks, subMap);
-                                                            const logsCnt = (projectDataCache.fbLogMap?.[s.id] || []).length;
-                                                            return `${st.goldCount > 0 ? `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#9A6F00]">🌟 ${st.goldCount} Emas</span>` : ''}${st.totalIssues > 0 ? `<span title="${esc(st.detailText)}" class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ ${st.totalIssues} Masalah</span>` : ''}${logsCnt > 0 ? `<button type="button" onclick="openStudentFeedbackHistory('${s.id}')" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-slate-600 hover:text-[#0082E6] cursor-pointer">📜 Catatan (${logsCnt})</button>` : ''}`;
-                                                        })()}
-                                                    </div>
-                                                    <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
-                                                        <span class="font-mono">@${esc(s.username)}</span>
-                                                        ${row.mentor ? `<span>• Pembimbing: <strong class="text-slate-600">${esc(row.mentor.full_name)}</strong></span>` : ''}
-                                                        ${renderWhatsappLink(s.whatsapp_number, false, waReminderText)}
-                                                        ${s.project_drive_url ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition">📁 Drive ↗</a>` : ''}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="self-start sm:self-center shrink-0">${stateBadge}</div>
-                                        </div>
-
-                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-2.5 pl-0 sm:pl-13">
-                                            ${row.taskEntries.map((entry) => {
-                                                const t = entry.task;
-                                                const u = entry.update;
-                                                const stObj = STATUS_OPTIONS.find((o) => o.value === entry.status) || STATUS_OPTIONS[0];
-                                                if (entry.isAcc && !u) {
-                                                    return `
-                                                        <div class="rounded-xl border border-[#BBE9E2] bg-[#F2FBF9] p-3 flex items-center justify-between gap-2 text-xs">
-                                                            <div class="min-w-0">
-                                                                <div class="font-bold text-[#1D5E55] truncate">${esc(t.title)}</div>
-                                                                <div class="text-[10.5px] text-[#2F8F81]">${esc(t.pipeline_stage)} • Sudah Selesai (ACC)</div>
-                                                            </div>
-                                                            <span class="px-2 py-0.5 rounded-md bg-[#E3F6F3] text-[#1D5E55] text-[10.5px] font-bold shrink-0">✓ ACC</span>
-                                                        </div>`;
-                                                }
-                                                if (!u) {
-                                                    return `
-                                                        <div class="rounded-xl border border-[#FECDD6] bg-[#FFF8FA] p-3 flex items-center justify-between gap-2 text-xs">
-                                                            <div class="min-w-0">
-                                                                <div class="font-bold text-[#1E293B] truncate">${esc(t.title)}</div>
-                                                                <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10.5px] text-slate-500">
-                                                                    <span>${esc(t.pipeline_stage)}</span>
-                                                                    <span>•</span>
-                                                                    <span class="px-1.5 py-0.5 rounded border ${stObj.badge} font-semibold">${esc(stObj.label)}</span>
-                                                                    ${t.due_date ? `<span>• DL ${esc(formatDateOnly(t.due_date))}</span>` : ''}
-                                                                </div>
-                                                                <div class="text-[11px] font-bold text-[#E11D48] mt-1">✕ Belum mengisi update minggu ini</div>
-                                                            </div>
-                                                            <button type="button" onclick="jumpToStudentProjectReview('${t.id}', '${esc(s.username || s.full_name)}')"
-                                                                class="shrink-0 px-2.5 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-[#0082E6] text-[10.5px] font-bold cursor-pointer">
-                                                                Detail
-                                                            </button>
-                                                        </div>`;
-                                                }
-                                                const checkKey = encodeURIComponent(u.key);
-                                                return `
-                                                    <div data-weekly-key="${esc(u.key)}" class="rounded-xl border ${u.checked_at ? 'border-[#BBE9E2] bg-white' : 'border-[#CBE5FF] bg-[#F8FBFF]'} p-3.5 space-y-2.5 text-xs">
-                                                        <div class="flex items-start justify-between gap-2">
-                                                            <div class="min-w-0">
-                                                                <div class="font-extrabold text-[#1E293B] truncate">${esc(t.title)}</div>
-                                                                <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10.5px] text-slate-400">
-                                                                    <span>${esc(t.pipeline_stage)}</span>
-                                                                    <span>•</span>
-                                                                    <span class="px-1.5 py-0.5 rounded border ${stObj.badge} font-semibold">${esc(stObj.label)}</span>
-                                                                    <span>• Update ${esc(formatDateTime(u.updated_at))}</span>
-                                                                </div>
-                                                            </div>
-                                                            <span class="px-2 py-0.5 rounded-lg bg-[#EAF4FF] text-[#0082E6] font-mono font-extrabold text-[11px] shrink-0">${u.progress_percent}%</span>
-                                                        </div>
-                                                        <div class="w-full h-1.5 rounded-full bg-[#E2E8F0] overflow-hidden">
-                                                            <div class="h-full bg-[#0095FF] rounded-full" style="width:${u.progress_percent}%"></div>
-                                                        </div>
-                                                        <div class="flex items-start gap-2.5">
-                                                            ${u.proof_image ? `
-                                                                <img src="${esc(u.proof_image)}" alt="Bukti Mingguan" onclick="openProofLightbox(this.src, 'Update ${esc(weekInfo.weekKey)} — ${esc(t.title)} (${esc(s.full_name)})')"
-                                                                    class="w-14 h-11 rounded-lg object-cover border border-[#CBD5E1] cursor-pointer hover:opacity-85 shrink-0" title="Klik perbesar bukti progres mingguan" />` : ''}
-                                                            <div class="min-w-0 space-y-1 flex-1">
-                                                                <div class="text-slate-700 leading-relaxed"><strong>Progres:</strong> ${esc(u.summary || '-')}</div>
-                                                                ${u.blockers ? `<div class="text-[#BE123C] bg-[#FFF0F4] border border-[#FECDD6] rounded-lg px-2 py-1 text-[11px]"><strong>Kendala:</strong> ${esc(u.blockers)}</div>` : ''}
-                                                            </div>
-                                                        </div>
-                                                        <div class="pt-2 border-t border-[#EDF1F7] flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
-                                                            <input type="text" value="${esc(u.mentor_note || '')}" placeholder="Tulis catatan pembimbing / tindak lanjut..."
-                                                                class="weekly-mentor-note flex-1 px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-[11px] focus:outline-none focus:border-[#0095FF]" />
-                                                            <button type="button" onclick="saveWeeklyUpdateCheck('${checkKey}', this)"
-                                                                class="px-3 py-1.5 rounded-lg ${u.checked_at ? 'bg-[#E3F6F3] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white' : 'bg-[#16A34A] hover:bg-[#15803D] text-white'} text-[11px] font-bold transition cursor-pointer shrink-0">
-                                                                ${u.checked_at ? '✓ Sudah Dicek (Simpan)' : '✓ Tandai Dicek'}
-                                                            </button>
-                                                        </div>
-                                                        ${u.checked_at ? `<div class="text-[10px] text-[#2F8F81] font-semibold">Dicek oleh ${esc(u.checked_by_name || 'Pembimbing')} • ${esc(formatDateTime(u.checked_at))}</div>` : ''}
-                                                    </div>`;
-                                            }).join('')}
-                                        </div>
-                                    </div>`;
-                            }).join('') : `<div class="p-10 text-center text-xs text-slate-400">Tidak ada data siswa untuk filter minggu ini.</div>`}
-                        </div>
-
-                        ${displayRows.length > perPage ? `
-                        <div class="px-4 py-3 bg-[#FAFBFD] border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-xs">
-                            <span class="text-slate-500 num-tabular">Menampilkan ${startIdx + 1}–${Math.min(startIdx + perPage, displayRows.length)} dari ${displayRows.length} siswa</span>
-                            <div class="flex items-center gap-1.5">
-                                <button type="button" onclick="setProjectWeeklyPage(${projectWeeklyState.page - 1})" ${projectWeeklyState.page <= 1 ? 'disabled' : ''}
-                                    class="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] disabled:opacity-40 font-semibold cursor-pointer">← Prev</button>
-                                <span class="px-2 font-bold text-[#1E293B] num-tabular">${projectWeeklyState.page} / ${totalPages}</span>
-                                <button type="button" onclick="setProjectWeeklyPage(${projectWeeklyState.page + 1})" ${projectWeeklyState.page >= totalPages ? 'disabled' : ''}
-                                    class="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] hover:border-[#0095FF] disabled:opacity-40 font-semibold cursor-pointer">Next →</button>
-                            </div>
-                        </div>` : ''}
-                    </div>`;
                 return;
             }
 
@@ -5001,7 +4689,6 @@
                 const revCount = eligible.filter((s) => subMap[`${t.id}__${s.id}`]?.status === 'revisi').length;
                 const activeCount = eligible.filter((s) => (subMap[`${t.id}__${s.id}`]?.status || 'belum_mulai') !== 'belum_mulai').length;
                 const belumCount = eligible.length - activeCount;
-                const weeklyThisTaskCount = eligible.filter((s) => Boolean(weeklyByKey[`${currentWeekKey}__${t.id}__${s.id}`])).length;
                 const pct = eligible.length ? Math.round((accCount / eligible.length) * 100) : 0;
                 const allAcc = eligible.length > 0 && accCount === eligible.length;
                 const dl = getDeadlineMeta(t.due_date, allAcc);
@@ -5219,11 +4906,6 @@
                                             <div class="h-full bg-[#4CB6A7] rounded-full" style="width:${pct}%"></div>
                                         </div>
                                         <span class="text-[#228B7D]">${accCount}/${eligible.length} ACC (${pct}%)</span>
-                                        <button type="button" onclick="setProjectWeeklyTask('${t.id}'); setProjectViewMode('weekly');"
-                                            class="px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white transition cursor-pointer"
-                                            title="Lihat rekap Update Mingguan khusus tugas ini">
-                                            📅 Update Minggu Ini: ${weeklyThisTaskCount}/${eligible.length}
-                                        </button>
                                         ${waitCount > 0 ? `<span class="px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#B88600]">🔔 ${waitCount} Review</span>` : ''}
                                         ${revCount > 0 ? `<span class="px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48]">⚠️ ${revCount} Revisi</span>` : ''}
                                         <span class="text-slate-400 font-medium">${belumCount} belum</span>
@@ -5268,11 +4950,10 @@
                 staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees';
             }
 
-            const [{ data: projTasks }, { data: projSubs }, { data: allStudents }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }, { data: checklistRowsRaw }, { data: taskFilesRaw }] = await Promise.all([
+            const [{ data: projTasks }, { data: projSubs }, { data: allStudents }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }, { data: checklistRowsRaw }, { data: taskFilesRaw }] = await Promise.all([
                 supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
                 supabase.from('project_submissions').select('*'),
                 supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name'),
-                supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_WEEKLY_PREFIX}%`),
                 supabase.from('profiles').select('id, full_name, username, whatsapp_number').in('role', ['mentor', 'superadmin']).order('full_name'),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_ARCHIVE_PREFIX}%`),
@@ -5299,7 +4980,6 @@
                 if (!studentIds.has(ps.student_id)) return;
                 subMap[`${ps.project_task_id}__${ps.student_id}`] = ps;
             });
-            const weeklyUpdates = parseWeeklyUpdateRows(weeklyRaw || []).filter((u) => studentIds.has(u.student_id));
             const fbLogMap = parseFeedbackLogMap(fbLogRaw || []);
             const checklistRowMap = parseChecklistRowMap(checklistRowsRaw || []);
             const taskFilesMap = parseTaskFilesMap(taskFilesRaw || []);
@@ -5312,7 +4992,7 @@
                 }
             }).filter(Boolean).sort((a, b) => String(b.created_at || b.updated_at || '').localeCompare(String(a.created_at || a.updated_at || '')));
 
-            projectDataCache = { allTasks, subMap, studentList, allStudentsList, weeklyUpdates, mentorsList: mentors || [], fbLogMap, archives, homeroomMap, pjMap, checklistColsMap, checklistRowMap, taskFilesMap };
+            projectDataCache = { allTasks, subMap, studentList, allStudentsList, mentorsList: mentors || [], fbLogMap, archives, homeroomMap, pjMap, checklistColsMap, checklistRowMap, taskFilesMap };
 
             // Overall Project Progress Summary + Lencana Emas & Total Masalah
             let totalAssignments = 0;
@@ -5392,7 +5072,7 @@
                                     ${myHomeroomClass ? `<span class="inline-block text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${esc(myHomeroomClass)}</span>` : ''}
                                 </div>
                                 <h3 class="text-lg sm:text-xl font-extrabold">Progres Total Project Animasi</h3>
-                                <p class="text-xs text-white/90">Pantau deadline, Lencana Emas, update mingguan, audit log catatan guru, hingga arsip snapshot.</p>
+                                <p class="text-xs text-white/90">Pantau deadline, Lencana Emas, status penyelesaian, audit log catatan guru, hingga arsip snapshot.</p>
                                 ${homeroomSwitcherHtml}
                             </div>
                             <div class="w-full lg:w-80 space-y-2.5 shrink-0">
@@ -5519,24 +5199,6 @@
                         timeLabel: ps.updated_at ? formatDateTime(ps.updated_at) : '',
                         ts: ps.updated_at ? Date.parse(ps.updated_at) || 0 : 0,
                         onClick: () => { switchTab('projects'); global.jumpToStudentProjectReview(t.id, s.username || s.full_name); }
-                    });
-                });
-            weeklyUpdates
-                .filter((u) => !u.checked_at)
-                .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
-                .slice(0, 6)
-                .forEach((u) => {
-                    const s = stuById[u.student_id];
-                    const t = taskById[u.project_task_id];
-                    if (!s || !t) return;
-                    staffNotifs.push({
-                        icon: '📅',
-                        iconBg: 'bg-[#EAF4FF] text-[#0082E6]',
-                        title: `Update Mingguan baru (${u.progress_percent}%) — ${s.full_name}`,
-                        desc: `${t.title}: ${u.summary || ''}`,
-                        timeLabel: u.updated_at ? formatDateTime(u.updated_at) : '',
-                        ts: u.updated_at ? Date.parse(u.updated_at) || 0 : 0,
-                        onClick: () => { switchTab('projects'); global.setProjectViewMode('weekly'); }
                     });
                 });
             updateNotificationCenter(staffNotifs, `staff_${currentUser.id}`);
@@ -5958,6 +5620,7 @@
                 global.switchTab('project-update');
                 return;
             }
+            if (mode === 'weekly') mode = 'tasks';
             projectViewMode = mode;
             renderProjectTrackerBody();
         };
@@ -7280,45 +6943,6 @@
             const stamp = getJakartaYmd(new Date());
             global.XLSX.writeFile(wb, `Project-Update-AniTrack-${stamp}.xlsx`);
             showToast('File Excel Project Update diunduh ✓');
-        };
-
-        global.saveWeeklyUpdateCheck = async function (encodedKey, btn) {
-            const key = decodeURIComponent(encodedKey || '');
-            const existing = (projectDataCache.weeklyUpdates || []).find((u) => u.key === key);
-            if (!existing) { showToast('Data update mingguan tidak ditemukan.'); return; }
-            const card = btn.closest('[data-weekly-key]');
-            const note = card?.querySelector('.weekly-mentor-note')?.value.trim() || '';
-
-            const nextObj = {
-                week_key: existing.week_key,
-                project_task_id: existing.project_task_id,
-                student_id: existing.student_id,
-                progress_percent: existing.progress_percent,
-                summary: existing.summary,
-                blockers: existing.blockers,
-                proof_image: existing.proof_image,
-                proof_url: existing.proof_url,
-                mentor_note: note,
-                checked_by: currentUser.id,
-                checked_by_name: currentUser.full_name || currentUser.username || 'Pembimbing',
-                checked_at: new Date().toISOString(),
-                updated_at: existing.updated_at || new Date().toISOString()
-            };
-
-            btn.disabled = true;
-            btn.textContent = 'Menyimpan...';
-            const { error } = await supabase
-                .from('app_settings')
-                .upsert({ key, value: JSON.stringify(nextObj), updated_at: new Date().toISOString() }, { onConflict: 'key' });
-            btn.disabled = false;
-
-            if (error) {
-                btn.textContent = 'Gagal';
-                showToast(`Gagal menyimpan catatan mingguan: ${error.message}`);
-                return;
-            }
-            showToast('Update mingguan siswa ditandai sudah dicek ✓');
-            loadProjectTracker();
         };
 
         global.jumpToStudentProjectReview = function (taskId, studentQuery) {

@@ -502,7 +502,7 @@ const DEFAULT_WA_TEMPLATE_GAS = [
   '',
   '{daftar_tugas}',
   '{project_update}',
-  '📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
+  '📌 Segera upload file (sesuai contoh penamaan) ke Folder Google Drive Project kamu, lalu klik Laporkan Tugas Selesai di AniTrack.',
   '{pembimbing}',
   '{link_anitrack}'
 ].join('\n');
