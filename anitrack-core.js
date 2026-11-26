@@ -5649,16 +5649,16 @@
                                 <col />
                             </colgroup>
                             <thead class="sticky top-0 z-20 shadow-[0_1px_0_#E2E8F0]">
-                                <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                                    <th rowspan="2" class="ck-sticky-col py-3 px-3.5 sticky left-0 bg-[#F7FAFF] z-30 border-r border-[#DCE5F2]">Siswa</th>
-                                    ${compact ? '' : '<th rowspan="2" class="py-3 px-2.5 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">Kelas</th>'}
-                                    <th rowspan="2" class="py-3 px-3 bg-[#F7FAFF] border-r border-[#EDF1F7]">Progress</th>
+                                <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-xs font-extrabold uppercase tracking-wider text-slate-500 text-center">
+                                    <th rowspan="2" class="ck-sticky-col py-3 px-3.5 sticky left-0 bg-[#F7FAFF] z-30 border-r border-[#DCE5F2] text-center align-middle">Siswa</th>
+                                    ${compact ? '' : '<th rowspan="2" class="py-3 px-2.5 text-center align-middle bg-[#F7FAFF] border-r border-[#EDF1F7]">Kelas</th>'}
+                                    <th rowspan="2" class="py-3 px-3 text-center align-middle bg-[#F7FAFF] border-r border-[#EDF1F7]">Progress</th>
                                     ${compact ? '' : `
-                                    <th rowspan="2" class="py-3 px-2.5 bg-[#F7FAFF] border-r border-[#EDF1F7]">No. HP / WA</th>
-                                    <th rowspan="2" class="py-3 px-2.5 bg-[#F7FAFF] border-r border-[#EDF1F7]">Link Drive</th>
-                                    <th rowspan="2" class="py-3 px-2.5 bg-[#F7FAFF] border-r border-[#EDF1F7]">Pembimbing</th>`}
-                                    <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-2 px-3 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
-                                    <th rowspan="2" class="py-3 px-3.5 bg-[#F7FAFF]">Notes / Catatan PJ</th>
+                                    <th rowspan="2" class="py-3 px-2.5 text-center align-middle bg-[#F7FAFF] border-r border-[#EDF1F7]">No. HP / WA</th>
+                                    <th rowspan="2" class="py-3 px-2.5 text-center align-middle bg-[#F7FAFF] border-r border-[#EDF1F7]">Link Drive</th>
+                                    <th rowspan="2" class="py-3 px-2.5 text-center align-middle bg-[#F7FAFF] border-r border-[#EDF1F7]">Pembimbing</th>`}
+                                    <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-2 px-3 text-center align-middle bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
+                                    <th rowspan="2" class="py-3 px-3.5 text-center align-middle bg-[#F7FAFF]">Notes / Catatan PJ</th>
                                 </tr>
                                 <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-xs font-bold text-[#1D5E55]">
                                     ${activeCols.map((col, ci) => `
