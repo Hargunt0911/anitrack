@@ -5502,22 +5502,13 @@
                         </div>
                     </div>
 
-                    <!-- Bar Navigasi Geser Kiri/Kanan + Scrollbar Atas Tersinkronisasi (Sticky saat Scroll Bawah) -->
-                    <div id="checklistNavBar" class="sticky top-[64px] sm:top-[68px] z-20 px-4 py-2 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7] space-y-1.5">
-                        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <button type="button" onclick="scrollChecklistTable('start')"
-                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">⏮ Awal</button>
-                                <button type="button" onclick="scrollChecklistTable(-320)"
-                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">◀ Kiri</button>
-                                <button type="button" onclick="scrollChecklistTable('status')"
-                                    class="px-3 py-1 rounded-lg bg-[#E3F6F3] hover:bg-[#4CB6A7] border border-[#BBE9E2] text-[#1D5E55] hover:text-white font-extrabold transition cursor-pointer">🎯 STATUS</button>
-                                <button type="button" onclick="scrollChecklistTable(320)"
-                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Kanan ▶</button>
-                                <button type="button" onclick="scrollChecklistTable('end')"
-                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Notes ⏭</button>
-                            </div>
-                            <span class="text-[10.5px] text-slate-400 hidden md:inline">Geser scrollbar di bawah, tahan <kbd class="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">Shift</kbd> + scroll mouse, atau seret area tabel.</span>
+                    <!-- Scrollbar Atas Tersinkronisasi + Info Singkat Shift + Scroll (Sticky saat Scroll Bawah) -->
+                    <div id="checklistNavBar" class="sticky top-[64px] sm:top-[68px] z-20 px-4 py-2 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7] space-y-1">
+                        <div class="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                            <span class="inline-flex items-center gap-1.5 font-medium">
+                                <span class="text-[#0082E6] font-extrabold">↔</span>
+                                <span>Geser kanan/kiri: tahan <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-[10.5px] font-bold text-[#1E293B] shadow-2xs">Shift</kbd> + <strong>Scroll mouse</strong>, seret tabel, atau geser scrollbar di bawah</span>
+                            </span>
                         </div>
                         <div id="checklistTopScroll" class="anitrack-xscroll overflow-x-auto overflow-y-hidden h-[16px]">
                             <div id="checklistTopScrollInner" class="h-[2px]"></div>
