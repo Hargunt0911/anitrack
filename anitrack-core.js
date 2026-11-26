@@ -4560,6 +4560,10 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2 shrink-0">
                                     ${(isAdminStaff || myPjSubconcs.length > 0) ? `
+                                    <button type="button" onclick="downloadChecklistTemplateXlsx()"
+                                        class="px-3.5 py-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-xs font-bold transition cursor-pointer">
+                                        📄 Download Format (.xlsx)
+                                    </button>
                                     <label for="importChecklistXlsxInput"
                                         class="px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
                                         📤 Import Spreadsheet (.xlsx)
@@ -4571,6 +4575,20 @@
                                     </button>
                                 </div>
                             </div>
+
+                            ${(isAdminStaff || myPjSubconcs.length > 0) ? `
+                            <div class="rounded-xl bg-white/90 border border-[#DCEBFF] px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span class="font-extrabold text-[#0082E6]">📋 Format Kolom Excel:</span>
+                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Nama Siswa</code>
+                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Username</code>
+                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Kelas</code>
+                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Link Google Drive</code>
+                                    <code class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-mono text-[10.5px]">[Tahapan: None / WIP / Revisi / Done]</code>
+                                    <code class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00] font-mono text-[10.5px]">Notes</code>
+                                </div>
+                                <span class="text-[10.5px] text-slate-400">Klik <strong>📄 Download Format (.xlsx)</strong> untuk mengunduh template siap isi dengan daftar siswa.</span>
+                            </div>` : ''}
 
                             <!-- Tab Otomatis per Sub-Konsentrasi + Grup 2D / 3D -->
                             <div class="flex flex-wrap items-center gap-1.5">
@@ -6703,6 +6721,71 @@
             renderProjectTrackerBody();
         };
 
+        global.downloadChecklistTemplateXlsx = function () {
+            if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
+            const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {} } = projectDataCache;
+            const statusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+            const wb = global.XLSX.utils.book_new();
+            const curTab = projectChecklistState.subconc;
+            const subconcsToBuild = SUBCONCS.includes(curTab)
+                ? [curTab]
+                : (curTab === '__group_2d'
+                    ? SUBCONCS.filter((sc) => sc.startsWith('2D'))
+                    : (curTab === '__group_3d'
+                        ? SUBCONCS.filter((sc) => sc.startsWith('3D'))
+                        : SUBCONCS));
+
+            subconcsToBuild.forEach((sc) => {
+                const cols = checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS;
+                const scStudents = allStudentsList.filter((s) => s.sub_concentration === sc);
+                let rows = [];
+                if (scStudents.length) {
+                    rows = scStudents.map((s, i) => {
+                        const rd = checklistRowMap[s.id] || { items: {}, notes: '' };
+                        const obj = {
+                            No: i + 1,
+                            'Nama Siswa': s.full_name,
+                            Username: s.username || '',
+                            Kelas: s.class_name || '',
+                            'Link Google Drive': s.project_drive_url || ''
+                        };
+                        cols.forEach((c) => {
+                            obj[c] = statusText[normalizeChecklistStatus(rd.items?.[c])] || 'None';
+                        });
+                        obj.Notes = rd.notes || '';
+                        return obj;
+                    });
+                } else {
+                    const sample = {
+                        No: 1,
+                        'Nama Siswa': 'CONTOH NAMA SISWA (Sesuaikan dengan database)',
+                        Username: 'afido',
+                        Kelas: 'X ANI A',
+                        'Link Google Drive': 'https://drive.google.com/drive/folders/...'
+                    };
+                    cols.forEach((c, idx) => {
+                        sample[c] = idx === 0 ? 'Done' : (idx === 1 ? 'WIP' : 'None');
+                    });
+                    sample.Notes = 'Catatan singkat PJ Sub-Konsentrasi (opsional)';
+                    rows = [sample];
+                }
+                global.XLSX.utils.book_append_sheet(wb, makeWorksheet(rows), sc.slice(0, 31));
+            });
+
+            const guideRows = [
+                { Kolom: 'Nama Siswa / Username', Wajib: 'YA', Keterangan: 'Dipakai sistem untuk mencocokkan akun siswa otomatis (jangan ubah Username).' },
+                { Kolom: 'Kelas', Wajib: 'Info', Keterangan: 'Informasi kelas siswa (otomatis terisi).' },
+                { Kolom: 'Link Google Drive', Wajib: 'Opsional', Keterangan: 'Jika diisi link https://..., otomatis memperbarui Link Folder Google Drive Project siswa.' },
+                { Kolom: 'Kolom Tahapan (Idea & Konsep, Storyboard, dst.)', Wajib: 'YA', Keterangan: 'Isi status dengan salah satu: None, WIP, Revisi, atau Done.' },
+                { Kolom: 'Notes', Wajib: 'Opsional', Keterangan: 'Catatan / masukan dari PJ Sub-Konsentrasi untuk siswa tersebut.' }
+            ];
+            global.XLSX.utils.book_append_sheet(wb, makeWorksheet(guideRows, [38, 12, 72]), 'Panduan Pengisian');
+
+            const labelSlug = SUBCONCS.includes(curTab) ? curTab.replace(/\s+/g, '-') : 'Semua-Subkon';
+            global.XLSX.writeFile(wb, `Format-ProjectUpdate-${labelSlug}-AniTrack.xlsx`);
+            showToast('Template Format Excel Project Update berhasil diunduh ✓');
+        };
+
         global.handleChecklistImportFile = async function (inp) {
             const file = inp?.files?.[0];
             if (!file) return;
@@ -6718,6 +6801,7 @@
                 const updatesMap = new Map();
 
                 wb.SheetNames.forEach((shName) => {
+                    if (/panduan|guide/i.test(shName)) return;
                     const ws = wb.Sheets[shName];
                     const aoa = global.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                     if (!aoa.length) return;
