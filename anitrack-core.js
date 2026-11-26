@@ -3375,6 +3375,9 @@
 
             document.querySelectorAll('[id^="tab-"]').forEach((sec) => sec.classList.add('hidden'));
             document.getElementById(`tab-${activeTab}`)?.classList.remove('hidden');
+            if (activeTab === 'project-update') {
+                requestAnimationFrame(() => initChecklistScrollSync());
+            }
             onTabChange(activeTab);
         }
 
@@ -3426,7 +3429,10 @@
 
             if (activeTab === 'tasks') loadDailyTaskFeed();
             else if (activeTab === 'projects') loadProjectTracker();
-            else if (activeTab === 'materials') {
+            else if (activeTab === 'project-update') {
+                projectChecklistState.search = val || '';
+                renderProjectUpdateView();
+            } else if (activeTab === 'materials') {
                 if (currentPlayerMaterialId) closeMaterialPlayer(false);
                 renderMaterialsView();
             } else if (activeTab === 'overview') {
@@ -4235,11 +4241,6 @@
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'tasks' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             📋 Daftar Tugas &amp; Review (${filteredTasks.length})
                         </button>
-                        <button type="button" onclick="setProjectViewMode('checklist')"
-                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'checklist' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            <span>📊 Project Update</span>
-                            ${myPjSubconcs.length ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${projectViewMode === 'checklist' ? 'bg-white/25 text-white' : 'bg-[#E7F9EE] text-[#15803D]'}">PJ</span>` : ''}
-                        </button>
                         <button type="button" onclick="setProjectViewMode('weekly')"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5 ${projectViewMode === 'weekly' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
                             <span>📅 Update Mingguan</span>
@@ -4259,15 +4260,13 @@
                         </button>
                     </div>
                     <span class="text-[11px] text-slate-400 hidden sm:inline">
-                        ${projectViewMode === 'checklist'
-                            ? 'Otomatis mengelompokkan siswa per Sub-Konsentrasi (Progress Bar + None / WIP / Revisi / Done + Notes).'
-                            : (projectViewMode === 'calendar'
-                                ? 'Kalender bulanan deadline & Timeline Gantt lintas Pre-Production, Production, hingga Post-Production.'
-                                : (projectViewMode === 'classes'
-                                    ? 'Akordion progres rata-rata tiap kelas, Link Pantau Ortu, Flowchart, & Cetak PDF Rapor.'
-                                    : (projectViewMode === 'weekly'
-                                        ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
-                                        : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" untuk periksa bukti, coret langsung (✏️), atau kirim revisi bergambar.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'))))}
+                        ${projectViewMode === 'calendar'
+                            ? 'Kalender bulanan deadline & Timeline Gantt lintas Pre-Production, Production, hingga Post-Production.'
+                            : (projectViewMode === 'classes'
+                                ? 'Akordion progres rata-rata tiap kelas, Link Pantau Ortu, Flowchart, & Cetak PDF Rapor.'
+                                : (projectViewMode === 'weekly'
+                                    ? 'Pantau progres mingguan tiap tugas &amp; siswa lintas sub-konsentrasi.'
+                                    : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" untuk periksa bukti, coret langsung (✏️), atau kirim revisi bergambar.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.')))}
                     </span>
                 </div>`;
 
@@ -4451,411 +4450,6 @@
                             }).join('') : `<div class="p-8 text-center text-xs text-slate-400">Tidak ada siswa yang sesuai pencarian.</div>`}
                         </div>
                     </div>`;
-                return;
-            }
-
-            // ==================== MODE 4: PROJECT UPDATE PER SUB-KONSENTRASI (PERSIS SPREADSHEET 2D/3D + OTOMATIS SUBKON) ====================
-            if (projectViewMode === 'checklist') {
-                const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {}, pjMap = {} } = projectDataCache;
-                const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
-                const isAdminStaff = isAnyAdmin(currentUser);
-                const poolStudents = (expectedRole === 'superadmin' || isAdminStaff) ? allStudentsList : studentList;
-
-                // Tentukan default tab aktif
-                let activeSc = projectChecklistState.subconc;
-                if (!activeSc && (expectedRole === 'superadmin' || myPjSubconcs.length > 0)) {
-                    activeSc = myPjSubconcs[0] || SUBCONCS[0];
-                    projectChecklistState.subconc = activeSc;
-                }
-
-                const isSpecificSc = SUBCONCS.includes(activeSc);
-                const isGroup2D = activeSc === '__group_2d';
-                const isGroup3D = activeSc === '__group_3d';
-                const isUnassignedTab = activeSc === '__unassigned';
-                const canEditActiveSc = isAdminStaff || (isSpecificSc && myPjSubconcs.includes(activeSc));
-
-                const pjNamesForActiveSc = isSpecificSc
-                    ? mentorsList.filter((m) => Array.isArray(pjMap[m.id]) && pjMap[m.id].includes(activeSc)).map((m) => m.full_name)
-                    : [];
-
-                // Helper cek siswa masuk tab yang dipilih (otomatis dari sub_concentration masing-masing siswa)
-                const matchSubconcTab = (s, tabVal) => {
-                    const sc = s.sub_concentration || '';
-                    if (!tabVal) return true;
-                    if (tabVal === '__group_2d') return sc.startsWith('2D');
-                    if (tabVal === '__group_3d') return sc.startsWith('3D');
-                    if (tabVal === '__unassigned') return !sc;
-                    return sc === tabVal;
-                };
-
-                // Sumber siswa: PJ Subkon / Admin melihat seluruh siswa di subkon yang dipegangnya; pembimbing biasa melihat siswa bimbingan/kelasnya
-                const studentSourceForTab = (tabVal) => {
-                    if (expectedRole === 'superadmin' || isAdminStaff) return allStudentsList;
-                    if (SUBCONCS.includes(tabVal) && myPjSubconcs.includes(tabVal)) return allStudentsList;
-                    return studentList;
-                };
-
-                const baseStudents = studentSourceForTab(activeSc).filter((s) => matchSubconcTab(s, activeSc));
-
-                const ckCls = projectChecklistState.className || '';
-                const ckStFilter = projectChecklistState.statusFilter || 'all';
-                const ckSearch = (projectChecklistState.search || '').trim().toLowerCase();
-                const ckClasses = [...new Set(baseStudents.map((s) => s.class_name).filter(Boolean))].sort();
-
-                const activeCols = isSpecificSc
-                    ? (checklistColsMap[activeSc] || DEFAULT_CHECKLIST_COLS)
-                    : (isGroup2D
-                        ? [...new Set(SUBCONCS.filter((sc) => sc.startsWith('2D')).flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]
-                        : (isGroup3D
-                            ? [...new Set(SUBCONCS.filter((sc) => sc.startsWith('3D')).flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]
-                            : [...new Set(SUBCONCS.flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]));
-
-                const getStuCols = (s) => (s.sub_concentration && checklistColsMap[s.sub_concentration])
-                    ? checklistColsMap[s.sub_concentration]
-                    : (isSpecificSc ? activeCols : DEFAULT_CHECKLIST_COLS);
-
-                const filteredRows = baseStudents.filter((s) => {
-                    if (ckCls && s.class_name !== ckCls) return false;
-                    if (ckSearch) {
-                        const hit = (s.full_name || '').toLowerCase().includes(ckSearch) ||
-                            (s.username || '').toLowerCase().includes(ckSearch) ||
-                            (s.class_name || '').toLowerCase().includes(ckSearch) ||
-                            (s.sub_concentration || '').toLowerCase().includes(ckSearch);
-                        if (!hit) return false;
-                    }
-                    const rowData = checklistRowMap[s.id] || { items: {} };
-                    const colsForStu = getStuCols(s);
-                    const doneCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
-                    const wipCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip').length;
-                    const revCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi').length;
-                    if (ckStFilter === 'all_done') return colsForStu.length > 0 && doneCnt === colsForStu.length;
-                    if (ckStFilter === 'wip') return wipCnt > 0;
-                    if (ckStFilter === 'not_done') return doneCnt < colsForStu.length;
-                    if (ckStFilter === 'revisi') return revCnt > 0;
-                    return true;
-                });
-
-                let sumProgressPct = 0;
-                const totalDoneAll = baseStudents.filter((s) => {
-                    const cols = getStuCols(s);
-                    const rowData = checklistRowMap[s.id] || { items: {} };
-                    const d = cols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
-                    sumProgressPct += cols.length ? Math.round((d / cols.length) * 100) : 0;
-                    return cols.length > 0 && d === cols.length;
-                }).length;
-                const avgProgressPct = baseStudents.length ? Math.round(sumProgressPct / baseStudents.length) : 0;
-                const totalWipAll = baseStudents.filter((s) => {
-                    const cols = getStuCols(s);
-                    const rowData = checklistRowMap[s.id] || { items: {} };
-                    return cols.some((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip');
-                }).length;
-                const totalRevisiAll = baseStudents.filter((s) => {
-                    const cols = getStuCols(s);
-                    const rowData = checklistRowMap[s.id] || { items: {} };
-                    return cols.some((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi');
-                }).length;
-                const totalNotDoneAll = baseStudents.length - totalDoneAll;
-
-                const unassignedCount = poolStudents.filter((s) => !s.sub_concentration).length;
-                const count2D = poolStudents.filter((s) => (s.sub_concentration || '').startsWith('2D')).length;
-                const count3D = poolStudents.filter((s) => (s.sub_concentration || '').startsWith('3D')).length;
-
-                const subconcTabs = [
-                    ...(expectedRole === 'mentor' ? [{ val: '', label: `Semua ${staffScopeMode === 'homeroom' && myHomeroomClass ? myHomeroomClass : 'Bimbingan'}`, count: studentList.length, group: 'scope' }] : []),
-                    ...SUBCONCS.map((sc) => ({
-                        val: sc,
-                        label: `${sc}${myPjSubconcs.includes(sc) ? ' ★PJ' : ''}`,
-                        count: studentSourceForTab(sc).filter((s) => s.sub_concentration === sc).length,
-                        group: 'subconc'
-                    })),
-                    { val: '__group_2d', label: 'Semua 2D', count: count2D, group: 'combo' },
-                    { val: '__group_3d', label: 'Semua 3D', count: count3D, group: 'combo' },
-                    ...(unassignedCount > 0 ? [{ val: '__unassigned', label: '⚠️ Belum Ada Subkon', count: unassignedCount, group: 'warn' }] : [])
-                ];
-
-                container.innerHTML = `
-                    ${modeSwitcherHtml}
-                    <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
-                        <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] space-y-4">
-                            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                                <div class="space-y-1">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${canEditActiveSc || isAdminStaff ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#EAF4FF] text-[#0082E6]'}">
-                                            ${canEditActiveSc || isAdminStaff ? '✏️ Mode Edit PJ Sub-Konsentrasi / Admin' : '👁️ Mode Pantau Pembimbing (Diisi oleh PJ Subkon)'}
-                                        </span>
-                                        <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white border border-[#DCEBFF] text-[#0082E6]">Otomatis per Sub-Konsentrasi Siswa</span>
-                                        ${isSpecificSc ? `<span class="text-[11px] font-bold text-slate-500">PJ ${esc(activeSc)}: <strong class="text-[#1E293B]">${pjNamesForActiveSc.length ? esc(pjNamesForActiveSc.join(', ')) : 'Belum ditetapkan (atur di Akun & Plotting)'}</strong></span>` : ''}
-                                    </div>
-                                    <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">📊 Project Update — ${esc(isSpecificSc ? activeSc : (isGroup2D ? 'Semua Subkon 2D' : (isGroup3D ? 'Semua Subkon 3D' : (isUnassignedTab ? 'Siswa Belum Ada Sub-Konsentrasi' : 'Semua Siswa'))))}</h3>
-                                    <p class="text-xs text-slate-500">
-                                        Siswa otomatis masuk ke tabel sesuai Sub-Konsentrasinya. Ubah status tahapan (<strong>None / WIP / Revisi / Done</strong>) untuk langsung menggerakkan <strong>Progress Bar hijau</strong> &amp; menyimpan <strong>Notes</strong> secara real-time.
-                                    </p>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2 shrink-0">
-                                    ${(isAdminStaff || myPjSubconcs.length > 0) ? `
-                                    <button type="button" onclick="downloadChecklistTemplateXlsx()"
-                                        class="px-3.5 py-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-xs font-bold transition cursor-pointer">
-                                        📄 Download Format (.xlsx)
-                                    </button>
-                                    <label for="importChecklistXlsxInput"
-                                        class="px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
-                                        📤 Import Spreadsheet (.xlsx)
-                                    </label>
-                                    <input id="importChecklistXlsxInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleChecklistImportFile(this)" />` : ''}
-                                    <button type="button" onclick="exportChecklistXlsx()"
-                                        class="px-3.5 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
-                                        📥 Export Project Update (.xlsx)
-                                    </button>
-                                </div>
-                            </div>
-
-                            ${(isAdminStaff || myPjSubconcs.length > 0) ? `
-                            <div class="rounded-xl bg-white/90 border border-[#DCEBFF] px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    <span class="font-extrabold text-[#0082E6]">📋 Format Kolom Excel:</span>
-                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Nama Siswa</code>
-                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Username</code>
-                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Kelas</code>
-                                    <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Link Google Drive</code>
-                                    <code class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-mono text-[10.5px]">[Tahapan: None / WIP / Revisi / Done]</code>
-                                    <code class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00] font-mono text-[10.5px]">Notes</code>
-                                </div>
-                                <span class="text-[10.5px] text-slate-400">Klik <strong>📄 Download Format (.xlsx)</strong> untuk mengunduh template siap isi dengan daftar siswa.</span>
-                            </div>` : ''}
-
-                            <!-- Tab Otomatis per Sub-Konsentrasi + Grup 2D / 3D -->
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                ${subconcTabs.map((tab) => {
-                                    const active = activeSc === tab.val;
-                                    const pillCls = active
-                                        ? 'bg-[#0095FF] text-white border-[#0095FF] shadow-sm'
-                                        : (tab.group === 'warn'
-                                            ? 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6] hover:bg-[#FFE4E6]'
-                                            : (tab.group === 'combo'
-                                                ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0] hover:border-[#4CAF50]'
-                                                : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'));
-                                    return `
-                                        <button type="button" onclick="setChecklistSubconc('${esc(tab.val)}')"
-                                            class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer inline-flex items-center gap-1.5 ${pillCls}">
-                                            <span>${esc(tab.label)}</span>
-                                            <span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold num-tabular ${active ? 'bg-white/20 text-white' : 'bg-black/5'}">${tab.count}</span>
-                                        </button>`;
-                                }).join('')}
-                            </div>
-
-                            <!-- Kelola Kolom Tahapan (Khusus PJ Subkon aktif / Admin) -->
-                            ${canEditActiveSc && isSpecificSc ? `
-                            <div class="rounded-xl bg-white border border-[#DCEBFF] p-3.5 space-y-2.5">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#0082E6]">✏️ Kelola Kolom Tahapan STATUS — ${esc(activeSc)}</span>
-                                        <p class="text-[10.5px] text-slate-400">Guru PJ Subkon bebas menambah, mengubah nama (✎), mengurutkan (◀/▶), atau menghapus tahapan sesuai pipeline subkon ini.</p>
-                                    </div>
-                                    <button type="button" onclick="syncChecklistColsFromTasks('${esc(activeSc)}')"
-                                        class="px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
-                                        ↻ Tarik dari Daftar Tugas Project
-                                    </button>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    ${activeCols.map((col, ci) => `
-                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F7FAFF] border border-[#DCEBFF] text-xs font-bold text-[#1E293B]">
-                                            ${ci > 0 ? `<button type="button" onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, -1)" title="Geser ke kiri" class="text-slate-400 hover:text-[#0082E6] text-[10px] px-0.5 cursor-pointer">◀</button>` : ''}
-                                            <span>${ci + 1}. ${esc(col)}</span>
-                                            <button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-slate-400 hover:text-[#0082E6] text-[11px] px-0.5 cursor-pointer">✎</button>
-                                            ${ci < activeCols.length - 1 ? `<button type="button" onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, 1)" title="Geser ke kanan" class="text-slate-400 hover:text-[#0082E6] text-[10px] px-0.5 cursor-pointer">▶</button>` : ''}
-                                            ${activeCols.length > 1 ? `<button type="button" onclick="removeChecklistColumn('${esc(activeSc)}', ${ci})" title="Hapus kolom tahapan ini" class="text-slate-400 hover:text-[#E11D48] font-extrabold px-0.5 cursor-pointer">✕</button>` : ''}
-                                        </span>`).join('')}
-                                </div>
-                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Storyline, Storyboard, Modeling, Rigging, Grading, Final Film)"
-                                        onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistColumn('${esc(activeSc)}');}"
-                                        class="flex-1 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                                    <button type="button" onclick="addChecklistColumn('${esc(activeSc)}')"
-                                        class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
-                                        + Tambah Kolom
-                                    </button>
-                                </div>
-                            </div>` : ''}
-
-                            <!-- 4 KPI Ringkasan -->
-                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 num-tabular">
-                                <div class="bg-white border border-[#DCEBFF] rounded-xl px-3.5 py-2.5 space-y-1">
-                                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                                        <span>Rata-rata Progres</span>
-                                        <strong class="text-[#15803D]">${avgProgressPct}%</strong>
-                                    </div>
-                                    <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                                        <div class="h-full bg-[#4CAF50] rounded-full transition-all duration-300" style="width:${avgProgressPct}%"></div>
-                                    </div>
-                                </div>
-                                <div class="bg-[#DCFCE7] border border-[#86EFAC] rounded-xl px-3.5 py-2">
-                                    <div class="text-[11px] font-semibold text-[#15803D]">✓ Semua Done</div>
-                                    <div class="text-lg font-extrabold text-[#15803D]">${totalDoneAll} / ${baseStudents.length}</div>
-                                </div>
-                                <div class="bg-[#FFF6D6] border border-[#FDE68A] rounded-xl px-3.5 py-2">
-                                    <div class="text-[11px] font-semibold text-[#B45309]">⏳ Sedang WIP</div>
-                                    <div class="text-lg font-extrabold text-[#B45309]">${totalWipAll} siswa</div>
-                                </div>
-                                <div class="bg-[#FFF0F4] border border-[#FECDD6] rounded-xl px-3.5 py-2">
-                                    <div class="text-[11px] font-semibold text-[#E11D48]">! Ada Revisi</div>
-                                    <div class="text-lg font-extrabold text-[#E11D48]">${totalRevisiAll} siswa</div>
-                                </div>
-                            </div>
-
-                            <!-- Toolbar Filter -->
-                            <div class="flex flex-wrap items-center gap-2">
-                                <select onchange="setChecklistClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
-                                    <option value="">Semua Kelas</option>
-                                    ${ckClasses.map((c) => `<option value="${esc(c)}" ${ckCls === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
-                                </select>
-                                <select onchange="setChecklistStatusFilter(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
-                                    <option value="all" ${ckStFilter === 'all' ? 'selected' : ''}>Semua Status (${baseStudents.length})</option>
-                                    <option value="not_done" ${ckStFilter === 'not_done' ? 'selected' : ''}>Belum Tuntas (${totalNotDoneAll})</option>
-                                    <option value="wip" ${ckStFilter === 'wip' ? 'selected' : ''}>Sedang WIP (${totalWipAll})</option>
-                                    <option value="revisi" ${ckStFilter === 'revisi' ? 'selected' : ''}>Ada Revisi (${totalRevisiAll})</option>
-                                    <option value="all_done" ${ckStFilter === 'all_done' ? 'selected' : ''}>Semua Done (${totalDoneAll})</option>
-                                </select>
-                                <input id="checklistSearchInp" type="text" value="${esc(projectChecklistState.search)}" oninput="setChecklistSearch(this.value)"
-                                    placeholder="Cari nama siswa / kelas / subkon..."
-                                    class="flex-1 min-w-[180px] max-w-xs px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
-                                <span class="ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
-                            </div>
-                        </div>
-
-                        <!-- Bar Navigasi Geser Kiri/Kanan + Scrollbar Atas Tersinkronisasi (Tidak Perlu Scroll ke Bawah) -->
-                        <div class="px-4 py-2 bg-[#FAFBFD] border-b border-[#EDF1F7] space-y-1.5">
-                            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    <button type="button" onclick="scrollChecklistTable('start')"
-                                        class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">⏮ Awal</button>
-                                    <button type="button" onclick="scrollChecklistTable(-340)"
-                                        class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">◀ Geser Kiri</button>
-                                    <button type="button" onclick="scrollChecklistTable('status')"
-                                        class="px-3 py-1 rounded-lg bg-[#E3F6F3] hover:bg-[#4CB6A7] border border-[#BBE9E2] text-[#1D5E55] hover:text-white font-extrabold transition cursor-pointer">⏭ Langsung ke STATUS</button>
-                                    <button type="button" onclick="scrollChecklistTable(340)"
-                                        class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Geser Kanan ▶</button>
-                                </div>
-                                <span class="text-[10.5px] text-slate-400 hidden md:inline">Tips: Geser scrollbar di bawah ini, tahan <kbd class="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">Shift</kbd> + scroll mouse, atau seret header tabel.</span>
-                            </div>
-                            <div id="checklistTopScroll" class="overflow-x-auto h-3.5 rounded-full bg-slate-100/80">
-                                <div id="checklistTopScrollInner" class="h-px"></div>
-                            </div>
-                        </div>
-
-                        <!-- Tabel Project Update 2-Tingkat Persis Spreadsheet 2D / 3D (Header & Kolom Nama Terkunci) -->
-                        <div id="checklistTableScroll" class="overflow-auto max-h-[68vh] relative">
-                            <table id="checklistMainTable" class="w-full text-left border-collapse text-xs">
-                                <thead class="sticky top-0 z-20 shadow-[0_1px_0_#E2E8F0]">
-                                    <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
-                                        <th rowspan="2" class="py-2.5 px-2.5 w-10 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">No</th>
-                                        <th rowspan="2" class="py-2.5 px-3 sticky left-0 bg-[#F7FAFF] z-30 min-w-[215px] border-r border-[#DCE5F2] shadow-[2px_0_6px_rgba(15,23,42,0.04)]">Nama Siswa</th>
-                                        <th rowspan="2" class="py-2.5 px-2.5 text-center bg-[#F7FAFF] min-w-[82px] border-r border-[#EDF1F7]">Kelas</th>
-                                        <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[130px] border-r border-[#EDF1F7]">Progress</th>
-                                        <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[118px] border-r border-[#EDF1F7]">No. HP / WA</th>
-                                        <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[125px] border-r border-[#EDF1F7]">Link Google Drive</th>
-                                        <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[120px] border-r border-[#EDF1F7]">Pembimbing</th>
-                                        <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-2 px-2 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
-                                        <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[230px]">Notes</th>
-                                    </tr>
-                                    <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-[10px] font-bold text-[#1D5E55]">
-                                        ${activeCols.map((col, ci) => `
-                                            <th class="py-2 px-2 text-center min-w-[128px] bg-[#F2FBF9] border-r border-[#DCEEEB]">
-                                                <div class="inline-flex items-center justify-center gap-1">
-                                                    <span>${esc(col)}</span>
-                                                    ${canEditActiveSc && isSpecificSc ? `<button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-[#1D5E55]/60 hover:text-[#0082E6] text-[10px] cursor-pointer">✎</button>` : ''}
-                                                </div>
-                                            </th>`).join('')}
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-[#F1F5F9]">
-                                    ${filteredRows.length ? filteredRows.map((s, idx) => {
-                                        const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
-                                        const stuSubconc = s.sub_concentration || '';
-                                        const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
-                                        const stuCols = getStuCols(s);
-                                        const stuColsSet = new Set(stuCols);
-                                        const doneCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
-                                        const progPct = stuCols.length ? Math.round((doneCount / stuCols.length) * 100) : 0;
-                                        const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
-                                        const notDoneList = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) !== 'done');
-                                        const waText = notDoneList.length
-                                            ? `Halo ${s.full_name}, update Project Update (${stuSubconc || 'Animasi'}) — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Notes: ${rowData.notes}` : ''} Mohon segera dilengkapi di Folder Google Drive ya.`
-                                            : `Halo ${s.full_name}, selamat! Semua tahapan Project Update kamu sudah Done (100%) ✓`;
-
-                                        return `
-                                            <tr class="hover:bg-[#F8FBFF] align-middle">
-                                                <td class="py-2.5 px-2.5 text-center font-mono text-slate-400 border-r border-[#F1F5F9]">${idx + 1}</td>
-                                                <td class="py-2.5 px-3 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                                    <div class="font-bold text-[#1E293B] truncate max-w-[200px]" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
-                                                    <div class="text-[10px] text-slate-400 truncate mt-0.5">
-                                                        <span class="font-mono">@${esc(s.username)}</span> • <span class="font-semibold ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Belum ada subkon')}</span>
-                                                    </div>
-                                                </td>
-                                                <td class="py-2.5 px-2.5 text-center border-r border-[#F1F5F9]">
-                                                    <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
-                                                </td>
-                                                <td class="py-2.5 px-3 border-r border-[#F1F5F9] num-tabular">
-                                                    <div class="flex items-center justify-between text-[10.5px] font-bold mb-1">
-                                                        <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length} Done</span>
-                                                        <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-400'}">${progPct}%</span>
-                                                    </div>
-                                                    <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
-                                                        <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
-                                                    </div>
-                                                </td>
-                                                <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
-                                                    ${renderWhatsappLink(s.whatsapp_number, false, waText)}
-                                                </td>
-                                                <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
-                                                    <div class="flex items-center gap-1">
-                                                        ${s.project_drive_url
-                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[10.5px] font-bold transition whitespace-nowrap">📁 Buka Drive ↗</a>`
-                                                            : `<span class="text-[10.5px] text-slate-400 italic">Belum diisi</span>`}
-                                                        ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-1.5 py-1 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[10px] font-bold cursor-pointer">✎</button>` : ''}
-                                                    </div>
-                                                </td>
-                                                <td class="py-2.5 px-2.5 text-[11px] text-slate-600 border-r border-[#F1F5F9]">
-                                                    ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">Belum di-plot</span>`}
-                                                </td>
-                                                ${activeCols.map((col) => {
-                                                    if (!stuColsSet.has(col)) return `<td class="py-2.5 px-2 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
-                                                    const stVal = normalizeChecklistStatus(rowData.items?.[col]);
-                                                    const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
-                                                    if (stuCanEdit) {
-                                                        return `
-                                                            <td class="py-2.5 px-1.5 text-center border-r border-[#F1F5F9]">
-                                                                <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
-                                                                    class="w-full px-2 py-1.5 rounded-lg border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
-                                                                    ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-                                                                </select>
-                                                            </td>`;
-                                                    }
-                                                    return `
-                                                        <td class="py-2.5 px-2 text-center border-r border-[#F1F5F9]">
-                                                            <span class="inline-block min-w-[68px] px-2.5 py-1 rounded-lg border text-[11px] font-extrabold ${stOpt.cls}">${stOpt.label}</span>
-                                                        </td>`;
-                                                }).join('')}
-                                                <td class="py-2.5 px-3">
-                                                    ${stuCanEdit ? `
-                                                        <div class="flex items-center gap-1.5">
-                                                            <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis Notes..."
-                                                                onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
-                                                                class="flex-1 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                                                            <button type="button" onclick="saveChecklistNote('${s.id}', this)"
-                                                                class="px-2.5 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
-                                                                Simpan
-                                                            </button>
-                                                        </div>` : `
-                                                        <div class="text-xs ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
-                                                    ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-1">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
-                                                </td>
-                                            </tr>`;
-                                    }).join('') : `<tr><td colspan="${activeCols.length + 8}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>`;
-                initChecklistScrollSync();
                 return;
             }
 
@@ -5845,10 +5439,422 @@
             updateNotificationCenter(staffNotifs, `staff_${currentUser.id}`);
 
             renderProjectTrackerBody();
+            renderProjectUpdateView();
         }
         global.loadProjectTracker = loadProjectTracker;
 
+        // ==================== HALAMAN MENU TERSENDIRI: PROJECT UPDATE (PJ SUB-KONSENTRASI) ====================
+        function renderProjectUpdateView() {
+            const container = document.getElementById('projectUpdateContainer');
+            if (!container) return;
+
+            const { allStudentsList = [], studentList = [], mentorsList = [], checklistColsMap = {}, checklistRowMap = {}, pjMap = {} } = projectDataCache;
+            const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m]));
+            const isAdminStaff = isAnyAdmin(currentUser);
+            const poolStudents = (expectedRole === 'superadmin' || isAdminStaff) ? allStudentsList : studentList;
+
+            // Tentukan default tab aktif
+            let activeSc = projectChecklistState.subconc;
+            if (!activeSc && (expectedRole === 'superadmin' || myPjSubconcs.length > 0)) {
+                activeSc = myPjSubconcs[0] || SUBCONCS[0];
+                projectChecklistState.subconc = activeSc;
+            }
+
+            const isSpecificSc = SUBCONCS.includes(activeSc);
+            const isGroup2D = activeSc === '__group_2d';
+            const isGroup3D = activeSc === '__group_3d';
+            const isUnassignedTab = activeSc === '__unassigned';
+            const canEditActiveSc = isAdminStaff || (isSpecificSc && myPjSubconcs.includes(activeSc));
+
+            const pjNamesForActiveSc = isSpecificSc
+                ? mentorsList.filter((m) => Array.isArray(pjMap[m.id]) && pjMap[m.id].includes(activeSc)).map((m) => m.full_name)
+                : [];
+
+            // Helper cek siswa masuk tab yang dipilih (otomatis dari sub_concentration masing-masing siswa)
+            const matchSubconcTab = (s, tabVal) => {
+                const sc = s.sub_concentration || '';
+                if (!tabVal) return true;
+                if (tabVal === '__group_2d') return sc.startsWith('2D');
+                if (tabVal === '__group_3d') return sc.startsWith('3D');
+                if (tabVal === '__unassigned') return !sc;
+                return sc === tabVal;
+            };
+
+            // Sumber siswa: PJ Subkon / Admin melihat seluruh siswa di subkon yang dipegangnya; pembimbing biasa melihat siswa bimbingan/kelasnya
+            const studentSourceForTab = (tabVal) => {
+                if (expectedRole === 'superadmin' || isAdminStaff) return allStudentsList;
+                if (SUBCONCS.includes(tabVal) && myPjSubconcs.includes(tabVal)) return allStudentsList;
+                return studentList;
+            };
+
+            const baseStudents = studentSourceForTab(activeSc).filter((s) => matchSubconcTab(s, activeSc));
+
+            const ckCls = projectChecklistState.className || '';
+            const ckStFilter = projectChecklistState.statusFilter || 'all';
+            const ckSearch = (projectChecklistState.search || '').trim().toLowerCase();
+            const ckClasses = [...new Set(baseStudents.map((s) => s.class_name).filter(Boolean))].sort();
+
+            const activeCols = isSpecificSc
+                ? (checklistColsMap[activeSc] || DEFAULT_CHECKLIST_COLS)
+                : (isGroup2D
+                    ? [...new Set(SUBCONCS.filter((sc) => sc.startsWith('2D')).flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]
+                    : (isGroup3D
+                        ? [...new Set(SUBCONCS.filter((sc) => sc.startsWith('3D')).flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]
+                        : [...new Set(SUBCONCS.flatMap((sc) => checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS))]));
+
+            const getStuCols = (s) => (s.sub_concentration && checklistColsMap[s.sub_concentration])
+                ? checklistColsMap[s.sub_concentration]
+                : (isSpecificSc ? activeCols : DEFAULT_CHECKLIST_COLS);
+
+            const filteredRows = baseStudents.filter((s) => {
+                if (ckCls && s.class_name !== ckCls) return false;
+                if (ckSearch) {
+                    const hit = (s.full_name || '').toLowerCase().includes(ckSearch) ||
+                        (s.username || '').toLowerCase().includes(ckSearch) ||
+                        (s.class_name || '').toLowerCase().includes(ckSearch) ||
+                        (s.sub_concentration || '').toLowerCase().includes(ckSearch);
+                    if (!hit) return false;
+                }
+                const rowData = checklistRowMap[s.id] || { items: {} };
+                const colsForStu = getStuCols(s);
+                const doneCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                const wipCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip').length;
+                const revCnt = colsForStu.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi').length;
+                if (ckStFilter === 'all_done') return colsForStu.length > 0 && doneCnt === colsForStu.length;
+                if (ckStFilter === 'wip') return wipCnt > 0;
+                if (ckStFilter === 'not_done') return doneCnt < colsForStu.length;
+                if (ckStFilter === 'revisi') return revCnt > 0;
+                return true;
+            });
+
+            let sumProgressPct = 0;
+            const totalDoneAll = baseStudents.filter((s) => {
+                const cols = getStuCols(s);
+                const rowData = checklistRowMap[s.id] || { items: {} };
+                const d = cols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                sumProgressPct += cols.length ? Math.round((d / cols.length) * 100) : 0;
+                return cols.length > 0 && d === cols.length;
+            }).length;
+            const avgProgressPct = baseStudents.length ? Math.round(sumProgressPct / baseStudents.length) : 0;
+            const totalWipAll = baseStudents.filter((s) => {
+                const cols = getStuCols(s);
+                const rowData = checklistRowMap[s.id] || { items: {} };
+                return cols.some((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip');
+            }).length;
+            const totalRevisiAll = baseStudents.filter((s) => {
+                const cols = getStuCols(s);
+                const rowData = checklistRowMap[s.id] || { items: {} };
+                return cols.some((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi');
+            }).length;
+            const totalNotDoneAll = baseStudents.length - totalDoneAll;
+
+            const unassignedCount = poolStudents.filter((s) => !s.sub_concentration).length;
+            const count2D = poolStudents.filter((s) => (s.sub_concentration || '').startsWith('2D')).length;
+            const count3D = poolStudents.filter((s) => (s.sub_concentration || '').startsWith('3D')).length;
+
+            const subconcTabs = [
+                ...(expectedRole === 'mentor' ? [{ val: '', label: `Semua ${staffScopeMode === 'homeroom' && myHomeroomClass ? myHomeroomClass : 'Bimbingan'}`, count: studentList.length, group: 'scope' }] : []),
+                ...SUBCONCS.map((sc) => ({
+                    val: sc,
+                    label: `${sc}${myPjSubconcs.includes(sc) ? ' ★PJ' : ''}`,
+                    count: studentSourceForTab(sc).filter((s) => s.sub_concentration === sc).length,
+                    group: 'subconc'
+                })),
+                { val: '__group_2d', label: 'Semua 2D', count: count2D, group: 'combo' },
+                { val: '__group_3d', label: 'Semua 3D', count: count3D, group: 'combo' },
+                ...(unassignedCount > 0 ? [{ val: '__unassigned', label: '⚠️ Belum Ada Subkon', count: unassignedCount, group: 'warn' }] : [])
+            ];
+
+            container.innerHTML = `
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] space-y-4">
+                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div class="space-y-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${canEditActiveSc || isAdminStaff ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#EAF4FF] text-[#0082E6]'}">
+                                        ${canEditActiveSc || isAdminStaff ? '✏️ Mode Edit PJ Sub-Konsentrasi / Admin' : '👁️ Mode Pantau Pembimbing (Diisi oleh PJ Subkon)'}
+                                    </span>
+                                    <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white border border-[#DCEBFF] text-[#0082E6]">Otomatis per Sub-Konsentrasi Siswa</span>
+                                    ${isSpecificSc ? `<span class="text-[11px] font-bold text-slate-500">PJ ${esc(activeSc)}: <strong class="text-[#1E293B]">${pjNamesForActiveSc.length ? esc(pjNamesForActiveSc.join(', ')) : 'Belum ditetapkan (atur di Akun & Plotting)'}</strong></span>` : ''}
+                                </div>
+                                <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">📊 Project Update — ${esc(isSpecificSc ? activeSc : (isGroup2D ? 'Semua Subkon 2D' : (isGroup3D ? 'Semua Subkon 3D' : (isUnassignedTab ? 'Siswa Belum Ada Sub-Konsentrasi' : 'Semua Siswa'))))}</h3>
+                                <p class="text-xs text-slate-500">
+                                    Siswa otomatis masuk ke tabel sesuai Sub-Konsentrasinya. Ubah status tahapan (<strong>None / WIP / Revisi / Done</strong>) untuk langsung menggerakkan <strong>Progress Bar hijau</strong> &amp; menyimpan <strong>Notes</strong> secara real-time.
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                ${(isAdminStaff || myPjSubconcs.length > 0) ? `
+                                <button type="button" onclick="downloadChecklistTemplateXlsx()"
+                                    class="px-3.5 py-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    📄 Download Format (.xlsx)
+                                </button>
+                                <label for="importChecklistXlsxInput"
+                                    class="px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    📤 Import Spreadsheet (.xlsx)
+                                </label>
+                                <input id="importChecklistXlsxInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleChecklistImportFile(this)" />` : ''}
+                                <button type="button" onclick="exportChecklistXlsx()"
+                                    class="px-3.5 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    📥 Export Project Update (.xlsx)
+                                </button>
+                            </div>
+                        </div>
+
+                        ${(isAdminStaff || myPjSubconcs.length > 0) ? `
+                        <div class="rounded-xl bg-white/90 border border-[#DCEBFF] px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="font-extrabold text-[#0082E6]">📋 Format Kolom Excel:</span>
+                                <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Nama Siswa</code>
+                                <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Username</code>
+                                <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Kelas</code>
+                                <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Link Google Drive</code>
+                                <code class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-mono text-[10.5px]">[Tahapan: None / WIP / Revisi / Done]</code>
+                                <code class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00] font-mono text-[10.5px]">Notes</code>
+                            </div>
+                            <span class="text-[10.5px] text-slate-400">Klik <strong>📄 Download Format (.xlsx)</strong> untuk mengunduh template siap isi dengan daftar siswa.</span>
+                        </div>` : ''}
+
+                        <!-- Tab Otomatis per Sub-Konsentrasi + Grup 2D / 3D -->
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            ${subconcTabs.map((tab) => {
+                                const active = activeSc === tab.val;
+                                const pillCls = active
+                                    ? 'bg-[#0095FF] text-white border-[#0095FF] shadow-sm'
+                                    : (tab.group === 'warn'
+                                        ? 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6] hover:bg-[#FFE4E6]'
+                                        : (tab.group === 'combo'
+                                            ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0] hover:border-[#4CAF50]'
+                                            : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'));
+                                return `
+                                    <button type="button" onclick="setChecklistSubconc('${esc(tab.val)}')"
+                                        class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer inline-flex items-center gap-1.5 ${pillCls}">
+                                        <span>${esc(tab.label)}</span>
+                                        <span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold num-tabular ${active ? 'bg-white/20 text-white' : 'bg-black/5'}">${tab.count}</span>
+                                    </button>`;
+                            }).join('')}
+                        </div>
+
+                        <!-- Kelola Kolom Tahapan (Khusus PJ Subkon aktif / Admin) -->
+                        ${canEditActiveSc && isSpecificSc ? `
+                        <div class="rounded-xl bg-white border border-[#DCEBFF] p-3.5 space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#0082E6]">✏️ Kelola Kolom Tahapan STATUS — ${esc(activeSc)}</span>
+                                    <p class="text-[10.5px] text-slate-400">Guru PJ Subkon bebas menambah, mengubah nama (✎), mengurutkan (◀/▶), atau menghapus tahapan sesuai pipeline subkon ini.</p>
+                                </div>
+                                <button type="button" onclick="syncChecklistColsFromTasks('${esc(activeSc)}')"
+                                    class="px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
+                                    ↻ Tarik dari Daftar Tugas Project
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${activeCols.map((col, ci) => `
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F7FAFF] border border-[#DCEBFF] text-xs font-bold text-[#1E293B]">
+                                        ${ci > 0 ? `<button type="button" onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, -1)" title="Geser ke kiri" class="text-slate-400 hover:text-[#0082E6] text-[10px] px-0.5 cursor-pointer">◀</button>` : ''}
+                                        <span>${ci + 1}. ${esc(col)}</span>
+                                        <button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-slate-400 hover:text-[#0082E6] text-[11px] px-0.5 cursor-pointer">✎</button>
+                                        ${ci < activeCols.length - 1 ? `<button type="button" onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, 1)" title="Geser ke kanan" class="text-slate-400 hover:text-[#0082E6] text-[10px] px-0.5 cursor-pointer">▶</button>` : ''}
+                                        ${activeCols.length > 1 ? `<button type="button" onclick="removeChecklistColumn('${esc(activeSc)}', ${ci})" title="Hapus kolom tahapan ini" class="text-slate-400 hover:text-[#E11D48] font-extrabold px-0.5 cursor-pointer">✕</button>` : ''}
+                                    </span>`).join('')}
+                            </div>
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Storyline, Storyboard, Modeling, Rigging, Grading, Final Film)"
+                                    onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistColumn('${esc(activeSc)}');}"
+                                    class="flex-1 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <button type="button" onclick="addChecklistColumn('${esc(activeSc)}')"
+                                    class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
+                                    + Tambah Kolom
+                                </button>
+                            </div>
+                        </div>` : ''}
+
+                        <!-- 4 KPI Ringkasan -->
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 num-tabular">
+                            <div class="bg-white border border-[#DCEBFF] rounded-xl px-3.5 py-2.5 space-y-1">
+                                <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                                    <span>Rata-rata Progres</span>
+                                    <strong class="text-[#15803D]">${avgProgressPct}%</strong>
+                                </div>
+                                <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                                    <div class="h-full bg-[#4CAF50] rounded-full transition-all duration-300" style="width:${avgProgressPct}%"></div>
+                                </div>
+                            </div>
+                            <div class="bg-[#DCFCE7] border border-[#86EFAC] rounded-xl px-3.5 py-2">
+                                <div class="text-[11px] font-semibold text-[#15803D]">✓ Semua Done</div>
+                                <div class="text-lg font-extrabold text-[#15803D]">${totalDoneAll} / ${baseStudents.length}</div>
+                            </div>
+                            <div class="bg-[#FFF6D6] border border-[#FDE68A] rounded-xl px-3.5 py-2">
+                                <div class="text-[11px] font-semibold text-[#B45309]">⏳ Sedang WIP</div>
+                                <div class="text-lg font-extrabold text-[#B45309]">${totalWipAll} siswa</div>
+                            </div>
+                            <div class="bg-[#FFF0F4] border border-[#FECDD6] rounded-xl px-3.5 py-2">
+                                <div class="text-[11px] font-semibold text-[#E11D48]">! Ada Revisi</div>
+                                <div class="text-lg font-extrabold text-[#E11D48]">${totalRevisiAll} siswa</div>
+                            </div>
+                        </div>
+
+                        <!-- Toolbar Filter -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select onchange="setChecklistClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Kelas</option>
+                                ${ckClasses.map((c) => `<option value="${esc(c)}" ${ckCls === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+                            </select>
+                            <select onchange="setChecklistStatusFilter(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                <option value="all" ${ckStFilter === 'all' ? 'selected' : ''}>Semua Status (${baseStudents.length})</option>
+                                <option value="not_done" ${ckStFilter === 'not_done' ? 'selected' : ''}>Belum Tuntas (${totalNotDoneAll})</option>
+                                <option value="wip" ${ckStFilter === 'wip' ? 'selected' : ''}>Sedang WIP (${totalWipAll})</option>
+                                <option value="revisi" ${ckStFilter === 'revisi' ? 'selected' : ''}>Ada Revisi (${totalRevisiAll})</option>
+                                <option value="all_done" ${ckStFilter === 'all_done' ? 'selected' : ''}>Semua Done (${totalDoneAll})</option>
+                            </select>
+                            <input id="checklistSearchInp" type="text" value="${esc(projectChecklistState.search)}" oninput="setChecklistSearch(this.value)"
+                                placeholder="Cari nama siswa / kelas / subkon..."
+                                class="flex-1 min-w-[180px] max-w-xs px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                            <span class="ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
+                        </div>
+                    </div>
+
+                    <!-- Bar Navigasi Geser Kiri/Kanan + Scrollbar Atas Tersinkronisasi (Tidak Perlu Scroll ke Bawah) -->
+                    <div class="px-4 py-2 bg-[#FAFBFD] border-b border-[#EDF1F7] space-y-1.5">
+                        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button type="button" onclick="scrollChecklistTable('start')"
+                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">⏮ Awal</button>
+                                <button type="button" onclick="scrollChecklistTable(-340)"
+                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">◀ Geser Kiri</button>
+                                <button type="button" onclick="scrollChecklistTable('status')"
+                                    class="px-3 py-1 rounded-lg bg-[#E3F6F3] hover:bg-[#4CB6A7] border border-[#BBE9E2] text-[#1D5E55] hover:text-white font-extrabold transition cursor-pointer">⏭ Langsung ke STATUS</button>
+                                <button type="button" onclick="scrollChecklistTable(340)"
+                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Geser Kanan ▶</button>
+                            </div>
+                            <span class="text-[10.5px] text-slate-400 hidden md:inline">Tips: Geser scrollbar di bawah ini, tahan <kbd class="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">Shift</kbd> + scroll mouse, atau seret header tabel.</span>
+                        </div>
+                        <div id="checklistTopScroll" class="overflow-x-auto h-3.5 rounded-full bg-slate-100/80">
+                            <div id="checklistTopScrollInner" class="h-px"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tabel Project Update 2-Tingkat Persis Spreadsheet 2D / 3D (Header & Kolom Nama Terkunci) -->
+                    <div id="checklistTableScroll" class="overflow-auto max-h-[68vh] relative">
+                        <table id="checklistMainTable" class="w-full text-left border-collapse text-xs">
+                            <thead class="sticky top-0 z-20 shadow-[0_1px_0_#E2E8F0]">
+                                <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                                    <th rowspan="2" class="py-2.5 px-2.5 w-10 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">No</th>
+                                    <th rowspan="2" class="py-2.5 px-3 sticky left-0 bg-[#F7FAFF] z-30 min-w-[215px] border-r border-[#DCE5F2] shadow-[2px_0_6px_rgba(15,23,42,0.04)]">Nama Siswa</th>
+                                    <th rowspan="2" class="py-2.5 px-2.5 text-center bg-[#F7FAFF] min-w-[82px] border-r border-[#EDF1F7]">Kelas</th>
+                                    <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[130px] border-r border-[#EDF1F7]">Progress</th>
+                                    <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[118px] border-r border-[#EDF1F7]">No. HP / WA</th>
+                                    <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[125px] border-r border-[#EDF1F7]">Link Google Drive</th>
+                                    <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[120px] border-r border-[#EDF1F7]">Pembimbing</th>
+                                    <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-2 px-2 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
+                                    <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[230px]">Notes</th>
+                                </tr>
+                                <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-[10px] font-bold text-[#1D5E55]">
+                                    ${activeCols.map((col, ci) => `
+                                        <th class="py-2 px-2 text-center min-w-[128px] bg-[#F2FBF9] border-r border-[#DCEEEB]">
+                                            <div class="inline-flex items-center justify-center gap-1">
+                                                <span>${esc(col)}</span>
+                                                ${canEditActiveSc && isSpecificSc ? `<button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-[#1D5E55]/60 hover:text-[#0082E6] text-[10px] cursor-pointer">✎</button>` : ''}
+                                            </div>
+                                        </th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[#F1F5F9]">
+                                ${filteredRows.length ? filteredRows.map((s, idx) => {
+                                    const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
+                                    const stuSubconc = s.sub_concentration || '';
+                                    const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
+                                    const stuCols = getStuCols(s);
+                                    const stuColsSet = new Set(stuCols);
+                                    const doneCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                                    const progPct = stuCols.length ? Math.round((doneCount / stuCols.length) * 100) : 0;
+                                    const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
+                                    const notDoneList = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) !== 'done');
+                                    const waText = notDoneList.length
+                                        ? `Halo ${s.full_name}, update Project Update (${stuSubconc || 'Animasi'}) — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Notes: ${rowData.notes}` : ''} Mohon segera dilengkapi di Folder Google Drive ya.`
+                                        : `Halo ${s.full_name}, selamat! Semua tahapan Project Update kamu sudah Done (100%) ✓`;
+
+                                    return `
+                                        <tr class="hover:bg-[#F8FBFF] align-middle">
+                                            <td class="py-2.5 px-2.5 text-center font-mono text-slate-400 border-r border-[#F1F5F9]">${idx + 1}</td>
+                                            <td class="py-2.5 px-3 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
+                                                <div class="font-bold text-[#1E293B] truncate max-w-[200px]" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
+                                                <div class="text-[10px] text-slate-400 truncate mt-0.5">
+                                                    <span class="font-mono">@${esc(s.username)}</span> • <span class="font-semibold ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Belum ada subkon')}</span>
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-2.5 text-center border-r border-[#F1F5F9]">
+                                                <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
+                                            </td>
+                                            <td class="py-2.5 px-3 border-r border-[#F1F5F9] num-tabular">
+                                                <div class="flex items-center justify-between text-[10.5px] font-bold mb-1">
+                                                    <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length} Done</span>
+                                                    <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-400'}">${progPct}%</span>
+                                                </div>
+                                                <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
+                                                    <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
+                                                ${renderWhatsappLink(s.whatsapp_number, false, waText)}
+                                            </td>
+                                            <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
+                                                <div class="flex items-center gap-1">
+                                                    ${s.project_drive_url
+                                                        ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[10.5px] font-bold transition whitespace-nowrap">📁 Buka Drive ↗</a>`
+                                                        : `<span class="text-[10.5px] text-slate-400 italic">Belum diisi</span>`}
+                                                    ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-1.5 py-1 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[10px] font-bold cursor-pointer">✎</button>` : ''}
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-2.5 text-[11px] text-slate-600 border-r border-[#F1F5F9]">
+                                                ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">Belum di-plot</span>`}
+                                            </td>
+                                            ${activeCols.map((col) => {
+                                                if (!stuColsSet.has(col)) return `<td class="py-2.5 px-2 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
+                                                const stVal = normalizeChecklistStatus(rowData.items?.[col]);
+                                                const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
+                                                if (stuCanEdit) {
+                                                    return `
+                                                        <td class="py-2.5 px-1.5 text-center border-r border-[#F1F5F9]">
+                                                            <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
+                                                                class="w-full px-2 py-1.5 rounded-lg border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
+                                                                ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+                                                            </select>
+                                                        </td>`;
+                                                }
+                                                return `
+                                                    <td class="py-2.5 px-2 text-center border-r border-[#F1F5F9]">
+                                                        <span class="inline-block min-w-[68px] px-2.5 py-1 rounded-lg border text-[11px] font-extrabold ${stOpt.cls}">${stOpt.label}</span>
+                                                    </td>`;
+                                            }).join('')}
+                                            <td class="py-2.5 px-3">
+                                                ${stuCanEdit ? `
+                                                    <div class="flex items-center gap-1.5">
+                                                        <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis Notes..."
+                                                            onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
+                                                            class="flex-1 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                                        <button type="button" onclick="saveChecklistNote('${s.id}', this)"
+                                                            class="px-2.5 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
+                                                            Simpan
+                                                        </button>
+                                                    </div>` : `
+                                                    <div class="text-xs ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
+                                                ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-1">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
+                                            </td>
+                                        </tr>`;
+                                }).join('') : `<tr><td colspan="${activeCols.length + 8}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+            initChecklistScrollSync();
+        }
+        global.renderProjectUpdateView = renderProjectUpdateView;
+
         global.setProjectViewMode = function (mode) {
+            if (mode === 'checklist') {
+                global.switchTab('project-update');
+                return;
+            }
             projectViewMode = mode;
             renderProjectTrackerBody();
         };
@@ -6629,22 +6635,22 @@
         global.setChecklistSubconc = function (sc) {
             projectChecklistState.subconc = sc || '';
             projectChecklistState.className = '';
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.setChecklistClass = function (cls) {
             projectChecklistState.className = cls || '';
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.setChecklistStatusFilter = function (st) {
             projectChecklistState.statusFilter = st || 'all';
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.setChecklistSearch = function (q) {
             projectChecklistState.search = q || '';
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
             const inp = document.getElementById('checklistSearchInp');
             if (inp) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
         };
@@ -6770,7 +6776,7 @@
 
             projectDataCache.checklistColsMap = colsMap;
             showToast(`Tahapan diubah: "${oldName}" → "${newName}" ✓`);
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.moveChecklistColumn = async function (subconc, idx, delta) {
@@ -6784,7 +6790,7 @@
             const { error } = await saveChecklistColsMap(colsMap);
             if (error) { showToast(`Gagal mengurutkan kolom: ${error.message}`); return; }
             projectDataCache.checklistColsMap = colsMap;
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.addChecklistColumn = async function (subconc) {
@@ -6803,7 +6809,7 @@
             if (error) { showToast(`Gagal menambah kolom: ${error.message}`); return; }
             projectDataCache.checklistColsMap = colsMap;
             showToast(`Kolom "${name}" ditambahkan ke ${subconc} ✓`);
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.removeChecklistColumn = async function (subconc, idx) {
@@ -6818,7 +6824,7 @@
             if (error) { showToast(`Gagal menghapus kolom: ${error.message}`); return; }
             projectDataCache.checklistColsMap = colsMap;
             showToast(`Kolom "${colName}" dihapus.`);
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.syncChecklistColsFromTasks = async function (subconc) {
@@ -6838,7 +6844,7 @@
             if (error) { showToast(`Gagal menyinkronkan kolom: ${error.message}`); return; }
             projectDataCache.checklistColsMap = colsMap;
             showToast(`Kolom tahapan ${subconc} disinkronkan dari Daftar Tugas ✓`);
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.updateChecklistCell = async function (studentId, encodedCol, newVal, selectEl) {
@@ -6875,7 +6881,7 @@
             rowMap[studentId] = nextRow;
             projectDataCache.checklistRowMap = rowMap;
             showToast(`Project Update "${colName}" → ${stOpt.label} ✓`);
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.saveChecklistNote = async function (studentId, btn) {
@@ -6903,7 +6909,7 @@
             rowMap[studentId] = nextRow;
             projectDataCache.checklistRowMap = rowMap;
             showToast('Catatan PJ Subkon tersimpan ✓');
-            renderProjectTrackerBody();
+            renderProjectUpdateView();
         };
 
         global.editStudentDriveQuick = async function (studentId, studentName) {
@@ -6922,6 +6928,7 @@
             const stuScoped = (projectDataCache.studentList || []).find((s) => s.id === studentId);
             if (stuScoped) stuScoped.project_drive_url = trimmed || null;
             showToast(`Link Google Drive ${studentName} diperbarui ✓`);
+            renderProjectUpdateView();
             renderProjectTrackerBody();
         };
 
