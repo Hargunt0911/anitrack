@@ -5561,20 +5561,17 @@
                                 return `
                                     <tr class="hover:bg-[#F8FBFF] align-middle">
                                         <td class="ck-sticky-col py-3 px-3.5 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                            <div class="flex items-start gap-2">
-                                                <span class="font-mono text-xs font-bold text-slate-400 mt-0.5 w-6 shrink-0">${globalRowIdx}.</span>
-                                                <div class="min-w-0 flex-1">
-                                                    <div class="font-bold text-[13.5px] text-[#1E293B] truncate leading-snug" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
-                                                    <div class="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px] text-slate-500">
-                                                        <span class="font-mono font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 leading-tight">${esc(s.class_name || '-')}</span>
-                                                        ${!isSpecificSc ? `<span class="font-semibold truncate max-w-[115px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>` : ''}
-                                                        ${compact ? `
-                                                        ${s.project_drive_url
-                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold leading-tight transition">📁 Drive</a>`
-                                                            : ''}
-                                                        ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / Isi Link Drive" class="px-1.5 py-0.5 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-tight cursor-pointer">✎</button>` : ''}
-                                                        ${renderWhatsappLink(s.whatsapp_number, true, waText)}` : ''}
-                                                    </div>
+                                            <div class="min-w-0">
+                                                <div class="font-bold text-[13.5px] text-[#1E293B] truncate leading-snug" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
+                                                <div class="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px] text-slate-500">
+                                                    <span class="font-mono font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 leading-tight">${esc(s.class_name || '-')}</span>
+                                                    ${!isSpecificSc ? `<span class="font-semibold truncate max-w-[115px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>` : ''}
+                                                    ${compact ? `
+                                                    ${s.project_drive_url
+                                                        ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold leading-tight transition">📁 Drive</a>`
+                                                        : ''}
+                                                    ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / Isi Link Drive" class="px-1.5 py-0.5 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-tight cursor-pointer">✎</button>` : ''}
+                                                    ${renderWhatsappLink(s.whatsapp_number, true, waText)}` : ''}
                                                 </div>
                                             </div>
                                         </td>
