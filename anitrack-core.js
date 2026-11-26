@@ -6947,7 +6947,9 @@
                     }
                     const h1 = aoa[headerRowIdx] || [];
                     const h2 = aoa[headerRowIdx + 1] || [];
-                    const isTwoRowHeader = h1.some((c) => /status/i.test(String(c || ''))) && h2.some((c) => String(c || '').trim().length > 0 && !/^\d+(\.0)?$/.test(String(c || '').trim()));
+                    const h1NameIdx = h1.findIndex((c) => ['namasiswa', 'nama', 'siswa'].includes(normKey(c)));
+                    const h2NameBlank = h1NameIdx >= 0 ? !String(h2[h1NameIdx] || '').trim() : true;
+                    const isTwoRowHeader = h2NameBlank && h1.some((c) => /^status$/i.test(String(c || '').trim())) && h2.some((c) => String(c || '').trim().length > 0 && !/^\d+(\.0)?$/.test(String(c || '').trim()));
                     const dataStart = isTwoRowHeader ? headerRowIdx + 2 : headerRowIdx + 1;
                     const maxCols = Math.max(h1.length, isTwoRowHeader ? h2.length : 0);
                     const headers = [];
@@ -6960,10 +6962,11 @@
                     const nameIdx = headers.findIndex((h) => ['namasiswa', 'nama', 'siswa'].includes(normKey(h)));
                     const userIdx = headers.findIndex((h) => ['username', 'user'].includes(normKey(h)));
                     const driveIdx = headers.findIndex((h) => normKey(h).includes('drive') || normKey(h).includes('linkgoogle'));
-                    const notesIdx = headers.findIndex((h) => normKey(h).startsWith('note'));
+                    const notesIdx = headers.findIndex((h) => normKey(h).startsWith('note') || normKey(h).includes('catatan'));
 
                     if (nameIdx < 0 && userIdx < 0) return;
 
+                    const isAdminStaff = isAnyAdmin(currentUser);
                     const ignoredCols = new Set([nameIdx, userIdx, driveIdx, notesIdx]);
                     const statusCols = [];
                     headers.forEach((h, idx) => {
@@ -6980,6 +6983,7 @@
                         if (!rawName && !rawUser) continue;
                         const stu = (rawUser && byUser[rawUser]) || (rawName && byName[rawName.toLowerCase()]);
                         if (!stu) continue;
+                        if (!isAdminStaff && (!stu.sub_concentration || !myPjSubconcs.includes(stu.sub_concentration))) continue;
 
                         const driveVal = driveIdx >= 0 ? String(row[driveIdx] || '').trim() : '';
                         const noteVal = notesIdx >= 0 ? String(row[notesIdx] || '').trim() : '';
