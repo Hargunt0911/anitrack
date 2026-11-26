@@ -798,9 +798,13 @@
                                 <input id="projDueDate" type="date" required title="Deadline tugas project"
                                     class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-mono font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                             </div>
-                            <div class="lg:col-span-9">
-                                <input id="projDesc" type="text" placeholder="Instruksi, kriteria ACC, atau format bukti yang wajib diunggah siswa..."
+                            <div class="lg:col-span-5">
+                                <input id="projDesc" type="text" placeholder="Instruksi atau kriteria ACC tugas..."
                                     class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                            </div>
+                            <div class="lg:col-span-4">
+                                <input id="projFileList" type="text" placeholder="Daftar file dikumpulkan (opsional, pisahkan koma: Storyline.pdf, Storyboard.pdf)"
+                                    class="w-full px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                             </div>
                             <div class="lg:col-span-3">
                                 <button id="saveProjectTaskBtn" type="submit"
@@ -961,7 +965,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126d"></script>
+    <script src="./anitrack-core.js?v=20261126e"></script>
     <script>
         window.AniTrack.initStaffPortal({
             role: 'mentor',

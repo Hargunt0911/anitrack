@@ -292,31 +292,123 @@
     function detectSuggestedFileExt(task) {
         const blob = `${task?.title || ''} ${task?.description || ''} ${task?.sub_concentration || ''}`.toLowerCase();
         if (/\b(mp4|mov|video|animasi|animatic|playblast|walk\s*cycle|lipsync|motion|render|compositing|editing|reel)\b/.test(blob)) return '.mp4';
+        if (/\b(wav|mp3|audio|sound|dubbing|sfx|musik|scoring|voice\s*over|vo)\b/.test(blob)) return '.wav';
+        if (/\b(mp4|mov|video|animasi|animation|blocking|splining|playblast|render|compositing|grading|film|motion|turntable)\b/.test(blob)) return '.mp4';
+        if (/\b(aep|after\s*effects)\b/.test(blob)) return '.aep';
+        if (/\b(psd|photoshop)\b/.test(blob)) return '.psd';
+        if (/\b(zip|rar|texture|asset|aset|pack)\b/.test(blob)) return '.zip';
         if (/\b(blend|fbx|obj|maya|rigging|rig|3d\s*model|modelling|modeling|sculpt|retopo|uv|texturing)\b/.test(blob)) return '.blend';
-        if (/\b(pdf|storyboard|script|naskah|treatment|sinopsis|dokumen|laporan|proposal|concept\s*doc)\b/.test(blob)) return '.pdf';
+        if (/\b(pdf|storyboard|script|naskah|treatment|sinopsis|storyline|dokumen|laporan|proposal|concept\s*doc)\b/.test(blob)) return '.pdf';
         if (/\b(png|jpg|jpeg|turnaround|model\s*sheet|character|poster|desain|ilustrasi|background|color\s*script|key\s*art|sheet)\b/.test(blob)) return '.png';
         return '.pdf';
     }
 
-    function buildProjectFileNaming(task, student = null) {
+    const PROJECT_FILES_PREFIX = 'proj_task_files::';
+
+    function parseFileSpecsInput(rawInput) {
+        if (!rawInput) return [];
+        const list = Array.isArray(rawInput)
+            ? rawInput
+            : String(rawInput).split(/[,;\n]+/);
+        const out = [];
+        list.forEach((entry) => {
+            if (!entry) return;
+            if (typeof entry === 'object' && entry.label) {
+                const lbl = String(entry.label).trim();
+                let ext = String(entry.ext || '').trim().toLowerCase();
+                if (ext && !ext.startsWith('.')) ext = `.${ext}`;
+                if (lbl) out.push({ label: lbl, ext });
+                return;
+            }
+            const raw = String(entry).trim();
+            if (!raw) return;
+            const extMatch = raw.match(/(\.[a-z0-9]{2,6})$/i);
+            const ext = extMatch ? extMatch[1].toLowerCase() : '';
+            const label = (extMatch ? raw.slice(0, -extMatch[1].length) : raw).replace(/[_\-\s]+$/g, '').trim();
+            if (label) out.push({ label, ext });
+        });
+        return out;
+    }
+
+    function parseTaskFilesMap(rows) {
+        const map = {};
+        (rows || []).forEach((r) => {
+            if (!r?.key || !r.key.startsWith(PROJECT_FILES_PREFIX)) return;
+            const taskId = r.key.slice(PROJECT_FILES_PREFIX.length);
+            if (!taskId) return;
+            try {
+                const parsed = JSON.parse(r.value || '[]');
+                const normalized = parseFileSpecsInput(parsed);
+                if (normalized.length) map[taskId] = normalized;
+            } catch { /* ignore */ }
+        });
+        return map;
+    }
+
+    function autoSplitMultiFileSpecs(task) {
+        const rawTitle = String(task?.title || '').trim();
+        if (!rawTitle) return [];
+        const parts = rawTitle
+            .split(/\s*(?:,|&|\+|\/|\bdan\b)\s*/i)
+            .map((p) => p.replace(/^[\d.)\s-]+/, '').trim())
+            .filter((p) => p.replace(/[^a-zA-Z0-9]/g, '').length >= 3);
+        if (parts.length >= 2 && parts.length <= 6) {
+            return parts.map((p) => ({ label: p, ext: '' }));
+        }
+        return [];
+    }
+
+    function buildProjectFileNaming(task, student = null, customFiles = null) {
         const stageShortMap = {
             'Pre-Production': 'PreProd',
             'Production': 'Prod',
             'Post-Production': 'PostProd'
         };
         const stageTag = stageShortMap[task?.pipeline_stage] || 'Project';
-        const taskTag = toSlugPascal(task?.title || 'Tugas', 5, 36);
-        const ext = detectSuggestedFileExt(task);
         const classTag = student?.class_name
             ? String(student.class_name).replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
             : 'XANIA';
         const studentTag = student?.full_name
             ? toSlugPascal(student.full_name, 2, 22)
             : 'NamaSiswa';
-        const pattern = `[Kelas]_[NamaSiswa]_${stageTag}_${taskTag}${ext}`;
-        const exampleBase = `${classTag}_${studentTag}_${stageTag}_${taskTag}`;
-        const exampleFull = `${exampleBase}${ext}`;
-        return { stageTag, taskTag, ext, pattern, exampleBase, exampleFull };
+
+        const customSpecs = parseFileSpecsInput(customFiles);
+        const isCustom = customSpecs.length > 0;
+        const autoSpecs = isCustom ? [] : autoSplitMultiFileSpecs(task);
+        const specs = isCustom
+            ? customSpecs
+            : (autoSpecs.length ? autoSpecs : [{ label: task?.title || 'Tugas', ext: '' }]);
+
+        const files = specs.map((sp) => {
+            const slug = toSlugPascal(sp.label || 'File', 4, 30);
+            const ext = sp.ext || detectSuggestedFileExt({
+                title: sp.label,
+                pipeline_stage: task?.pipeline_stage,
+                description: isCustom || autoSpecs.length ? sp.label : (task?.description || '')
+            });
+            const pattern = `[Kelas]_[NamaSiswa]_${stageTag}_${slug}${ext}`;
+            const exampleBase = `${classTag}_${studentTag}_${stageTag}_${slug}`;
+            const exampleFull = `${exampleBase}${ext}`;
+            return { label: sp.label, slug, ext, pattern, exampleBase, exampleFull };
+        });
+
+        const primary = files[0];
+        const multiHintExamples = [
+            `${primary.exampleBase}_01${primary.ext}`,
+            `${primary.exampleBase}_02${primary.ext}`
+        ];
+        return {
+            stageTag,
+            taskTag: primary.slug,
+            ext: primary.ext,
+            pattern: primary.pattern,
+            exampleBase: primary.exampleBase,
+            exampleFull: primary.exampleFull,
+            isCustom,
+            isMulti: files.length > 1,
+            files,
+            multiHintExamples
+        };
     }
 
     async function copyTextToClipboard(text, successMsg) {
@@ -349,7 +441,7 @@
         '',
         '{daftar_tugas}',
         '{project_update}',
-        '📌 Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai + unggah bukti screenshot di AniTrack.',
+        '📌 Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai di AniTrack.',
         '{pembimbing}',
         '{link_anitrack}'
     ].join('\n');
@@ -5108,10 +5200,19 @@
                                     </div>
                                     <h3 class="text-base font-extrabold text-[#1E293B]">${esc(t.title)}</h3>
                                     ${t.description ? `<p class="text-xs text-slate-500 leading-relaxed">${esc(t.description)}</p>` : ''}
-                                    <div class="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F4F8FF] border border-[#DCEBFF] text-[11px] text-slate-600">
-                                        <span class="font-bold text-[#0082E6]">📝 Format File:</span>
-                                        <code class="font-mono text-[10.5px] font-semibold text-[#1E293B]">${esc(buildProjectFileNaming(t).pattern)}</code>
-                                    </div>
+                                    ${(() => {
+                                        const customFiles = projectDataCache.taskFilesMap?.[t.id] || null;
+                                        const naming = buildProjectFileNaming(t, null, customFiles);
+                                        return `
+                                    <div class="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#F4F8FF] border border-[#DCEBFF] text-[11px] text-slate-600">
+                                        <span class="font-bold text-[#0082E6]">📝 Format File${naming.files.length > 1 ? ` (${naming.files.length} file)` : ''}:</span>
+                                        ${naming.files.map((f, fi) => `<code class="font-mono text-[10.5px] font-semibold text-[#1E293B] bg-white border border-[#DCEBFF] px-1.5 py-0.5 rounded-md">${naming.files.length > 1 ? `${fi + 1}. ` : ''}${esc(f.pattern)}</code>`).join('')}
+                                        <button type="button" onclick="openTaskFilesEditor('${t.id}')"
+                                            class="ml-auto px-2 py-0.5 rounded-md bg-white hover:bg-[#0095FF] border border-[#CBE5FF] text-[#0082E6] hover:text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
+                                            ✎ Atur File
+                                        </button>
+                                    </div>`;
+                                    })()}
                                     <!-- Ringkasan Status & Mini Progress Bar -->
                                     <div class="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-bold num-tabular">
                                         <div class="w-28 h-2 rounded-full bg-[#E2E8F0] overflow-hidden">
@@ -5167,7 +5268,7 @@
                 staffScopeMode = expectedRole === 'superadmin' ? 'all' : 'mentees';
             }
 
-            const [{ data: projTasks }, { data: projSubs }, { data: allStudents }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }, { data: checklistRowsRaw }] = await Promise.all([
+            const [{ data: projTasks }, { data: projSubs }, { data: allStudents }, { data: weeklyRaw }, { data: mentors }, { data: fbLogRaw }, { data: archivesRaw }, { data: checklistRowsRaw }, { data: taskFilesRaw }] = await Promise.all([
                 supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
                 supabase.from('project_submissions').select('*'),
                 supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, mentor_id, avatar_url, whatsapp_number, project_drive_url').eq('role', 'student').order('class_name').order('full_name'),
@@ -5175,7 +5276,8 @@
                 supabase.from('profiles').select('id, full_name, username, whatsapp_number').in('role', ['mentor', 'superadmin']).order('full_name'),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_FB_LOG_PREFIX}%`),
                 supabase.from('app_settings').select('key, value, updated_at').like('key', `${PROJECT_ARCHIVE_PREFIX}%`),
-                supabase.from('app_settings').select('key, value, updated_at').like('key', `${CHECKLIST_ROW_PREFIX}%`)
+                supabase.from('app_settings').select('key, value, updated_at').like('key', `${CHECKLIST_ROW_PREFIX}%`),
+                supabase.from('app_settings').select('key, value').like('key', `${PROJECT_FILES_PREFIX}%`)
             ]);
 
             const allStudentsList = allStudents || [];
@@ -5200,6 +5302,7 @@
             const weeklyUpdates = parseWeeklyUpdateRows(weeklyRaw || []).filter((u) => studentIds.has(u.student_id));
             const fbLogMap = parseFeedbackLogMap(fbLogRaw || []);
             const checklistRowMap = parseChecklistRowMap(checklistRowsRaw || []);
+            const taskFilesMap = parseTaskFilesMap(taskFilesRaw || []);
             const archives = (archivesRaw || []).map((r) => {
                 try {
                     const parsed = JSON.parse(r.value || '{}');
@@ -5209,7 +5312,7 @@
                 }
             }).filter(Boolean).sort((a, b) => String(b.created_at || b.updated_at || '').localeCompare(String(a.created_at || a.updated_at || '')));
 
-            projectDataCache = { allTasks, subMap, studentList, allStudentsList, weeklyUpdates, mentorsList: mentors || [], fbLogMap, archives, homeroomMap, pjMap, checklistColsMap, checklistRowMap };
+            projectDataCache = { allTasks, subMap, studentList, allStudentsList, weeklyUpdates, mentorsList: mentors || [], fbLogMap, archives, homeroomMap, pjMap, checklistColsMap, checklistRowMap, taskFilesMap };
 
             // Overall Project Progress Summary + Lencana Emas & Total Masalah
             let totalAssignments = 0;
@@ -7259,9 +7362,174 @@
             if (!confirm('Hapus tugas project ini beserta seluruh data pengumpulannya?')) return;
             const { error } = await supabase.from('project_tasks').delete().eq('id', taskId);
             if (error) { showToast(`Gagal menghapus tugas: ${error.message}`); return; }
+            await supabase.from('app_settings').delete().eq('key', `${PROJECT_FILES_PREFIX}${taskId}`);
             expandedProjectIds.delete(taskId);
             showToast('Tugas project dihapus.');
             loadProjectTracker();
+        };
+
+        // ==================== EDITOR MULTI-FILE PENAMAAN TUGAS PROJECT ====================
+        const TASK_FILE_EXT_OPTIONS = ['.pdf', '.mp4', '.mov', '.png', '.jpg', '.blend', '.fbx', '.obj', '.aep', '.psd', '.ai', '.zip', '.wav', '.mp3', '.docx', '.pptx'];
+
+        function renderTaskFilesEditorRows(task, items) {
+            const rowsEl = document.getElementById('taskFilesEditorRows');
+            if (!rowsEl) return;
+            const stageTag = ({ 'Pre-Production': 'PreProd', 'Production': 'Prod', 'Post-Production': 'PostProd' })[task?.pipeline_stage] || 'Project';
+            rowsEl.innerHTML = items.map((it, idx) => {
+                const curExt = it.ext || '.pdf';
+                const hasPreset = TASK_FILE_EXT_OPTIONS.includes(curExt);
+                const slug = toSlugPascal(it.label || 'File', 4, 30);
+                return `
+                    <div class="tfe-row rounded-xl border border-[#E2E8F0] bg-[#FAFBFD] p-3 space-y-2">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <span class="hidden sm:inline-flex w-6 h-6 rounded-md bg-[#EAF4FF] text-[#0082E6] font-mono text-[11px] font-extrabold items-center justify-center shrink-0">${idx + 1}</span>
+                            <input type="text" value="${esc(it.label || '')}" placeholder="Nama / jenis file (mis: Storyline, Model3D, RenderScene01)"
+                                oninput="updateTaskFilesEditorPreview()"
+                                class="tfe-label flex-1 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-xs font-semibold text-[#1E293B] focus:outline-none focus:border-[#0095FF]" />
+                            <select onchange="updateTaskFilesEditorPreview()"
+                                class="tfe-ext px-2.5 py-2 bg-white border border-[#E2E8F0] rounded-lg text-xs font-mono font-bold text-[#1E293B] focus:outline-none focus:border-[#0095FF]">
+                                ${TASK_FILE_EXT_OPTIONS.map((ex) => `<option value="${ex}" ${curExt === ex ? 'selected' : ''}>${ex}</option>`).join('')}
+                                ${!hasPreset ? `<option value="${esc(curExt)}" selected>${esc(curExt)}</option>` : ''}
+                            </select>
+                            <button type="button" onclick="removeTaskFilesEditorRow(this)" title="Hapus file ini"
+                                class="px-2.5 py-2 rounded-lg bg-[#FFF0F4] hover:bg-[#F13B6E] text-[#E11D48] hover:text-white text-xs font-bold transition cursor-pointer shrink-0">✕</button>
+                        </div>
+                        <div class="text-[10.5px] font-mono text-slate-500 pl-0 sm:pl-8 truncate">
+                            Preview: <strong class="tfe-preview text-[#0082E6]">[Kelas]_[NamaSiswa]_${stageTag}_${esc(slug)}${esc(curExt)}</strong>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        let activeTaskFilesEditorTask = null;
+
+        global.updateTaskFilesEditorPreview = function () {
+            if (!activeTaskFilesEditorTask) return;
+            const stageTag = ({ 'Pre-Production': 'PreProd', 'Production': 'Prod', 'Post-Production': 'PostProd' })[activeTaskFilesEditorTask?.pipeline_stage] || 'Project';
+            document.querySelectorAll('#taskFilesEditorRows .tfe-row').forEach((row) => {
+                const lbl = row.querySelector('.tfe-label')?.value.trim() || 'File';
+                const ext = row.querySelector('.tfe-ext')?.value || '.pdf';
+                const prev = row.querySelector('.tfe-preview');
+                if (prev) prev.textContent = `[Kelas]_[NamaSiswa]_${stageTag}_${toSlugPascal(lbl, 4, 30)}${ext}`;
+            });
+        };
+
+        global.addTaskFilesEditorRow = function () {
+            if (!activeTaskFilesEditorTask) return;
+            const cur = Array.from(document.querySelectorAll('#taskFilesEditorRows .tfe-row')).map((row) => ({
+                label: row.querySelector('.tfe-label')?.value || '',
+                ext: row.querySelector('.tfe-ext')?.value || '.pdf'
+            }));
+            cur.push({ label: '', ext: detectSuggestedFileExt(activeTaskFilesEditorTask) });
+            renderTaskFilesEditorRows(activeTaskFilesEditorTask, cur);
+            const inputs = document.querySelectorAll('#taskFilesEditorRows .tfe-label');
+            inputs[inputs.length - 1]?.focus();
+        };
+
+        global.removeTaskFilesEditorRow = function (btn) {
+            const rows = document.querySelectorAll('#taskFilesEditorRows .tfe-row');
+            if (rows.length <= 1) {
+                showToast('Minimal harus ada 1 format file.');
+                return;
+            }
+            btn.closest('.tfe-row')?.remove();
+            const cur = Array.from(document.querySelectorAll('#taskFilesEditorRows .tfe-row')).map((row) => ({
+                label: row.querySelector('.tfe-label')?.value || '',
+                ext: row.querySelector('.tfe-ext')?.value || '.pdf'
+            }));
+            renderTaskFilesEditorRows(activeTaskFilesEditorTask, cur);
+        };
+
+        global.openTaskFilesEditor = function (taskId) {
+            const task = (projectDataCache.allTasks || []).find((t) => t.id === taskId);
+            if (!task) return;
+            activeTaskFilesEditorTask = task;
+
+            let modal = document.getElementById('taskFilesEditorModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'taskFilesEditorModal';
+                modal.className = 'fixed inset-0 z-[82] hidden bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4';
+                modal.onclick = (ev) => { if (ev.target === modal) modal.classList.add('hidden'); };
+                document.body.appendChild(modal);
+            }
+
+            const existingCustom = projectDataCache.taskFilesMap?.[taskId] || null;
+            const naming = buildProjectFileNaming(task, null, existingCustom);
+            const initialItems = naming.files.map((f) => ({ label: f.label, ext: f.ext }));
+
+            modal.innerHTML = `
+                <div class="max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7] flex flex-col max-h-[88vh]">
+                    <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">📝 Pengaturan Multi-File Penamaan Tugas</div>
+                            <h3 class="text-sm sm:text-base font-extrabold text-[#1E293B] truncate">${esc(task.title)}</h3>
+                            <p class="text-[11px] text-slate-500">Tambahkan semua file yang wajib dikumpulkan siswa untuk tugas ini (bisa 1, 2, 3, atau lebih).</p>
+                        </div>
+                        <button type="button" onclick="document.getElementById('taskFilesEditorModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
+                    </div>
+                    <div class="p-5 overflow-y-auto space-y-3 flex-1">
+                        <div id="taskFilesEditorRows" class="space-y-2.5"></div>
+                        <button type="button" onclick="addTaskFilesEditorRow()"
+                            class="w-full py-2.5 rounded-xl border-2 border-dashed border-[#CBE5FF] hover:border-[#0095FF] bg-[#F7FAFF] hover:bg-[#EAF4FF] text-[#0082E6] text-xs font-extrabold transition cursor-pointer">
+                            + Tambah File Lain untuk Tugas Ini
+                        </button>
+                    </div>
+                    <div class="px-5 py-3.5 border-t border-[#EDF1F7] bg-[#FAFBFD] flex flex-wrap items-center justify-between gap-2">
+                        <button type="button" onclick="resetTaskFilesSpec('${task.id}')"
+                            class="px-3 py-2 rounded-xl bg-white hover:bg-[#FFF0F4] border border-[#E2E8F0] text-slate-500 hover:text-[#E11D48] text-xs font-bold transition cursor-pointer">
+                            ↻ Reset ke Otomatis
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="document.getElementById('taskFilesEditorModal').classList.add('hidden')"
+                                class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-600 text-xs font-bold transition cursor-pointer">Batal</button>
+                            <button type="button" onclick="saveTaskFilesEditor('${task.id}', this)"
+                                class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
+                                💾 Simpan Format File
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+
+            renderTaskFilesEditorRows(task, initialItems);
+            modal.classList.remove('hidden');
+        };
+
+        global.saveTaskFilesEditor = async function (taskId, btn) {
+            const items = Array.from(document.querySelectorAll('#taskFilesEditorRows .tfe-row')).map((row) => ({
+                label: (row.querySelector('.tfe-label')?.value || '').trim(),
+                ext: (row.querySelector('.tfe-ext')?.value || '.pdf').trim()
+            })).filter((it) => it.label);
+
+            if (!items.length) {
+                showToast('Isi minimal 1 nama file terlebih dahulu.');
+                return;
+            }
+            if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+            const nowIso = new Date().toISOString();
+            const { error } = await supabase.from('app_settings').upsert({
+                key: `${PROJECT_FILES_PREFIX}${taskId}`,
+                value: JSON.stringify(items),
+                updated_at: nowIso
+            }, { onConflict: 'key' });
+            if (btn) { btn.disabled = false; btn.textContent = '💾 Simpan Format File'; }
+            if (error) { showToast(`Gagal menyimpan format file: ${error.message}`); return; }
+
+            if (!projectDataCache.taskFilesMap) projectDataCache.taskFilesMap = {};
+            projectDataCache.taskFilesMap[taskId] = items;
+            document.getElementById('taskFilesEditorModal')?.classList.add('hidden');
+            showToast(`Format penamaan (${items.length} file) berhasil disimpan ✓`);
+            renderProjectTrackerBody();
+        };
+
+        global.resetTaskFilesSpec = async function (taskId) {
+            const { error } = await supabase.from('app_settings').delete().eq('key', `${PROJECT_FILES_PREFIX}${taskId}`);
+            if (error) { showToast(`Gagal mereset format file: ${error.message}`); return; }
+            if (projectDataCache.taskFilesMap) delete projectDataCache.taskFilesMap[taskId];
+            document.getElementById('taskFilesEditorModal')?.classList.add('hidden');
+            showToast('Format penamaan dikembalikan ke otomatis ✓');
+            renderProjectTrackerBody();
         };
 
         global.resetProjectSubmission = async function (projectTaskId, studentId, btn) {
@@ -7339,6 +7607,7 @@
             const subconc = document.getElementById('projSubconc').value || null;
             const dueDate = document.getElementById('projDueDate').value || null;
             const desc = document.getElementById('projDesc').value.trim();
+            const fileListRaw = (document.getElementById('projFileList')?.value || '').trim();
 
             if (!title) return;
             btn.disabled = true;
@@ -7348,6 +7617,17 @@
                 title, pipeline_stage: stage, sub_concentration: subconc,
                 due_date: dueDate, description: desc || null, created_by: currentUser.id
             }).select().single();
+
+            if (!error && created?.id && fileListRaw) {
+                const parsedFiles = parseFileSpecsInput(fileListRaw);
+                if (parsedFiles.length) {
+                    await supabase.from('app_settings').upsert({
+                        key: `${PROJECT_FILES_PREFIX}${created.id}`,
+                        value: JSON.stringify(parsedFiles),
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                }
+            }
 
             btn.disabled = false;
             btn.textContent = '+ Tambah Tugas Project';
@@ -7440,13 +7720,15 @@
                     'Tahap Pipeline': 'Pre-Production',
                     'Sub-Konsentrasi': 'Semua',
                     'Deadline (YYYY-MM-DD)': '2026-11-28',
-                    Deskripsi: 'Kumpulkan file PDF storyboard lengkap dengan durasi tiap scene.'
+                    'Daftar File (pisahkan koma)': 'Storyline.pdf, Treatment.pdf, Storyboard.pdf',
+                    Deskripsi: 'Kumpulkan file PDF storyline, treatment, dan storyboard lengkap dengan durasi tiap scene.'
                 },
                 {
                     'Judul Tugas': 'Character Turnaround & Model Sheet',
                     'Tahap Pipeline': 'Pre-Production',
                     'Sub-Konsentrasi': '3D Modeller',
                     'Deadline (YYYY-MM-DD)': '2026-12-03',
+                    'Daftar File (pisahkan koma)': 'ModelSheet.png, Turnaround.png',
                     Deskripsi: 'Tampak depan, samping, belakang karakter utama (PNG/JPG).'
                 },
                 {
@@ -7454,14 +7736,16 @@
                     'Tahap Pipeline': 'Production',
                     'Sub-Konsentrasi': '3D Animator',
                     'Deadline (YYYY-MM-DD)': '2026-12-12',
-                    Deskripsi: 'Unggah screenshot viewport & tautan playblast video.'
+                    'Daftar File (pisahkan koma)': 'Scene01.mp4, Scene02.mp4, Scene03.mp4, ProjectFile.blend',
+                    Deskripsi: 'Upload seluruh file playblast video dan file project animasi ke Drive.'
                 },
                 {
                     'Judul Tugas': 'Final Compositing, Sound & Render Master',
                     'Tahap Pipeline': 'Post-Production',
                     'Sub-Konsentrasi': 'Semua',
                     'Deadline (YYYY-MM-DD)': '2026-12-20',
-                    Deskripsi: 'Pastikan color grading dan audio sinkron, upload bukti hasil render.'
+                    'Daftar File (pisahkan koma)': 'FinalFilm.mp4, AudioMaster.wav, ProjectComp.aep',
+                    Deskripsi: 'Pastikan color grading dan audio sinkron.'
                 }
             ];
 
@@ -7470,11 +7754,12 @@
                 { Kolom: 'Tahap Pipeline', Wajib: 'YA', Keterangan: 'Isi salah satu: Pre-Production, Production, atau Post-Production.' },
                 { Kolom: 'Sub-Konsentrasi', Wajib: 'Opsional', Keterangan: 'Kosongkan atau isi "Semua" untuk seluruh siswa; atau pilih: 2D Animator, 2D Motion Graphic, 3D Animator, 3D Modeller, 3D Motion Graphic.' },
                 { Kolom: 'Deadline (YYYY-MM-DD)', Wajib: 'Opsional', Keterangan: 'Format tanggal YYYY-MM-DD (misal 2026-12-15) atau DD/MM/YYYY, bisa juga langsung format Tanggal Excel.' },
-                { Kolom: 'Deskripsi', Wajib: 'Opsional', Keterangan: 'Instruksi pengerjaan, kriteria ACC, atau format bukti yang diminta.' }
+                { Kolom: 'Daftar File (pisahkan koma)', Wajib: 'Opsional', Keterangan: 'Daftar nama & ekstensi file yang harus dikumpulkan (bisa lebih dari 1, pisahkan koma — misal: Storyline.pdf, Treatment.pdf, Storyboard.pdf).' },
+                { Kolom: 'Deskripsi', Wajib: 'Opsional', Keterangan: 'Instruksi pengerjaan atau kriteria ACC.' }
             ];
 
             const wb = global.XLSX.utils.book_new();
-            global.XLSX.utils.book_append_sheet(wb, makeWorksheet(sampleRows, [36, 18, 22, 22, 52]), 'Tugas Project');
+            global.XLSX.utils.book_append_sheet(wb, makeWorksheet(sampleRows, [36, 18, 22, 22, 42, 48]), 'Tugas Project');
             global.XLSX.utils.book_append_sheet(wb, makeWorksheet(guideRows, [24, 12, 72]), 'Panduan Pengisian');
             global.XLSX.writeFile(wb, 'Template-ProjectTracker-AniTrack.xlsx');
             showToast('Template Excel (.xlsx) berhasil diunduh ✓');
@@ -7504,6 +7789,7 @@
                         const stageRaw = pickRowField(row, ['tahap pipeline', 'tahap', 'stage', 'pipeline']);
                         const subRaw = pickRowField(row, ['sub-konsentrasi', 'sub konsentrasi', 'konsentrasi', 'subconc']);
                         const dueRaw = pickRowField(row, ['deadline (yyyy-mm-dd)', 'deadline', 'due date', 'due_date', 'tanggal']);
+                        const filesRaw = pickRowField(row, ['daftar file (pisahkan koma)', 'daftar file', 'format file', 'files', 'nama file']);
                         const descRaw = pickRowField(row, ['deskripsi', 'instruksi', 'keterangan', 'description', 'catatan']);
 
                         parsed.push({
@@ -7512,7 +7798,8 @@
                             sub_concentration: normalizeSubConcentration(subRaw),
                             due_date: normalizeExcelDate(dueRaw),
                             description: String(descRaw || '').trim() || null,
-                            created_by: currentUser.id
+                            created_by: currentUser.id,
+                            _fileSpecs: parseFileSpecsInput(filesRaw)
                         });
                     });
 
@@ -7565,10 +7852,29 @@
             btn.disabled = true;
             btn.textContent = 'Mengimpor ke database...';
 
+            const insertPayload = pendingImportProjectRows.map(({ _fileSpecs, ...dbRow }) => dbRow);
             const { data: inserted, error } = await supabase
                 .from('project_tasks')
-                .insert(pendingImportProjectRows)
+                .insert(insertPayload)
                 .select('id');
+
+            if (!error && Array.isArray(inserted)) {
+                const nowIso = new Date().toISOString();
+                const fileUpserts = [];
+                inserted.forEach((row, idx) => {
+                    const specs = pendingImportProjectRows[idx]?._fileSpecs;
+                    if (row?.id && Array.isArray(specs) && specs.length) {
+                        fileUpserts.push({
+                            key: `${PROJECT_FILES_PREFIX}${row.id}`,
+                            value: JSON.stringify(specs),
+                            updated_at: nowIso
+                        });
+                    }
+                });
+                if (fileUpserts.length) {
+                    await supabase.from('app_settings').upsert(fileUpserts, { onConflict: 'key' });
+                }
+            }
 
             btn.disabled = false;
             if (error) {
@@ -7658,6 +7964,9 @@
         formatWhatsappDisplay,
         getWhatsappUrl,
         renderWhatsappLink,
+        PROJECT_FILES_PREFIX,
+        parseFileSpecsInput,
+        parseTaskFilesMap,
         buildProjectFileNaming,
         copyTextToClipboard,
         DEFAULT_WA_TEMPLATE,

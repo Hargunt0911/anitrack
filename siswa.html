@@ -1080,7 +1080,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126d"></script>
+    <script src="./anitrack-core.js?v=20261126e"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2236,14 +2236,16 @@
                 const bannerEl = document.getElementById('studentProjectBanner');
                 if (!listEl || !bannerEl) return;
 
-                const [{ data: projTasks }, { data: projSubs }, { data: weeklyRaw }, { data: fbLogRow }, checklistColsMap, { data: myChecklistRow }] = await Promise.all([
+                const [{ data: projTasks }, { data: projSubs }, { data: weeklyRaw }, { data: fbLogRow }, checklistColsMap, { data: myChecklistRow }, { data: taskFilesRaw }] = await Promise.all([
                     supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
                     supabase.from('project_submissions').select('*').eq('student_id', currentUser.id),
                     supabase.from('app_settings').select('key, value, updated_at').like('key', `${A.PROJECT_WEEKLY_PREFIX}%::${currentUser.id}`),
                     supabase.from('app_settings').select('value').eq('key', `${A.PROJECT_FB_LOG_PREFIX}${currentUser.id}`).maybeSingle(),
                     A.loadChecklistColsMap(),
-                    supabase.from('app_settings').select('key, value, updated_at').eq('key', `${A.CHECKLIST_ROW_PREFIX}${currentUser.id}`).maybeSingle()
+                    supabase.from('app_settings').select('key, value, updated_at').eq('key', `${A.CHECKLIST_ROW_PREFIX}${currentUser.id}`).maybeSingle(),
+                    supabase.from('app_settings').select('key, value').like('key', `${A.PROJECT_FILES_PREFIX}%`)
                 ]);
+                const taskFilesMap = A.parseTaskFilesMap(taskFilesRaw || []);
 
                 let myChecklistData = { items: {}, notes: '', updated_by: '', updated_at: null };
                 if (myChecklistRow?.value) {
@@ -2620,7 +2622,7 @@
                     const revNum = Number(ps.revision_count || 0);
                     const dl = A.getDeadlineMeta(t.due_date, isAcc);
                     const proofSrc = projectProofDrafts[t.id] || ps.proof_image || '';
-                    const naming = A.buildProjectFileNaming(t, currentUser);
+                    const naming = A.buildProjectFileNaming(t, currentUser, taskFilesMap[t.id] || null);
                     const tm = A.evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
                     const taskLogs = studentFeedbackLogsCache.filter((l) => l.task_id === t.id);
 
@@ -2642,24 +2644,30 @@
                                 </span>
                             </div>
 
-                            <!-- Panduan & Contoh Penamaan File Otomatis Mengikuti Tugas -->
-                            <div class="bg-[#F4F8FF] border border-[#DCEBFF] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                <div class="space-y-1 min-w-0">
+                            <!-- Panduan & Contoh Penamaan File (Mendukung Banyak File / Multi-File per Tugas) -->
+                            <div class="bg-[#F4F8FF] border border-[#DCEBFF] rounded-xl p-3.5 space-y-2.5">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
                                     <div class="text-[11px] font-extrabold text-[#0082E6] uppercase tracking-wider">
-                                        📝 Format &amp; Contoh Penamaan File Tugas Ini
+                                        📝 Format &amp; Contoh Penamaan File Tugas Ini ${naming.files.length > 1 ? `(${naming.files.length} File)` : ''}
                                     </div>
-                                    <div class="flex flex-wrap items-center gap-1.5 text-xs">
-                                        <span class="text-slate-500 font-semibold">Contoh:</span>
-                                        <code class="font-mono font-bold text-[#1E293B] bg-white border border-[#DCEBFF] px-2.5 py-1 rounded-lg break-all">${A.esc(naming.exampleFull)}</code>
-                                    </div>
-                                    <p class="text-[11px] text-slate-500">
-                                        Pola: <span class="font-mono text-slate-600">[Kelas]_[NamaSiswa]_[Tahap]_[NamaTugas]</span> • Simpan ke Folder Google Drive Project kamu di atas.
-                                    </p>
+                                    <span class="text-[10.5px] font-mono text-slate-500">Pola: [Kelas]_[NamaSiswa]_[Tahap]_[NamaFile]</span>
                                 </div>
-                                <button type="button" onclick="copyProjectFileName('${A.esc(naming.exampleBase)}')"
-                                    class="shrink-0 self-start sm:self-center px-3.5 py-2 rounded-xl bg-white hover:bg-[#0095FF] border border-[#CBE5FF] text-[#0082E6] hover:text-white text-xs font-bold transition cursor-pointer">
-                                    📋 Salin Nama File
-                                </button>
+                                <div class="space-y-1.5">
+                                    ${naming.files.map((f, fi) => `
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white border border-[#DCEBFF] rounded-lg px-2.5 py-2">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                ${naming.files.length > 1 ? `<span class="w-5 h-5 rounded-md bg-[#EAF4FF] text-[#0082E6] font-mono text-[10px] font-extrabold flex items-center justify-center shrink-0">${fi + 1}</span>` : ''}
+                                                <code class="font-mono font-bold text-xs text-[#1E293B] break-all">${A.esc(f.exampleFull)}</code>
+                                            </div>
+                                            <button type="button" onclick="copyProjectFileName('${A.esc(f.exampleBase)}')"
+                                                class="shrink-0 self-start sm:self-center px-2.5 py-1 rounded-lg bg-[#F4F8FF] hover:bg-[#0095FF] border border-[#CBE5FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer">
+                                                📋 Salin
+                                            </button>
+                                        </div>`).join('')}
+                                </div>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    Simpan semua file ke Folder Google Drive Project kamu di atas. Jika ada beberapa file/bagian sejenis, tambahkan nomor urut di belakangnya (contoh: <code class="font-mono font-semibold text-slate-700">${A.esc(naming.multiHintExamples[0])}</code>, <code class="font-mono font-semibold text-slate-700">${A.esc(naming.multiHintExamples[1])}</code>, dst).
+                                </p>
                             </div>
 
                             ${ps.mentor_feedback ? `
