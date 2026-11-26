@@ -5529,126 +5529,172 @@
                         ${(() => {
                             const compact = projectChecklistState.compactCols !== false;
                             const totalColSpan = activeCols.length + (compact ? 3 : 7);
+                            const baseFixedPx = 215 + 102 + (compact ? 0 : (74 + 112 + 112 + 115));
+                            const stageColPx = 116;
+                            const notesMinPx = 320;
+                            const tableMinPx = baseFixedPx + (activeCols.length * stageColPx) + notesMinPx;
+
+                            // Kelompokkan baris per Sub-Konsentrasi saat melihat tab gabungan (Semua 2D / Semua 3D / Semua) agar tidak selang-seling
+                            const orderedGroups = [];
+                            if (!isSpecificSc && !isUnassignedTab) {
+                                const bySc = {};
+                                filteredRows.forEach((s) => {
+                                    const k = s.sub_concentration || 'Belum Ada Sub-Konsentrasi';
+                                    if (!bySc[k]) bySc[k] = [];
+                                    bySc[k].push(s);
+                                });
+                                const scOrder = [...SUBCONCS, ...Object.keys(bySc).filter((k) => !SUBCONCS.includes(k))];
+                                scOrder.forEach((k) => {
+                                    if (bySc[k]?.length) orderedGroups.push({ label: k, rows: bySc[k] });
+                                });
+                            } else if (filteredRows.length) {
+                                orderedGroups.push({ label: '', rows: filteredRows });
+                            }
+
+                            let globalRowIdx = 0;
+                            const renderStudentRow = (s) => {
+                                globalRowIdx++;
+                                const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
+                                const stuSubconc = s.sub_concentration || '';
+                                const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
+                                const stuCols = getStuCols(s);
+                                const stuColsSet = new Set(stuCols);
+                                const doneCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                                const progPct = stuCols.length ? Math.round((doneCount / stuCols.length) * 100) : 0;
+                                const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
+                                const notDoneList = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) !== 'done');
+                                const waText = notDoneList.length
+                                    ? `Halo ${s.full_name}, update Project Update (${stuSubconc || 'Animasi'}) — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Notes: ${rowData.notes}` : ''} Mohon segera dilengkapi di Folder Google Drive ya.`
+                                    : `Halo ${s.full_name}, selamat! Semua tahapan Project Update kamu sudah Done (100%) ✓`;
+
+                                return `
+                                    <tr class="hover:bg-[#F8FBFF] align-middle">
+                                        <td class="ck-sticky-col py-1.5 px-2.5 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
+                                            <div class="flex items-start gap-1.5">
+                                                <span class="font-mono text-[10px] font-bold text-slate-400 mt-0.5 w-5 shrink-0">${globalRowIdx}.</span>
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="font-bold text-[12px] text-[#1E293B] truncate leading-tight" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
+                                                    <div class="flex flex-wrap items-center gap-1 mt-1 text-[9.5px] text-slate-400">
+                                                        <span class="font-mono font-bold px-1 py-0.5 rounded bg-[#F1F5F9] text-slate-600 leading-none">${esc(s.class_name || '-')}</span>
+                                                        ${!isSpecificSc ? `<span class="font-semibold truncate max-w-[95px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>` : ''}
+                                                        ${compact ? `
+                                                        ${s.project_drive_url
+                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold leading-none transition">📁</a>`
+                                                            : ''}
+                                                        ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / Isi Link Drive" class="px-1 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-none cursor-pointer">✎</button>` : ''}
+                                                        ${renderWhatsappLink(s.whatsapp_number, true, waText)}` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        ${compact ? '' : `
+                                        <td class="py-1.5 px-2 text-center border-r border-[#F1F5F9]">
+                                            <span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
+                                        </td>`}
+                                        <td class="py-1.5 px-2 border-r border-[#F1F5F9] num-tabular">
+                                            <div class="flex items-center justify-between text-[10px] font-bold mb-0.5">
+                                                <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length}</span>
+                                                <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-400'}">${progPct}%</span>
+                                            </div>
+                                            <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
+                                                <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
+                                            </div>
+                                        </td>
+                                        ${compact ? '' : `
+                                        <td class="py-1.5 px-2 border-r border-[#F1F5F9] truncate">
+                                            ${renderWhatsappLink(s.whatsapp_number, false, waText)}
+                                        </td>
+                                        <td class="py-1.5 px-2 border-r border-[#F1F5F9]">
+                                            <div class="flex items-center gap-1">
+                                                ${s.project_drive_url
+                                                    ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[10px] font-bold transition whitespace-nowrap">📁 Drive ↗</a>`
+                                                    : `<span class="text-[10px] text-slate-400 italic">Belum</span>`}
+                                                ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-1.5 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[10px] font-bold cursor-pointer">✎</button>` : ''}
+                                            </div>
+                                        </td>
+                                        <td class="py-1.5 px-2 text-[10.5px] text-slate-600 border-r border-[#F1F5F9] truncate">
+                                            ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">-</span>`}
+                                        </td>`}
+                                        ${activeCols.map((col) => {
+                                            if (!stuColsSet.has(col)) return `<td class="py-1.5 px-1 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
+                                            const stVal = normalizeChecklistStatus(rowData.items?.[col]);
+                                            const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
+                                            if (stuCanEdit) {
+                                                return `
+                                                    <td class="py-1.5 px-1 text-center border-r border-[#F1F5F9]">
+                                                        <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
+                                                            class="w-[92px] max-w-full mx-auto block px-1.5 py-1 rounded-md border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
+                                                            ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+                                                        </select>
+                                                    </td>`;
+                                            }
+                                            return `
+                                                <td class="py-1.5 px-1.5 text-center border-r border-[#F1F5F9]">
+                                                    <span class="inline-block min-w-[64px] px-2 py-1 rounded-md border text-[10.5px] font-extrabold ${stOpt.cls}">${stOpt.label}</span>
+                                                </td>`;
+                                        }).join('')}
+                                        <td class="py-1.5 px-2.5">
+                                            ${stuCanEdit ? `
+                                                <div class="flex items-center gap-1.5">
+                                                    <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis catatan PJ Subkon..."
+                                                        onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
+                                                        class="flex-1 min-w-0 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                                    <button type="button" onclick="saveChecklistNote('${s.id}', this)"
+                                                        class="px-2.5 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
+                                                        Simpan
+                                                    </button>
+                                                </div>` : `
+                                                <div class="text-xs leading-snug ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
+                                            ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-0.5">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
+                                        </td>
+                                    </tr>`;
+                            };
+
                             return `
-                        <table id="checklistMainTable" class="w-max min-w-full text-left border-collapse text-xs">
+                        <table id="checklistMainTable" class="table-fixed text-left border-collapse text-xs" style="width: max(100%, ${tableMinPx}px);">
+                            <colgroup>
+                                <col style="width: 215px;" />
+                                ${compact ? '' : '<col style="width: 74px;" />'}
+                                <col style="width: 102px;" />
+                                ${compact ? '' : '<col style="width: 112px;" /><col style="width: 112px;" /><col style="width: 115px;" />'}
+                                ${activeCols.map(() => `<col style="width: ${stageColPx}px;" />`).join('')}
+                                <col />
+                            </colgroup>
                             <thead class="sticky top-0 z-20 shadow-[0_1px_0_#E2E8F0]">
                                 <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                                    <th rowspan="2" class="ck-sticky-col py-2 px-2.5 sticky left-0 bg-[#F7FAFF] z-30 min-w-[205px] max-w-[225px] border-r border-[#DCE5F2]">Siswa</th>
-                                    ${compact ? '' : '<th rowspan="2" class="py-2 px-2 text-center bg-[#F7FAFF] min-w-[74px] border-r border-[#EDF1F7]">Kelas</th>'}
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] min-w-[96px] w-[104px] border-r border-[#EDF1F7]">Progress</th>
+                                    <th rowspan="2" class="ck-sticky-col py-2 px-2.5 sticky left-0 bg-[#F7FAFF] z-30 border-r border-[#DCE5F2]">Siswa</th>
+                                    ${compact ? '' : '<th rowspan="2" class="py-2 px-2 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">Kelas</th>'}
+                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">Progress</th>
                                     ${compact ? '' : `
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] min-w-[110px] border-r border-[#EDF1F7]">No. HP / WA</th>
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] min-w-[112px] border-r border-[#EDF1F7]">Link Drive</th>
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] min-w-[110px] border-r border-[#EDF1F7]">Pembimbing</th>`}
+                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">No. HP / WA</th>
+                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">Link Drive</th>
+                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">Pembimbing</th>`}
                                     <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-1.5 px-2 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
-                                    <th rowspan="2" class="py-2 px-2.5 bg-[#F7FAFF] min-w-[300px] w-[320px]">Notes / Catatan PJ</th>
+                                    <th rowspan="2" class="py-2 px-2.5 bg-[#F7FAFF]">Notes / Catatan PJ</th>
                                 </tr>
                                 <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-[10px] font-bold text-[#1D5E55]">
                                     ${activeCols.map((col, ci) => `
-                                        <th class="py-1.5 px-1.5 text-center min-w-[96px] max-w-[132px] bg-[#F2FBF9] border-r border-[#DCEEEB] leading-tight">
-                                            <div class="inline-flex items-center justify-center gap-1">
-                                                <span class="line-clamp-2">${esc(col)}</span>
+                                        <th class="py-1.5 px-1.5 text-center bg-[#F2FBF9] border-r border-[#DCEEEB] leading-tight">
+                                            <div class="inline-flex items-center justify-center gap-1 max-w-full">
+                                                <span class="line-clamp-2" title="${esc(col)}">${esc(col)}</span>
                                                 ${canEditActiveSc && isSpecificSc ? `<button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-[#1D5E55]/60 hover:text-[#0082E6] text-[10px] cursor-pointer shrink-0">✎</button>` : ''}
                                             </div>
                                         </th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-[#F1F5F9]">
-                                ${filteredRows.length ? filteredRows.map((s, idx) => {
-                                    const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
-                                    const stuSubconc = s.sub_concentration || '';
-                                    const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
-                                    const stuCols = getStuCols(s);
-                                    const stuColsSet = new Set(stuCols);
-                                    const doneCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
-                                    const progPct = stuCols.length ? Math.round((doneCount / stuCols.length) * 100) : 0;
-                                    const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
-                                    const notDoneList = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) !== 'done');
-                                    const waText = notDoneList.length
-                                        ? `Halo ${s.full_name}, update Project Update (${stuSubconc || 'Animasi'}) — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Notes: ${rowData.notes}` : ''} Mohon segera dilengkapi di Folder Google Drive ya.`
-                                        : `Halo ${s.full_name}, selamat! Semua tahapan Project Update kamu sudah Done (100%) ✓`;
-
-                                    return `
-                                        <tr class="hover:bg-[#F8FBFF] align-middle">
-                                            <td class="ck-sticky-col py-1.5 px-2.5 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                                <div class="flex items-start gap-1.5">
-                                                    <span class="font-mono text-[10px] font-bold text-slate-400 mt-0.5 w-5 shrink-0">${idx + 1}.</span>
-                                                    <div class="min-w-0 flex-1">
-                                                        <div class="font-bold text-[12px] text-[#1E293B] truncate max-w-[175px] leading-tight" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
-                                                        <div class="flex flex-wrap items-center gap-1 mt-1 text-[9.5px] text-slate-400">
-                                                            <span class="font-mono font-bold px-1 py-0.5 rounded bg-[#F1F5F9] text-slate-600 leading-none">${esc(s.class_name || '-')}</span>
-                                                            ${compact ? `
-                                                            ${s.project_drive_url
-                                                                ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold leading-none transition">📁 Drive</a>`
-                                                                : `<span class="text-slate-300">No Drive</span>`}
-                                                            ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah Link Drive" class="px-1 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-none cursor-pointer">✎</button>` : ''}
-                                                            ${renderWhatsappLink(s.whatsapp_number, true, waText)}` : `<span class="font-semibold truncate max-w-[115px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>`}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            ${compact ? '' : `
-                                            <td class="py-1.5 px-2 text-center border-r border-[#F1F5F9]">
-                                                <span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
-                                            </td>`}
-                                            <td class="py-1.5 px-2 border-r border-[#F1F5F9] num-tabular">
-                                                <div class="flex items-center justify-between text-[10px] font-bold mb-0.5">
-                                                    <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length}</span>
-                                                    <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-400'}">${progPct}%</span>
-                                                </div>
-                                                <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
-                                                    <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
-                                                </div>
-                                            </td>
-                                            ${compact ? '' : `
-                                            <td class="py-1.5 px-2 border-r border-[#F1F5F9]">
-                                                ${renderWhatsappLink(s.whatsapp_number, false, waText)}
-                                            </td>
-                                            <td class="py-1.5 px-2 border-r border-[#F1F5F9]">
-                                                <div class="flex items-center gap-1">
-                                                    ${s.project_drive_url
-                                                        ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[10px] font-bold transition whitespace-nowrap">📁 Drive ↗</a>`
-                                                        : `<span class="text-[10px] text-slate-400 italic">Belum diisi</span>`}
-                                                    ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-1.5 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[10px] font-bold cursor-pointer">✎</button>` : ''}
-                                                </div>
-                                            </td>
-                                            <td class="py-1.5 px-2 text-[10.5px] text-slate-600 border-r border-[#F1F5F9]">
-                                                ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">Belum di-plot</span>`}
-                                            </td>`}
-                                            ${activeCols.map((col) => {
-                                                if (!stuColsSet.has(col)) return `<td class="py-1.5 px-1 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
-                                                const stVal = normalizeChecklistStatus(rowData.items?.[col]);
-                                                const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
-                                                if (stuCanEdit) {
-                                                    return `
-                                                        <td class="py-1.5 px-1 text-center border-r border-[#F1F5F9]">
-                                                            <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
-                                                                class="w-full px-1.5 py-1 rounded-md border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
-                                                                ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-                                                            </select>
-                                                        </td>`;
-                                                }
-                                                return `
-                                                    <td class="py-1.5 px-1.5 text-center border-r border-[#F1F5F9]">
-                                                        <span class="inline-block min-w-[62px] px-2 py-1 rounded-md border text-[10.5px] font-extrabold ${stOpt.cls}">${stOpt.label}</span>
-                                                    </td>`;
-                                            }).join('')}
-                                            <td class="py-1.5 px-2.5 min-w-[300px]">
-                                                ${stuCanEdit ? `
-                                                    <div class="flex items-center gap-1.5">
-                                                        <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis catatan PJ Subkon..."
-                                                            onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
-                                                            class="flex-1 min-w-[215px] px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                                                        <button type="button" onclick="saveChecklistNote('${s.id}', this)"
-                                                            class="px-2.5 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
-                                                            Simpan
-                                                        </button>
-                                                    </div>` : `
-                                                    <div class="text-xs leading-snug ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
-                                                ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-0.5">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
-                                            </td>
-                                        </tr>`;
-                                }).join('') : `<tr><td colspan="${totalColSpan}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
+                                ${orderedGroups.length ? orderedGroups.map((grp) => `
+                                    ${grp.label ? `
+                                    <tr class="bg-[#F0F7FF] border-t border-b border-[#DCEBFF]">
+                                        <td class="ck-sticky-col sticky left-0 z-10 bg-[#F0F7FF] py-1.5 px-2.5 font-extrabold text-[11px] text-[#0082E6] border-r border-[#DCEBFF]">
+                                            📌 ${esc(grp.label)} (${grp.rows.length})
+                                        </td>
+                                        <td colspan="${totalColSpan - 1}" class="py-1.5 px-2.5 text-[10.5px] text-slate-500">
+                                            ${SUBCONCS.includes(grp.label) ? `<button type="button" onclick="setChecklistSubconc('${esc(grp.label)}')" class="font-bold text-[#0082E6] hover:underline cursor-pointer">Buka tab khusus ${esc(grp.label)} →</button>` : ''}
+                                        </td>
+                                    </tr>` : ''}
+                                    ${grp.rows.map(renderStudentRow).join('')}
+                                `).join('') : `<tr><td colspan="${totalColSpan}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
                             </tbody>
                         </table>`;
                         })()}
