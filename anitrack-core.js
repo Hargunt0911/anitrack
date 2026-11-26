@@ -5524,14 +5524,14 @@
                         </div>
                     </div>
 
-                    <!-- Tabel Project Update 2-Tingkat (Header & Kolom Siswa Terkunci Rapi Tanpa Menimpa) -->
+                    <!-- Tabel Project Update 2-Tingkat (Teks & Cell Lega, Header & Kolom Siswa Terkunci, Mulus Slide Kiri-Kanan) -->
                     <div id="checklistTableScroll" class="anitrack-xscroll overflow-auto max-h-[75vh] relative cursor-grab">
                         ${(() => {
                             const compact = projectChecklistState.compactCols !== false;
                             const totalColSpan = activeCols.length + (compact ? 3 : 7);
-                            const baseFixedPx = 215 + 102 + (compact ? 0 : (74 + 112 + 112 + 115));
-                            const stageColPx = 116;
-                            const notesMinPx = 320;
+                            const baseFixedPx = 265 + 132 + (compact ? 0 : (92 + 140 + 135 + 150));
+                            const stageColPx = 156;
+                            const notesMinPx = 380;
                             const tableMinPx = baseFixedPx + (activeCols.length * stageColPx) + notesMinPx;
 
                             // Kelompokkan baris per Sub-Konsentrasi saat melihat tab gabungan (Semua 2D / Semua 3D / Semua) agar tidak selang-seling
@@ -5569,115 +5569,115 @@
 
                                 return `
                                     <tr class="hover:bg-[#F8FBFF] align-middle">
-                                        <td class="ck-sticky-col py-1.5 px-2.5 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                            <div class="flex items-start gap-1.5">
-                                                <span class="font-mono text-[10px] font-bold text-slate-400 mt-0.5 w-5 shrink-0">${globalRowIdx}.</span>
+                                        <td class="ck-sticky-col py-3 px-3.5 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
+                                            <div class="flex items-start gap-2">
+                                                <span class="font-mono text-xs font-bold text-slate-400 mt-0.5 w-6 shrink-0">${globalRowIdx}.</span>
                                                 <div class="min-w-0 flex-1">
-                                                    <div class="font-bold text-[12px] text-[#1E293B] truncate leading-tight" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
-                                                    <div class="flex flex-wrap items-center gap-1 mt-1 text-[9.5px] text-slate-400">
-                                                        <span class="font-mono font-bold px-1 py-0.5 rounded bg-[#F1F5F9] text-slate-600 leading-none">${esc(s.class_name || '-')}</span>
-                                                        ${!isSpecificSc ? `<span class="font-semibold truncate max-w-[95px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>` : ''}
+                                                    <div class="font-bold text-[13.5px] text-[#1E293B] truncate leading-snug" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
+                                                    <div class="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px] text-slate-500">
+                                                        <span class="font-mono font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 leading-tight">${esc(s.class_name || '-')}</span>
+                                                        ${!isSpecificSc ? `<span class="font-semibold truncate max-w-[115px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>` : ''}
                                                         ${compact ? `
                                                         ${s.project_drive_url
-                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold leading-none transition">📁</a>`
+                                                            ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold leading-tight transition">📁 Drive</a>`
                                                             : ''}
-                                                        ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / Isi Link Drive" class="px-1 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-none cursor-pointer">✎</button>` : ''}
+                                                        ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / Isi Link Drive" class="px-1.5 py-0.5 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-tight cursor-pointer">✎</button>` : ''}
                                                         ${renderWhatsappLink(s.whatsapp_number, true, waText)}` : ''}
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
                                         ${compact ? '' : `
-                                        <td class="py-1.5 px-2 text-center border-r border-[#F1F5F9]">
-                                            <span class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
+                                        <td class="py-3 px-2.5 text-center border-r border-[#F1F5F9]">
+                                            <span class="font-mono text-xs font-bold px-2 py-1 rounded-md bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
                                         </td>`}
-                                        <td class="py-1.5 px-2 border-r border-[#F1F5F9] num-tabular">
-                                            <div class="flex items-center justify-between text-[10px] font-bold mb-0.5">
+                                        <td class="py-3 px-3 border-r border-[#F1F5F9] num-tabular">
+                                            <div class="flex items-center justify-between text-xs font-bold mb-1">
                                                 <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length}</span>
-                                                <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-400'}">${progPct}%</span>
+                                                <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-500'}">${progPct}%</span>
                                             </div>
-                                            <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
+                                            <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
                                                 <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
                                             </div>
                                         </td>
                                         ${compact ? '' : `
-                                        <td class="py-1.5 px-2 border-r border-[#F1F5F9] truncate">
+                                        <td class="py-3 px-2.5 border-r border-[#F1F5F9] truncate text-xs">
                                             ${renderWhatsappLink(s.whatsapp_number, false, waText)}
                                         </td>
-                                        <td class="py-1.5 px-2 border-r border-[#F1F5F9]">
-                                            <div class="flex items-center gap-1">
+                                        <td class="py-3 px-2.5 border-r border-[#F1F5F9]">
+                                            <div class="flex items-center gap-1.5">
                                                 ${s.project_drive_url
-                                                    ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[10px] font-bold transition whitespace-nowrap">📁 Drive ↗</a>`
-                                                    : `<span class="text-[10px] text-slate-400 italic">Belum</span>`}
-                                                ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-1.5 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[10px] font-bold cursor-pointer">✎</button>` : ''}
+                                                    ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.project_drive_url)}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-xs font-bold transition whitespace-nowrap">📁 Drive ↗</a>`
+                                                    : `<span class="text-xs text-slate-400 italic">Belum</span>`}
+                                                ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / isi Link Google Drive siswa" class="px-2 py-1 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-xs font-bold cursor-pointer">✎</button>` : ''}
                                             </div>
                                         </td>
-                                        <td class="py-1.5 px-2 text-[10.5px] text-slate-600 border-r border-[#F1F5F9] truncate">
+                                        <td class="py-3 px-2.5 text-xs text-slate-600 border-r border-[#F1F5F9] truncate">
                                             ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">-</span>`}
                                         </td>`}
                                         ${activeCols.map((col) => {
-                                            if (!stuColsSet.has(col)) return `<td class="py-1.5 px-1 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
+                                            if (!stuColsSet.has(col)) return `<td class="py-3 px-2 text-center text-slate-300 text-sm border-r border-[#F1F5F9]">·</td>`;
                                             const stVal = normalizeChecklistStatus(rowData.items?.[col]);
                                             const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
                                             if (stuCanEdit) {
                                                 return `
-                                                    <td class="py-1.5 px-1 text-center border-r border-[#F1F5F9]">
+                                                    <td class="py-3 px-2.5 text-center border-r border-[#F1F5F9]">
                                                         <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
-                                                            class="w-[92px] max-w-full mx-auto block px-1.5 py-1 rounded-md border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
+                                                            class="w-full max-w-[126px] mx-auto block px-2.5 py-2 rounded-xl border text-xs font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
                                                             ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
                                                         </select>
                                                     </td>`;
                                             }
                                             return `
-                                                <td class="py-1.5 px-1.5 text-center border-r border-[#F1F5F9]">
-                                                    <span class="inline-block min-w-[64px] px-2 py-1 rounded-md border text-[10.5px] font-extrabold ${stOpt.cls}">${stOpt.label}</span>
+                                                <td class="py-3 px-2.5 text-center border-r border-[#F1F5F9]">
+                                                    <span class="inline-block min-w-[82px] px-3 py-1.5 rounded-xl border text-xs font-extrabold ${stOpt.cls}">${stOpt.label}</span>
                                                 </td>`;
                                         }).join('')}
-                                        <td class="py-1.5 px-2.5">
+                                        <td class="py-3 px-3.5">
                                             ${stuCanEdit ? `
-                                                <div class="flex items-center gap-1.5">
+                                                <div class="flex items-center gap-2">
                                                     <input id="ckNote_${s.id}" type="text" value="${esc(rowData.notes || '')}" placeholder="Tulis catatan PJ Subkon..."
                                                         onkeydown="if(event.key==='Enter'){saveChecklistNote('${s.id}');}"
-                                                        class="flex-1 min-w-0 px-2.5 py-1.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-lg text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                                        class="flex-1 min-w-0 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-[13px] focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                                     <button type="button" onclick="saveChecklistNote('${s.id}', this)"
-                                                        class="px-2.5 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0082E6] text-white text-[10.5px] font-bold transition cursor-pointer shrink-0">
+                                                        class="px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
                                                         Simpan
                                                     </button>
                                                 </div>` : `
-                                                <div class="text-xs leading-snug ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
-                                            ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-0.5">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
+                                                <div class="text-[13px] leading-relaxed ${rowData.notes ? 'text-slate-700' : 'text-slate-300 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
+                                            ${rowData.updated_at ? `<div class="text-[11px] text-slate-400 mt-1">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
                                         </td>
                                     </tr>`;
                             };
 
                             return `
-                        <table id="checklistMainTable" class="table-fixed text-left border-collapse text-xs" style="width: max(100%, ${tableMinPx}px);">
+                        <table id="checklistMainTable" class="table-fixed text-left border-collapse text-sm" style="width: max(100%, ${tableMinPx}px);">
                             <colgroup>
-                                <col style="width: 215px;" />
-                                ${compact ? '' : '<col style="width: 74px;" />'}
-                                <col style="width: 102px;" />
-                                ${compact ? '' : '<col style="width: 112px;" /><col style="width: 112px;" /><col style="width: 115px;" />'}
+                                <col style="width: 265px;" />
+                                ${compact ? '' : '<col style="width: 92px;" />'}
+                                <col style="width: 132px;" />
+                                ${compact ? '' : '<col style="width: 140px;" /><col style="width: 135px;" /><col style="width: 150px;" />'}
                                 ${activeCols.map(() => `<col style="width: ${stageColPx}px;" />`).join('')}
                                 <col />
                             </colgroup>
                             <thead class="sticky top-0 z-20 shadow-[0_1px_0_#E2E8F0]">
-                                <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                                    <th rowspan="2" class="ck-sticky-col py-2 px-2.5 sticky left-0 bg-[#F7FAFF] z-30 border-r border-[#DCE5F2]">Siswa</th>
-                                    ${compact ? '' : '<th rowspan="2" class="py-2 px-2 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">Kelas</th>'}
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">Progress</th>
+                                <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                                    <th rowspan="2" class="ck-sticky-col py-3 px-3.5 sticky left-0 bg-[#F7FAFF] z-30 border-r border-[#DCE5F2]">Siswa</th>
+                                    ${compact ? '' : '<th rowspan="2" class="py-3 px-2.5 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">Kelas</th>'}
+                                    <th rowspan="2" class="py-3 px-3 bg-[#F7FAFF] border-r border-[#EDF1F7]">Progress</th>
                                     ${compact ? '' : `
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">No. HP / WA</th>
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">Link Drive</th>
-                                    <th rowspan="2" class="py-2 px-2 bg-[#F7FAFF] border-r border-[#EDF1F7]">Pembimbing</th>`}
-                                    <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-1.5 px-2 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
-                                    <th rowspan="2" class="py-2 px-2.5 bg-[#F7FAFF]">Notes / Catatan PJ</th>
+                                    <th rowspan="2" class="py-3 px-2.5 bg-[#F7FAFF] border-r border-[#EDF1F7]">No. HP / WA</th>
+                                    <th rowspan="2" class="py-3 px-2.5 bg-[#F7FAFF] border-r border-[#EDF1F7]">Link Drive</th>
+                                    <th rowspan="2" class="py-3 px-2.5 bg-[#F7FAFF] border-r border-[#EDF1F7]">Pembimbing</th>`}
+                                    <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-2 px-3 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
+                                    <th rowspan="2" class="py-3 px-3.5 bg-[#F7FAFF]">Notes / Catatan PJ</th>
                                 </tr>
-                                <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-[10px] font-bold text-[#1D5E55]">
+                                <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-xs font-bold text-[#1D5E55]">
                                     ${activeCols.map((col, ci) => `
-                                        <th class="py-1.5 px-1.5 text-center bg-[#F2FBF9] border-r border-[#DCEEEB] leading-tight">
+                                        <th class="py-2.5 px-2.5 text-center bg-[#F2FBF9] border-r border-[#DCEEEB] leading-snug">
                                             <div class="inline-flex items-center justify-center gap-1 max-w-full">
                                                 <span class="line-clamp-2" title="${esc(col)}">${esc(col)}</span>
-                                                ${canEditActiveSc && isSpecificSc ? `<button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-[#1D5E55]/60 hover:text-[#0082E6] text-[10px] cursor-pointer shrink-0">✎</button>` : ''}
+                                                ${canEditActiveSc && isSpecificSc ? `<button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-[#1D5E55]/60 hover:text-[#0082E6] text-xs cursor-pointer shrink-0">✎</button>` : ''}
                                             </div>
                                         </th>`).join('')}
                                 </tr>
@@ -5686,15 +5686,15 @@
                                 ${orderedGroups.length ? orderedGroups.map((grp) => `
                                     ${grp.label ? `
                                     <tr class="bg-[#F0F7FF] border-t border-b border-[#DCEBFF]">
-                                        <td class="ck-sticky-col sticky left-0 z-10 bg-[#F0F7FF] py-1.5 px-2.5 font-extrabold text-[11px] text-[#0082E6] border-r border-[#DCEBFF]">
+                                        <td class="ck-sticky-col sticky left-0 z-10 bg-[#F0F7FF] py-2.5 px-3.5 font-extrabold text-xs text-[#0082E6] border-r border-[#DCEBFF]">
                                             📌 ${esc(grp.label)} (${grp.rows.length})
                                         </td>
-                                        <td colspan="${totalColSpan - 1}" class="py-1.5 px-2.5 text-[10.5px] text-slate-500">
+                                        <td colspan="${totalColSpan - 1}" class="py-2.5 px-3.5 text-xs text-slate-500">
                                             ${SUBCONCS.includes(grp.label) ? `<button type="button" onclick="setChecklistSubconc('${esc(grp.label)}')" class="font-bold text-[#0082E6] hover:underline cursor-pointer">Buka tab khusus ${esc(grp.label)} →</button>` : ''}
                                         </td>
                                     </tr>` : ''}
                                     ${grp.rows.map(renderStudentRow).join('')}
-                                `).join('') : `<tr><td colspan="${totalColSpan}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
+                                `).join('') : `<tr><td colspan="${totalColSpan}" class="p-8 text-center text-sm text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
                             </tbody>
                         </table>`;
                         })()}
