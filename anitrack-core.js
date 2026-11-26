@@ -1180,20 +1180,29 @@
         st.textContent = `
             html.dark, html.dark body { background-color: #0B1120 !important; color: #E2E8F0 !important; }
             html.dark section.bg-\\[\\#F3F6FB\\], html.dark div.bg-\\[\\#F3F6FB\\], html.dark .bg-\\[\\#F3F6FB\\] { background-color: #0B1120 !important; }
-            html.dark aside#sidebar, html.dark header, html.dark .bg-white { background-color: #111827 !important; }
-            html.dark header.bg-white\\/95 { background-color: rgba(17, 24, 39, 0.94) !important; }
+            html.dark aside#sidebar, html.dark header, html.dark nav.fixed, html.dark .bg-white { background-color: #111827 !important; }
+            html.dark header.bg-white\\/95, html.dark nav.bg-white\\/95 { background-color: rgba(17, 24, 39, 0.94) !important; }
             html.dark .bg-\\[\\#FAFBFD\\], html.dark .bg-\\[\\#F7F9FC\\], html.dark .bg-\\[\\#F7FAFF\\], html.dark .bg-\\[\\#F8FBFF\\], html.dark .bg-\\[\\#F4F8FF\\], html.dark .bg-slate-50 { background-color: #1A2438 !important; }
-            html.dark .bg-\\[\\#F1F5F9\\], html.dark .bg-slate-100 { background-color: #1E293B !important; }
-            html.dark .bg-\\[\\#EAF4FF\\] { background-color: rgba(0, 149, 255, 0.16) !important; }
-            html.dark .bg-\\[\\#E3F6F3\\], html.dark .bg-\\[\\#E2F5F2\\], html.dark .bg-\\[\\#F0FDF4\\], html.dark .bg-\\[\\#F5FBF7\\], html.dark .bg-\\[\\#E7F9EE\\], html.dark .bg-\\[\\#DCFCE7\\] { background-color: rgba(16, 185, 129, 0.16) !important; }
+            html.dark .bg-\\[\\#F1F5F9\\], html.dark .bg-slate-100, html.dark .bg-slate-100\\/80 { background-color: #1E293B !important; }
+            html.dark .bg-\\[\\#EAF4FF\\], html.dark .bg-\\[\\#F0F9FF\\], html.dark .bg-\\[\\#E0F2FE\\] { background-color: rgba(0, 149, 255, 0.16) !important; }
+            html.dark .bg-\\[\\#E3F6F3\\], html.dark .bg-\\[\\#E2F5F2\\], html.dark .bg-\\[\\#F2FBF9\\], html.dark .bg-\\[\\#F0FDF4\\], html.dark .bg-\\[\\#F5FBF7\\], html.dark .bg-\\[\\#E7F9EE\\], html.dark .bg-\\[\\#DCFCE7\\] { background-color: rgba(16, 185, 129, 0.16) !important; }
             html.dark .bg-\\[\\#FFF0F4\\], html.dark .bg-\\[\\#FFF1F5\\], html.dark .bg-\\[\\#FFF5F7\\], html.dark .bg-\\[\\#FFF8FA\\], html.dark .bg-\\[\\#FFE4EC\\] { background-color: rgba(244, 63, 94, 0.16) !important; }
             html.dark .bg-\\[\\#FFF6D6\\], html.dark .bg-\\[\\#FFFDF5\\], html.dark .bg-\\[\\#FFFBEB\\] { background-color: rgba(245, 158, 11, 0.16) !important; }
             html.dark .bg-\\[\\#EEF2FF\\] { background-color: rgba(99, 102, 241, 0.2) !important; }
-            html.dark .border-\\[\\#EDF1F7\\], html.dark .border-\\[\\#E2E8F0\\], html.dark .border-\\[\\#E8EEF6\\], html.dark .border-\\[\\#F1F5F9\\], html.dark .border-\\[\\#DCEBFF\\], html.dark .border-\\[\\#DCE5F2\\], html.dark .border-slate-200 { border-color: #253349 !important; }
+            html.dark .border-\\[\\#EDF1F7\\], html.dark .border-\\[\\#E2E8F0\\], html.dark .border-\\[\\#E8EEF6\\], html.dark .border-\\[\\#F1F5F9\\], html.dark .border-\\[\\#DCEBFF\\], html.dark .border-\\[\\#CBE5FF\\], html.dark .border-\\[\\#DCE5F2\\], html.dark .border-\\[\\#DCEEEB\\], html.dark .border-\\[\\#BBE9E2\\], html.dark .border-\\[\\#BAE6FD\\], html.dark .border-slate-200 { border-color: #253349 !important; }
+            html.dark .border-\\[\\#86EFAC\\], html.dark .border-\\[\\#BBF7D0\\] { border-color: rgba(16, 185, 129, 0.4) !important; }
+            html.dark .border-\\[\\#FDE68A\\] { border-color: rgba(245, 158, 11, 0.4) !important; }
+            html.dark .border-\\[\\#FECDD6\\] { border-color: rgba(244, 63, 94, 0.4) !important; }
             html.dark .divide-\\[\\#EDF1F7\\] > :not([hidden]) ~ :not([hidden]), html.dark .divide-\\[\\#F1F5F9\\] > :not([hidden]) ~ :not([hidden]) { border-color: #253349 !important; }
             html.dark .text-\\[\\#1E293B\\], html.dark .text-slate-800, html.dark .text-slate-700 { color: #F1F5F9 !important; }
             html.dark .text-slate-600, html.dark .text-slate-500 { color: #94A3B8 !important; }
             html.dark .text-slate-400 { color: #64748B !important; }
+            html.dark .text-\\[\\#1D5E55\\], html.dark .text-\\[\\#15803D\\], html.dark .text-\\[\\#166534\\] { color: #6EE7B7 !important; }
+            html.dark .text-\\[\\#78350F\\], html.dark .text-\\[\\#92400E\\], html.dark .text-\\[\\#B45309\\], html.dark .text-\\[\\#9A6F00\\] { color: #FCD34D !important; }
+            html.dark .text-\\[\\#0369A1\\], html.dark .text-\\[\\#0082E6\\] { color: #38BDF8 !important; }
+            html.dark .text-\\[\\#BE123C\\], html.dark .text-\\[\\#9F1239\\] { color: #FDA4AF !important; }
+            html.dark #checklistMainTable thead th { background-color: #162033 !important; }
+            html.dark #checklistMainTable thead tr:nth-child(2) th { background-color: #132A2E !important; color: #6EE7B7 !important; }
             html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), html.dark select, html.dark textarea { background-color: #0F172A !important; color: #F1F5F9 !important; border-color: #334155 !important; }
             html.dark input::placeholder, html.dark textarea::placeholder { color: #64748B !important; }
             html.dark .hover\\:bg-\\[\\#F8FBFF\\]:hover, html.dark .hover\\:bg-\\[\\#F7F9FC\\]:hover, html.dark .hover\\:bg-\\[\\#F4F8FF\\]:hover, html.dark .hover\\:bg-slate-50:hover { background-color: #1E293B !important; }
