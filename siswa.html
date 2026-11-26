@@ -912,7 +912,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div>
                             <h2 class="text-lg font-extrabold text-[#1E293B]">Daftar Tugas Project &amp; Deadline</h2>
-                            <p class="text-xs text-slate-500">Simpan file sesuai contoh penamaan ke Folder Google Drive kamu di atas, lalu unggah bukti screenshot sebelum deadline.</p>
+                            <p class="text-xs text-slate-500">Simpan file sesuai contoh penamaan ke Folder Google Drive kamu di atas, lalu klik <strong>Laporkan Tugas Selesai</strong> sebelum deadline.</p>
                         </div>
                         <div id="studentProjectStagePills" class="flex items-center gap-2 overflow-x-auto pb-1"></div>
                     </div>
@@ -2361,7 +2361,7 @@
                                     PROJECT TRACKER • ${A.esc((currentUser.sub_concentration || 'ANIMASI').toUpperCase())}
                                 </span>
                                 <h2 class="text-xl sm:text-2xl font-extrabold">Progres Project Keseluruhan</h2>
-                                <p class="text-xs sm:text-sm text-white/90">Simpan file ke Folder Google Drive, lampirkan bukti screenshot, lalu klik <strong>Laporkan Tugas Selesai</strong> sebelum deadline untuk meraih <strong>🌟 Lencana Emas</strong>.</p>
+                                <p class="text-xs sm:text-sm text-white/90">Simpan file ke Folder Google Drive kamu di atas, lalu klik <strong>Laporkan Tugas Selesai</strong> sebelum deadline untuk meraih <strong>🌟 Lencana Emas</strong>.</p>
                                 <div class="flex flex-wrap items-center gap-2 pt-1">
                                     <button type="button" onclick="openMyFlowchart()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer">
@@ -2681,28 +2681,13 @@
                                 </div>
                                 <span class="self-start sm:self-center px-3 py-1.5 rounded-xl bg-[#16A34A] text-white text-xs font-bold shrink-0">✓ Selesai (ACC)</span>
                             </div>` : `
-                            <div class="space-y-3">
-                                <div class="proj-proof-box flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[#FFFDF5] border border-[#F7C200] rounded-xl p-3">
-                                    <div class="flex items-center gap-3 min-w-0">
-                                        <img src="${A.esc(proofSrc)}" alt="Bukti Project" onclick="openProofLightbox(this.src, '${A.esc(t.title)}')"
-                                            class="proj-proof-img ${proofSrc ? '' : 'hidden'} w-16 h-12 rounded-lg object-cover border border-[#CBD5E1] cursor-pointer shrink-0" />
-                                        <span class="proj-proof-hint text-[11px] font-medium text-slate-600 truncate">
-                                            ${proofSrc ? 'Bukti foto terlampir (klik gambar untuk perbesar).' : 'Wajib upload foto/screenshot bukti sebelum melaporkan tugas selesai.'}
-                                        </span>
-                                    </div>
-                                    <label class="shrink-0 text-center px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
-                                        📷 ${proofSrc ? 'Ganti Bukti Foto' : 'Upload Bukti Foto'}
-                                        <input type="file" accept="image/*" class="hidden" onchange="handleProjectProofPick('${t.id}', this)" />
-                                    </label>
-                                </div>
-                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                                    <input type="text" value="${A.esc(ps.student_notes || '')}" placeholder="Catatan / nama file yang diunggah ke Drive (opsional)..."
-                                        class="proj-notes flex-1 px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                                    <button type="button" onclick="saveStudentProjectSubmission('${t.id}', this)"
-                                        class="px-5 py-2.5 ${isWaiting ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#0095FF] hover:bg-[#0082E6]'} text-white text-xs font-bold rounded-xl shadow-blueGlow transition cursor-pointer shrink-0">
-                                        ${isRevision ? '🔄 Laporkan Revisi Selesai' : (isWaiting ? '✓ Perbarui Laporan Selesai' : '✅ Laporkan Tugas Selesai')}
-                                    </button>
-                                </div>
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                                <input type="text" value="${A.esc(ps.student_notes || '')}" placeholder="Catatan / nama file yang diunggah ke Drive (opsional)..."
+                                    class="proj-notes flex-1 px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <button type="button" onclick="saveStudentProjectSubmission('${t.id}', this)"
+                                    class="px-5 py-2.5 ${isWaiting ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#0095FF] hover:bg-[#0082E6]'} text-white text-xs font-bold rounded-xl shadow-blueGlow transition cursor-pointer shrink-0">
+                                    ${isRevision ? '🔄 Laporkan Revisi Selesai' : (isWaiting ? '✓ Perbarui Laporan Selesai' : '✅ Laporkan Tugas Selesai')}
+                                </button>
                             </div>`}
                         </div>`;
                 }).join('');
@@ -2711,31 +2696,16 @@
             window.saveStudentProjectSubmission = async function (projTaskId, btn) {
                 const card = btn.closest('[data-proj-id]');
                 const stVal = 'menunggu_review';
-                const hasExistingProof = card.dataset.hasProof === '1';
-                const newProof = projectProofDrafts[projTaskId];
                 const driveUrl = (currentUser?.project_drive_url || '').trim();
-
-                if (!driveUrl) {
-                    A.showToast('Isi & simpan Link Folder Google Drive Project kamu (1x di bagian atas) terlebih dahulu!');
-                    document.getElementById('studentProjectDriveCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    setTimeout(() => document.getElementById('studentProjectDriveInput')?.focus(), 250);
-                    return;
-                }
-
-                if (!hasExistingProof && !newProof) {
-                    A.showToast('Wajib upload foto/screenshot bukti terlebih dahulu sebelum melaporkan tugas selesai!');
-                    return;
-                }
 
                 const payload = {
                     project_task_id: projTaskId,
                     student_id: currentUser.id,
                     status: stVal,
-                    proof_url: driveUrl,
+                    proof_url: driveUrl || null,
                     student_notes: card.querySelector('.proj-notes')?.value.trim() || null,
                     updated_at: new Date().toISOString()
                 };
-                if (newProof) payload.proof_image = newProof;
 
                 btn.disabled = true;
                 btn.textContent = 'Mengirim...';
@@ -2747,8 +2717,9 @@
                     A.showToast(`Gagal menyimpan: ${error.message}`);
                     return;
                 }
-                delete projectProofDrafts[projTaskId];
-                A.showToast('Laporan tugas selesai terkirim! Menunggu review pembimbing ✓');
+                A.showToast(driveUrl
+                    ? 'Laporan tugas selesai terkirim! Menunggu review pembimbing ✓'
+                    : 'Laporan tugas selesai terkirim! (Lengkapi Link Folder Google Drive kamu di atas jika belum) ✓');
                 loadStudentProjects();
             };
 
