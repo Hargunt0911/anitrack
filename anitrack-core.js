@@ -1178,6 +1178,17 @@
         const st = document.createElement('style');
         st.id = 'anitrackDarkStyle';
         st.textContent = `
+            .anitrack-xscroll { scrollbar-width: thin; scrollbar-color: #94A3B8 #EEF2F7; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+            .anitrack-xscroll::-webkit-scrollbar { height: 11px; width: 11px; }
+            .anitrack-xscroll::-webkit-scrollbar-track { background: #EEF2F7; border-radius: 999px; }
+            .anitrack-xscroll::-webkit-scrollbar-thumb { background: #94A3B8; border-radius: 999px; border: 2px solid #EEF2F7; }
+            .anitrack-xscroll::-webkit-scrollbar-thumb:hover { background: #0095FF; }
+            html.dark .anitrack-xscroll { scrollbar-color: #475569 #1E293B; }
+            html.dark .anitrack-xscroll::-webkit-scrollbar-track { background: #1E293B; }
+            html.dark .anitrack-xscroll::-webkit-scrollbar-thumb { background: #475569; border-color: #1E293B; }
+            html.dark .anitrack-xscroll::-webkit-scrollbar-thumb:hover { background: #38BDF8; }
+            #checklistTableScroll.is-scrolled .ck-sticky-col { box-shadow: 6px 0 12px -4px rgba(15, 23, 42, 0.14); }
+            html.dark #checklistTableScroll.is-scrolled .ck-sticky-col { box-shadow: 6px 0 14px -4px rgba(0, 0, 0, 0.55); }
             html.dark, html.dark body { background-color: #0B1120 !important; color: #E2E8F0 !important; }
             html.dark section.bg-\\[\\#F3F6FB\\], html.dark div.bg-\\[\\#F3F6FB\\], html.dark .bg-\\[\\#F3F6FB\\] { background-color: #0B1120 !important; }
             html.dark aside#sidebar, html.dark header, html.dark nav.fixed, html.dark .bg-white { background-color: #111827 !important; }
@@ -4284,7 +4295,7 @@
         let projectReviewState = { status: 'active', className: '', search: '', page: 1 };
         let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
-        let projectChecklistState = { subconc: '', className: '', statusFilter: 'all', search: '' };
+        let projectChecklistState = { subconc: '', className: '', statusFilter: 'all', search: '', compactCols: true };
         let projectChecklistScrollPos = { left: 0, top: 0 };
         let projectClassesState = { search: '', mentorId: '', openClasses: new Set() };
         let projectCalendarState = { year: new Date().getFullYear(), month: new Date().getMonth() };
@@ -5340,8 +5351,8 @@
             ];
 
             container.innerHTML = `
-                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
-                    <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] space-y-4">
+                <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-x-clip">
+                    <div class="p-4 sm:p-5 border-b border-[#EDF1F7] bg-[#F7FAFF] rounded-t-2xl space-y-4">
                         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                             <div class="space-y-1">
                                 <div class="flex flex-wrap items-center gap-2">
@@ -5483,48 +5494,58 @@
                             <input id="checklistSearchInp" type="text" value="${esc(projectChecklistState.search)}" oninput="setChecklistSearch(this.value)"
                                 placeholder="Cari nama siswa / kelas / subkon..."
                                 class="flex-1 min-w-[180px] max-w-xs px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                            <button type="button" onclick="toggleChecklistCompactCols()"
+                                class="px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${projectChecklistState.compactCols ? 'bg-[#EAF4FF] border-[#CBE5FF] text-[#0082E6] hover:bg-[#0095FF] hover:text-white' : 'bg-white border-[#E2E8F0] text-slate-600 hover:border-[#0095FF]'}">
+                                ${projectChecklistState.compactCols ? '📊 Tampilkan Kolom Detail (WA/Drive/Pembimbing)' : '⚡ Mode Ringkas (Fokus STATUS)'}
+                            </button>
                             <span class="ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
                         </div>
                     </div>
 
-                    <!-- Bar Navigasi Geser Kiri/Kanan + Scrollbar Atas Tersinkronisasi (Tidak Perlu Scroll ke Bawah) -->
-                    <div class="px-4 py-2 bg-[#FAFBFD] border-b border-[#EDF1F7] space-y-1.5">
+                    <!-- Bar Navigasi Geser Kiri/Kanan + Scrollbar Atas Tersinkronisasi (Sticky saat Scroll Bawah) -->
+                    <div id="checklistNavBar" class="sticky top-[64px] sm:top-[68px] z-20 px-4 py-2 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7] space-y-1.5">
                         <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <button type="button" onclick="scrollChecklistTable('start')"
                                     class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">⏮ Awal</button>
-                                <button type="button" onclick="scrollChecklistTable(-340)"
-                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">◀ Geser Kiri</button>
+                                <button type="button" onclick="scrollChecklistTable(-320)"
+                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">◀ Kiri</button>
                                 <button type="button" onclick="scrollChecklistTable('status')"
-                                    class="px-3 py-1 rounded-lg bg-[#E3F6F3] hover:bg-[#4CB6A7] border border-[#BBE9E2] text-[#1D5E55] hover:text-white font-extrabold transition cursor-pointer">⏭ Langsung ke STATUS</button>
-                                <button type="button" onclick="scrollChecklistTable(340)"
-                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Geser Kanan ▶</button>
+                                    class="px-3 py-1 rounded-lg bg-[#E3F6F3] hover:bg-[#4CB6A7] border border-[#BBE9E2] text-[#1D5E55] hover:text-white font-extrabold transition cursor-pointer">🎯 STATUS</button>
+                                <button type="button" onclick="scrollChecklistTable(320)"
+                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Kanan ▶</button>
+                                <button type="button" onclick="scrollChecklistTable('end')"
+                                    class="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#E2E8F0] text-slate-600 hover:text-[#0082E6] font-bold transition cursor-pointer">Notes ⏭</button>
                             </div>
-                            <span class="text-[10.5px] text-slate-400 hidden md:inline">Tips: Geser scrollbar di bawah ini, tahan <kbd class="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">Shift</kbd> + scroll mouse, atau seret header tabel.</span>
+                            <span class="text-[10.5px] text-slate-400 hidden md:inline">Geser scrollbar di bawah, tahan <kbd class="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">Shift</kbd> + scroll mouse, atau seret area tabel.</span>
                         </div>
-                        <div id="checklistTopScroll" class="overflow-x-auto h-3.5 rounded-full bg-slate-100/80">
-                            <div id="checklistTopScrollInner" class="h-px"></div>
+                        <div id="checklistTopScroll" class="anitrack-xscroll overflow-x-auto overflow-y-hidden h-[16px]">
+                            <div id="checklistTopScrollInner" class="h-[2px]"></div>
                         </div>
                     </div>
 
-                    <!-- Tabel Project Update 2-Tingkat Persis Spreadsheet 2D / 3D (Header & Kolom Nama Terkunci) -->
-                    <div id="checklistTableScroll" class="overflow-auto max-h-[68vh] relative">
+                    <!-- Tabel Project Update 2-Tingkat (Header & Kolom Siswa Terkunci Rapi Tanpa Menimpa) -->
+                    <div id="checklistTableScroll" class="anitrack-xscroll overflow-auto max-h-[75vh] relative cursor-grab">
+                        ${(() => {
+                            const compact = projectChecklistState.compactCols !== false;
+                            const totalColSpan = activeCols.length + (compact ? 3 : 7);
+                            return `
                         <table id="checklistMainTable" class="w-full text-left border-collapse text-xs">
                             <thead class="sticky top-0 z-20 shadow-[0_1px_0_#E2E8F0]">
                                 <tr class="border-b border-[#E2E8F0] bg-[#F7FAFF] text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
-                                    <th rowspan="2" class="py-2.5 px-2.5 w-10 text-center bg-[#F7FAFF] border-r border-[#EDF1F7]">No</th>
-                                    <th rowspan="2" class="py-2.5 px-3 sticky left-0 bg-[#F7FAFF] z-30 min-w-[215px] border-r border-[#DCE5F2] shadow-[2px_0_6px_rgba(15,23,42,0.04)]">Nama Siswa</th>
-                                    <th rowspan="2" class="py-2.5 px-2.5 text-center bg-[#F7FAFF] min-w-[82px] border-r border-[#EDF1F7]">Kelas</th>
-                                    <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[130px] border-r border-[#EDF1F7]">Progress</th>
+                                    <th rowspan="2" class="ck-sticky-col py-2.5 px-3 sticky left-0 bg-[#F7FAFF] z-30 min-w-[235px] border-r border-[#DCE5F2]">Siswa</th>
+                                    ${compact ? '' : '<th rowspan="2" class="py-2.5 px-2.5 text-center bg-[#F7FAFF] min-w-[82px] border-r border-[#EDF1F7]">Kelas</th>'}
+                                    <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[125px] border-r border-[#EDF1F7]">Progress</th>
+                                    ${compact ? '' : `
                                     <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[118px] border-r border-[#EDF1F7]">No. HP / WA</th>
                                     <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[125px] border-r border-[#EDF1F7]">Link Google Drive</th>
-                                    <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[120px] border-r border-[#EDF1F7]">Pembimbing</th>
+                                    <th rowspan="2" class="py-2.5 px-2.5 bg-[#F7FAFF] min-w-[120px] border-r border-[#EDF1F7]">Pembimbing</th>`}
                                     <th id="checklistStatusGroupTh" colspan="${activeCols.length}" class="py-2 px-2 text-center bg-[#E3F6F3] text-[#1D5E55] border-b border-r border-[#BBE9E2]">STATUS</th>
-                                    <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[230px]">Notes</th>
+                                    <th rowspan="2" class="py-2.5 px-3 bg-[#F7FAFF] min-w-[225px]">Notes</th>
                                 </tr>
                                 <tr class="border-b border-[#E2E8F0] bg-[#F2FBF9] text-[10px] font-bold text-[#1D5E55]">
                                     ${activeCols.map((col, ci) => `
-                                        <th class="py-2 px-2 text-center min-w-[128px] bg-[#F2FBF9] border-r border-[#DCEEEB]">
+                                        <th class="py-2 px-2 text-center min-w-[124px] bg-[#F2FBF9] border-r border-[#DCEEEB]">
                                             <div class="inline-flex items-center justify-center gap-1">
                                                 <span>${esc(col)}</span>
                                                 ${canEditActiveSc && isSpecificSc ? `<button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-[#1D5E55]/60 hover:text-[#0082E6] text-[10px] cursor-pointer">✎</button>` : ''}
@@ -5549,16 +5570,30 @@
 
                                     return `
                                         <tr class="hover:bg-[#F8FBFF] align-middle">
-                                            <td class="py-2.5 px-2.5 text-center font-mono text-slate-400 border-r border-[#F1F5F9]">${idx + 1}</td>
-                                            <td class="py-2.5 px-3 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
-                                                <div class="font-bold text-[#1E293B] truncate max-w-[200px]" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
-                                                <div class="text-[10px] text-slate-400 truncate mt-0.5">
-                                                    <span class="font-mono">@${esc(s.username)}</span> • <span class="font-semibold ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Belum ada subkon')}</span>
+                                            <td class="ck-sticky-col py-2.5 px-3 sticky left-0 bg-white z-10 border-r border-[#EDF1F7]">
+                                                <div class="flex items-start gap-2">
+                                                    <span class="font-mono text-[10px] font-bold text-slate-400 mt-0.5 w-5 shrink-0">${idx + 1}.</span>
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="font-bold text-[#1E293B] truncate max-w-[195px]" title="${esc(s.full_name)}">${esc(s.full_name)}</div>
+                                                        <div class="flex flex-wrap items-center gap-1 mt-0.5 text-[10px] text-slate-400">
+                                                            <span class="font-mono font-bold px-1.5 py-0.2 rounded bg-[#F1F5F9] text-slate-600">${esc(s.class_name || '-')}</span>
+                                                            <span class="font-semibold truncate max-w-[110px] ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Tanpa subkon')}</span>
+                                                        </div>
+                                                        ${compact ? `
+                                                        <div class="flex flex-wrap items-center gap-1 mt-1">
+                                                            ${s.project_drive_url
+                                                                ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" title="Buka Folder Google Drive" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[9.5px] font-bold transition">📁 Drive</a>`
+                                                                : `<span class="text-[9.5px] text-slate-300">No Drive</span>`}
+                                                            ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah Link Drive" class="px-1 py-0.5 rounded bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 text-[9.5px] font-bold cursor-pointer">✎</button>` : ''}
+                                                            ${renderWhatsappLink(s.whatsapp_number, true, waText)}
+                                                        </div>` : ''}
+                                                    </div>
                                                 </div>
                                             </td>
+                                            ${compact ? '' : `
                                             <td class="py-2.5 px-2.5 text-center border-r border-[#F1F5F9]">
                                                 <span class="font-mono text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600 whitespace-nowrap">${esc(s.class_name || '-')}</span>
-                                            </td>
+                                            </td>`}
                                             <td class="py-2.5 px-3 border-r border-[#F1F5F9] num-tabular">
                                                 <div class="flex items-center justify-between text-[10.5px] font-bold mb-1">
                                                     <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length} Done</span>
@@ -5568,6 +5603,7 @@
                                                     <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
                                                 </div>
                                             </td>
+                                            ${compact ? '' : `
                                             <td class="py-2.5 px-2.5 border-r border-[#F1F5F9]">
                                                 ${renderWhatsappLink(s.whatsapp_number, false, waText)}
                                             </td>
@@ -5581,7 +5617,7 @@
                                             </td>
                                             <td class="py-2.5 px-2.5 text-[11px] text-slate-600 border-r border-[#F1F5F9]">
                                                 ${mentorObj ? `<span class="font-semibold">${esc(mentorObj.full_name)}</span>` : `<span class="text-slate-300">Belum di-plot</span>`}
-                                            </td>
+                                            </td>`}
                                             ${activeCols.map((col) => {
                                                 if (!stuColsSet.has(col)) return `<td class="py-2.5 px-2 text-center text-slate-200 border-r border-[#F1F5F9]">·</td>`;
                                                 const stVal = normalizeChecklistStatus(rowData.items?.[col]);
@@ -5615,9 +5651,10 @@
                                                 ${rowData.updated_at ? `<div class="text-[9.5px] text-slate-400 mt-1">Update: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
                                             </td>
                                         </tr>`;
-                                }).join('') : `<tr><td colspan="${activeCols.length + 8}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
+                                }).join('') : `<tr><td colspan="${totalColSpan}" class="p-8 text-center text-slate-400">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada Sub-Konsentrasi ini. Begitu siswa memiliki Sub-Konsentrasi di menu Plotting, barisnya akan muncul otomatis di sini.'}</td></tr>`}
                             </tbody>
-                        </table>
+                        </table>`;
+                        })()}
                     </div>
                 </div>`;
             initChecklistScrollSync();
@@ -6430,23 +6467,40 @@
             if (inp) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
         };
 
+        global.toggleChecklistCompactCols = function () {
+            projectChecklistState.compactCols = !projectChecklistState.compactCols;
+            projectChecklistScrollPos.left = 0;
+            renderProjectUpdateView();
+        };
+
         function initChecklistScrollSync() {
             const topSc = document.getElementById('checklistTopScroll');
             const topInner = document.getElementById('checklistTopScrollInner');
+            const navBar = document.getElementById('checklistNavBar');
             const mainSc = document.getElementById('checklistTableScroll');
             const tbl = document.getElementById('checklistMainTable');
             if (!mainSc || !tbl) return;
 
-            const syncWidth = () => {
+            const syncDimensions = () => {
+                const needScroll = tbl.scrollWidth > mainSc.clientWidth + 4;
                 if (topInner) topInner.style.width = `${tbl.scrollWidth}px`;
+                if (navBar) navBar.classList.toggle('hidden', !needScroll);
+                mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
+                mainSc.classList.toggle('cursor-grab', needScroll);
             };
-            syncWidth();
+
+            syncDimensions();
             requestAnimationFrame(() => {
-                syncWidth();
+                syncDimensions();
                 if (projectChecklistScrollPos.left) mainSc.scrollLeft = projectChecklistScrollPos.left;
                 if (projectChecklistScrollPos.top) mainSc.scrollTop = projectChecklistScrollPos.top;
                 if (topSc) topSc.scrollLeft = mainSc.scrollLeft;
+                mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
             });
+
+            // Jangan pasang listener ganda jika sudah terpasang pada elemen DOM yang sama
+            if (mainSc.dataset.scrollBound === '1') return;
+            mainSc.dataset.scrollBound = '1';
 
             let lockSync = false;
             if (topSc) {
@@ -6455,19 +6509,27 @@
                     lockSync = true;
                     mainSc.scrollLeft = topSc.scrollLeft;
                     projectChecklistScrollPos.left = topSc.scrollLeft;
+                    mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
                     lockSync = false;
-                });
+                }, { passive: true });
             }
             mainSc.addEventListener('scroll', () => {
                 projectChecklistScrollPos.left = mainSc.scrollLeft;
                 projectChecklistScrollPos.top = mainSc.scrollTop;
+                mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
                 if (lockSync || !topSc) return;
                 lockSync = true;
                 topSc.scrollLeft = mainSc.scrollLeft;
                 lockSync = false;
-            });
+            }, { passive: true });
 
-            // Shift + Mouse Wheel untuk geser kanan/kiri instan
+            if (typeof ResizeObserver !== 'undefined') {
+                const ro = new ResizeObserver(() => syncDimensions());
+                ro.observe(mainSc);
+                ro.observe(tbl);
+            }
+
+            // Shift + Mouse Wheel untuk geser kanan/kiri mulus
             mainSc.addEventListener('wheel', (e) => {
                 if (e.shiftKey && Math.abs(e.deltaY) > 0) {
                     e.preventDefault();
@@ -6475,28 +6537,31 @@
                 }
             }, { passive: false });
 
-            // Drag-to-pan dengan mouse pada area kosong / header tabel
+            // Drag-to-pan yang tidak nyangkut (mouseup terikat ke window)
             let dragActive = false;
             let dragStartX = 0;
             let dragStartScroll = 0;
-            mainSc.addEventListener('mousedown', (e) => {
-                if (e.button !== 0 || e.target.closest('select, input, button, a, label')) return;
-                dragActive = true;
-                dragStartX = e.clientX;
-                dragStartScroll = mainSc.scrollLeft;
-                mainSc.classList.add('cursor-grabbing', 'select-none');
-            });
+            const onMove = (e) => {
+                if (!dragActive) return;
+                mainSc.scrollLeft = dragStartScroll - (e.clientX - dragStartX);
+            };
             const endDrag = () => {
                 if (!dragActive) return;
                 dragActive = false;
                 mainSc.classList.remove('cursor-grabbing', 'select-none');
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', endDrag);
             };
-            mainSc.addEventListener('mousemove', (e) => {
-                if (!dragActive) return;
-                mainSc.scrollLeft = dragStartScroll - (e.clientX - dragStartX);
+            mainSc.addEventListener('mousedown', (e) => {
+                if (e.button !== 0 || e.target.closest('select, input, button, a, label')) return;
+                if (tbl.scrollWidth <= mainSc.clientWidth + 4) return;
+                dragActive = true;
+                dragStartX = e.clientX;
+                dragStartScroll = mainSc.scrollLeft;
+                mainSc.classList.add('cursor-grabbing', 'select-none');
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('mouseup', endDrag);
             });
-            mainSc.addEventListener('mouseup', endDrag);
-            mainSc.addEventListener('mouseleave', endDrag);
         }
 
         global.scrollChecklistTable = function (target) {
@@ -6504,9 +6569,11 @@
             if (!mainSc) return;
             if (target === 'start') {
                 mainSc.scrollTo({ left: 0, behavior: 'smooth' });
+            } else if (target === 'end') {
+                mainSc.scrollTo({ left: mainSc.scrollWidth, behavior: 'smooth' });
             } else if (target === 'status') {
                 const stTh = document.getElementById('checklistStatusGroupTh');
-                const dest = stTh ? Math.max(0, stTh.offsetLeft - 230) : 520;
+                const dest = stTh ? Math.max(0, stTh.offsetLeft - 240) : 360;
                 mainSc.scrollTo({ left: dest, behavior: 'smooth' });
             } else if (typeof target === 'number') {
                 mainSc.scrollBy({ left: target, behavior: 'smooth' });
