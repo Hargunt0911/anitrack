@@ -2361,7 +2361,7 @@
                                     PROJECT TRACKER • ${A.esc((currentUser.sub_concentration || 'ANIMASI').toUpperCase())}
                                 </span>
                                 <h2 class="text-xl sm:text-2xl font-extrabold">Progres Project Keseluruhan</h2>
-                                <p class="text-xs sm:text-sm text-white/90">Kumpulkan lebih awal dari deadline untuk meraih <strong>🌟 Lencana Emas</strong>, dan kirim <strong>Update Mingguan</strong> tiap minggu.</p>
+                                <p class="text-xs sm:text-sm text-white/90">Simpan file ke Folder Google Drive, lampirkan bukti screenshot, lalu klik <strong>Laporkan Tugas Selesai</strong> sebelum deadline untuk meraih <strong>🌟 Lencana Emas</strong>.</p>
                                 <div class="flex flex-wrap items-center gap-2 pt-1">
                                     <button type="button" onclick="openMyFlowchart()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer">
@@ -2402,22 +2402,18 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 num-tabular">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 num-tabular">
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                                 <div class="text-[11px] text-white/85">🌟 Lencana Emas</div>
                                 <div class="text-lg font-extrabold text-[#FFF6D6]">${myIssueStats.goldCount}</div>
                             </div>
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Update Minggu Ini</div>
-                                <div class="text-lg font-extrabold text-[#FFF6D6]">${updatedThisWeekCount}/${activeForWeekly.length}</div>
+                                <div class="text-[11px] text-white/85">Menunggu Review</div>
+                                <div class="text-lg font-extrabold text-[#FFF6D6]">${waitCount}</div>
                             </div>
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                                 <div class="text-[11px] text-white/85">Perlu Revisi</div>
                                 <div class="text-lg font-extrabold text-[#FFE4EC]">${revCount}</div>
-                            </div>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Menunggu Review</div>
-                                <div class="text-lg font-extrabold text-[#FFF6D6]">${waitCount}</div>
                             </div>
                             <div class="bg-white/15 rounded-xl px-3.5 py-2.5" title="${A.esc(myIssueStats.detailText)}">
                                 <div class="text-[11px] text-white/85">⚠️ Total Masalah</div>
@@ -2619,15 +2615,12 @@
                     const stVal = ps.status || 'belum_mulai';
                     const isAcc = stVal === 'selesai';
                     const isRevision = stVal === 'revisi';
+                    const isWaiting = stVal === 'menunggu_review';
                     const stObj = STATUS_OPTIONS.find((x) => x.value === stVal) || STATUS_OPTIONS[0];
                     const revNum = Number(ps.revision_count || 0);
                     const dl = A.getDeadlineMeta(t.due_date, isAcc);
                     const proofSrc = projectProofDrafts[t.id] || ps.proof_image || '';
                     const naming = A.buildProjectFileNaming(t, currentUser);
-                    const taskWeeklyList = (weeklyByTask[t.id] || []).slice().sort((a, b) => String(b.week_key).localeCompare(String(a.week_key)));
-                    const thisWeekUpd = taskWeeklyList.find((u) => u.week_key === currentWeekKey) || null;
-                    const weeklyProofSrc = weeklyProofDrafts[t.id] || thisWeekUpd?.proof_image || '';
-                    const defaultPct = thisWeekUpd ? thisWeekUpd.progress_percent : (taskWeeklyList[0]?.progress_percent || (isAcc ? 100 : 25));
                     const tm = A.evaluateSubmissionTimeliness(t.due_date, ps.updated_at, stVal);
                     const taskLogs = studentFeedbackLogsCache.filter((l) => l.task_id === t.id);
 
@@ -2638,9 +2631,6 @@
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         <span class="font-mono text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#EAF4FF] text-[#0082E6]">${A.esc(t.pipeline_stage)}</span>
                                         <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md border ${dl.badgeClass}">📅 ${A.esc(dl.label)}</span>
-                                        ${!isAcc ? (thisWeekUpd
-                                            ? `<span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#E7F9EE] text-[#15803D] border border-[#BBF7D0]">✓ Update Minggu Ini (${thisWeekUpd.progress_percent}%)</span>`
-                                            : `<span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#FFF6D6] text-[#B88600] border border-[#FDE68A]">⏳ Belum Update Minggu Ini</span>`) : ''}
                                         ${revNum > 0 ? `<span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48] border border-[#FECDD6]">Revisi ke-${revNum}</span>` : ''}
                                         ${taskLogs.length > 0 ? `<button type="button" onclick="openMyFeedbackHistory()" class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#F7FAFF] hover:bg-[#EAF4FF] text-[#0082E6] border border-[#DCEBFF] cursor-pointer">📜 Riwayat Catatan (${taskLogs.length})</button>` : ''}
                                     </div>
@@ -2650,83 +2640,6 @@
                                 <span class="self-start text-xs font-bold px-3 py-1 rounded-full border shrink-0 ${isAcc ? tm.badgeClass : stObj.badge}">
                                     ${isAcc ? A.esc(tm.label) : stObj.label}
                                 </span>
-                            </div>
-
-                            <!-- Project Update Mingguan Siswa (Terpantau Pembimbing & Admin Setiap Minggu) -->
-                            <div data-weekly-task="${t.id}" class="rounded-xl border ${thisWeekUpd ? 'border-[#BBF7D0] bg-[#F5FBF7]' : 'border-[#DCEBFF] bg-[#F7FAFF]'} p-4 space-y-3">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <div class="text-[11px] font-extrabold uppercase tracking-wider ${thisWeekUpd ? 'text-[#15803D]' : 'text-[#0082E6]'}">
-                                            📅 Project Update Mingguan • ${A.esc(currentWeekInfo.label)}
-                                        </div>
-                                        <p class="text-[11px] text-slate-500 mt-0.5">Laporkan perkembangan pengerjaan tugas ini setiap minggu agar guru pembimbing tahu progres &amp; kendalamu.</p>
-                                    </div>
-                                    ${taskWeeklyList.length ? `
-                                    <button type="button" onclick="toggleWeeklyHistory('${t.id}')"
-                                        class="px-2.5 py-1 rounded-lg bg-white border border-[#CBD5E1] hover:border-[#0095FF] text-[11px] font-bold text-slate-600 hover:text-[#0082E6] transition cursor-pointer">
-                                        📜 Riwayat (${taskWeeklyList.length} minggu)
-                                    </button>` : ''}
-                                </div>
-
-                                ${!isAcc ? `
-                                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                                    <div class="md:col-span-3">
-                                        <div class="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
-                                            <span>Progres Tugas</span>
-                                            <span class="weekly-pct-label font-mono font-extrabold text-[#0082E6]">${defaultPct}%</span>
-                                        </div>
-                                        <input type="range" min="0" max="100" step="5" value="${defaultPct}" oninput="onWeeklyRangeInput(this)"
-                                            class="weekly-pct-range w-full h-2 cursor-pointer" />
-                                    </div>
-                                    <div class="md:col-span-5">
-                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Progres Minggu Ini <span class="text-[#F13B6E]">*</span></label>
-                                        <input type="text" value="${A.esc(thisWeekUpd?.summary || '')}" placeholder="Contoh: Selesai sketsa turnaround tampak depan & samping..."
-                                            class="weekly-summary-inp w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
-                                    </div>
-                                    <div class="md:col-span-4">
-                                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Kendala (Opsional)</label>
-                                        <input type="text" value="${A.esc(thisWeekUpd?.blockers || '')}" placeholder="Kosongkan jika lancar..."
-                                            class="weekly-blockers-inp w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
-                                    </div>
-                                    <div class="md:col-span-8 flex flex-wrap items-center gap-2.5">
-                                        <img src="${A.esc(weeklyProofSrc)}" alt="WIP" onclick="openProofLightbox(this.src, 'Progres Mingguan — ${A.esc(t.title)}')"
-                                            class="weekly-proof-img ${weeklyProofSrc ? '' : 'hidden'} w-12 h-9 rounded-lg object-cover border border-[#CBD5E1] cursor-pointer shrink-0" />
-                                        <label class="px-3 py-1.5 rounded-lg bg-white hover:bg-[#EAF4FF] border border-[#CBD5E1] text-[#0082E6] text-[11px] font-bold transition cursor-pointer">
-                                            📷 ${weeklyProofSrc ? 'Ganti Screenshot WIP' : 'Lampirkan Screenshot WIP (Opsional)'}
-                                            <input type="file" accept="image/*" class="hidden" onchange="handleWeeklyProofPick('${t.id}', this)" />
-                                        </label>
-                                        <span class="weekly-proof-hint text-[11px] text-slate-500 truncate">${weeklyProofSrc ? 'Screenshot progres terlampir.' : 'Opsional: screenshot viewport / draft saat ini.'}</span>
-                                    </div>
-                                    <div class="md:col-span-4">
-                                        <button type="button" onclick="saveStudentWeeklyUpdate('${t.id}', this)"
-                                            class="w-full py-2 px-4 rounded-xl ${thisWeekUpd ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#0095FF] hover:bg-[#0082E6]'} text-white text-xs font-bold shadow-sm transition cursor-pointer">
-                                            ${thisWeekUpd ? '✓ Perbarui Update Minggu Ini' : '💾 Kirim Update Minggu Ini'}
-                                        </button>
-                                    </div>
-                                </div>` : ''}
-
-                                ${thisWeekUpd?.mentor_note || thisWeekUpd?.checked_at ? `
-                                <div class="rounded-lg bg-white border border-[#BBE9E2] px-3 py-2 text-[11px] text-[#1D5E55]">
-                                    <strong>✓ Dicek Pembimbing (${A.esc(thisWeekUpd.checked_by_name || 'Guru')}):</strong> ${A.esc(thisWeekUpd.mentor_note || 'Update minggu ini sudah diterima & dipantau.')}
-                                </div>` : ''}
-
-                                ${taskWeeklyList.length ? `
-                                <div id="weeklyHistory_${t.id}" class="hidden pt-2 border-t border-[#DCEBFF] space-y-2">
-                                    ${taskWeeklyList.map((u) => `
-                                        <div class="bg-white border border-[#EDF1F7] rounded-lg p-2.5 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                            <div class="space-y-0.5 min-w-0">
-                                                <div class="flex flex-wrap items-center gap-1.5">
-                                                    <span class="font-bold text-[#1E293B]">${A.esc(A.getWeekRangeInfo(u.week_key).label)}</span>
-                                                    <span class="px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-mono font-bold">${u.progress_percent}%</span>
-                                                    ${u.checked_at ? `<span class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-bold">✓ Dicek</span>` : ''}
-                                                </div>
-                                                <div class="text-slate-600">${A.esc(u.summary)}</div>
-                                                ${u.blockers ? `<div class="text-[#E11D48]">Kendala: ${A.esc(u.blockers)}</div>` : ''}
-                                                ${u.mentor_note ? `<div class="text-[#1D5E55] font-semibold">Catatan Pembimbing: ${A.esc(u.mentor_note)}</div>` : ''}
-                                            </div>
-                                            ${u.proof_image ? `<img src="${A.esc(u.proof_image)}" onclick="openProofLightbox(this.src, '${A.esc(u.week_key)} — ${A.esc(t.title)}')" class="w-12 h-9 rounded object-cover border border-[#CBD5E1] cursor-pointer shrink-0" />` : ''}
-                                        </div>`).join('')}
-                                </div>` : ''}
                             </div>
 
                             <!-- Panduan & Contoh Penamaan File Otomatis Mengikuti Tugas -->
@@ -2740,7 +2653,7 @@
                                         <code class="font-mono font-bold text-[#1E293B] bg-white border border-[#DCEBFF] px-2.5 py-1 rounded-lg break-all">${A.esc(naming.exampleFull)}</code>
                                     </div>
                                     <p class="text-[11px] text-slate-500">
-                                        Pola: <span class="font-mono text-slate-600">[Kelas]_[NamaSiswa]_[Tahap]_[NamaTugas]</span> • Simpan ke Folder Google Drive Project kamu di atas (sesuaikan ekstensi file aslimu).
+                                        Pola: <span class="font-mono text-slate-600">[Kelas]_[NamaSiswa]_[Tahap]_[NamaTugas]</span> • Simpan ke Folder Google Drive Project kamu di atas.
                                     </p>
                                 </div>
                                 <button type="button" onclick="copyProjectFileName('${A.esc(naming.exampleBase)}')"
@@ -2757,62 +2670,60 @@
                                 <div class="leading-relaxed space-y-2">${A.formatFeedbackWithImages(ps.mentor_feedback)}</div>
                             </div>` : ''}
 
-                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                                <div class="md:col-span-4">
-                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Status Pengerjaan</label>
-                                    <select onchange="onProjectStatusChange(this)" class="proj-status w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm sm:text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]" ${isAcc ? 'disabled' : ''}>
-                                        <option value="belum_mulai" ${stVal === 'belum_mulai' ? 'selected' : ''}>Belum Mulai</option>
-                                        <option value="sedang_dikerjakan" ${stVal === 'sedang_dikerjakan' || stVal === 'revisi' ? 'selected' : ''}>Sedang Dikerjakan / Perbaiki Revisi</option>
-                                        <option value="menunggu_review" ${stVal === 'menunggu_review' ? 'selected' : ''}>Selesai — Ajukan Review Guru (Wajib Bukti)</option>
-                                        ${isAcc ? '<option value="selesai" selected>Selesai (ACC Guru)</option>' : ''}
-                                    </select>
+                            ${isAcc ? `
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#E7F9EE] border border-[#BBF7D0] rounded-xl p-3.5">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    ${proofSrc ? `<img src="${A.esc(proofSrc)}" alt="Bukti Project" onclick="openProofLightbox(this.src, '${A.esc(t.title)}')" class="w-16 h-12 rounded-lg object-cover border border-[#86EFAC] cursor-pointer shrink-0" />` : ''}
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-extrabold text-[#15803D]">✓ Tugas Selesai &amp; Sudah di-ACC Pembimbing</div>
+                                        ${ps.student_notes ? `<div class="text-[11px] text-[#166534] mt-0.5 truncate">Catatan kamu: ${A.esc(ps.student_notes)}</div>` : ''}
+                                    </div>
                                 </div>
-                                <div class="md:col-span-5">
-                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Catatan Pengerjaan / Nama File yang Diunggah</label>
-                                    <input type="text" value="${A.esc(ps.student_notes || '')}" placeholder="Contoh: File ${A.esc(naming.exampleFull)} sudah diupload ke Drive..." ${isAcc ? 'disabled' : ''}
-                                        class="proj-notes w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF] disabled:bg-slate-100" />
-                                </div>
-                                <div class="md:col-span-3">
-                                    <button type="button" onclick="saveStudentProjectSubmission('${t.id}', this)" ${isAcc ? 'disabled' : ''}
-                                        class="w-full py-2.5 px-4 bg-[#0095FF] hover:bg-[#0082E6] disabled:bg-[#4CB6A7] text-white text-xs font-bold rounded-xl shadow-blueGlow transition cursor-pointer">
-                                        ${isAcc ? '✓ Sudah di-ACC' : (isRevision ? 'Kirim Hasil Revisi' : 'Kirim Progres / Bukti')}
-                                    </button>
-                                </div>
-                                <div class="proj-proof-box ${(stVal === 'menunggu_review' || isAcc) ? '' : 'hidden'} md:col-span-12 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[#FFFDF5] border border-[#F7C200] rounded-xl p-3">
+                                <span class="self-start sm:self-center px-3 py-1.5 rounded-xl bg-[#16A34A] text-white text-xs font-bold shrink-0">✓ Selesai (ACC)</span>
+                            </div>` : `
+                            <div class="space-y-3">
+                                <div class="proj-proof-box flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[#FFFDF5] border border-[#F7C200] rounded-xl p-3">
                                     <div class="flex items-center gap-3 min-w-0">
                                         <img src="${A.esc(proofSrc)}" alt="Bukti Project" onclick="openProofLightbox(this.src, '${A.esc(t.title)}')"
                                             class="proj-proof-img ${proofSrc ? '' : 'hidden'} w-16 h-12 rounded-lg object-cover border border-[#CBD5E1] cursor-pointer shrink-0" />
                                         <span class="proj-proof-hint text-[11px] font-medium text-slate-600 truncate">
-                                            ${proofSrc ? 'Bukti foto terlampir (klik gambar untuk perbesar).' : 'Wajib upload foto/screenshot bukti untuk mengajukan Selesai / Review Guru.'}
+                                            ${proofSrc ? 'Bukti foto terlampir (klik gambar untuk perbesar).' : 'Wajib upload foto/screenshot bukti sebelum melaporkan tugas selesai.'}
                                         </span>
                                     </div>
-                                    ${!isAcc ? `
                                     <label class="shrink-0 text-center px-3.5 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
-                                        ${proofSrc ? 'Ganti Bukti Foto' : 'Upload Bukti Foto'}
+                                        📷 ${proofSrc ? 'Ganti Bukti Foto' : 'Upload Bukti Foto'}
                                         <input type="file" accept="image/*" class="hidden" onchange="handleProjectProofPick('${t.id}', this)" />
-                                    </label>` : ''}
+                                    </label>
                                 </div>
-                            </div>
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                                    <input type="text" value="${A.esc(ps.student_notes || '')}" placeholder="Catatan / nama file yang diunggah ke Drive (opsional)..."
+                                        class="proj-notes flex-1 px-3.5 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-base sm:text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                    <button type="button" onclick="saveStudentProjectSubmission('${t.id}', this)"
+                                        class="px-5 py-2.5 ${isWaiting ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#0095FF] hover:bg-[#0082E6]'} text-white text-xs font-bold rounded-xl shadow-blueGlow transition cursor-pointer shrink-0">
+                                        ${isRevision ? '🔄 Laporkan Revisi Selesai' : (isWaiting ? '✓ Perbarui Laporan Selesai' : '✅ Laporkan Tugas Selesai')}
+                                    </button>
+                                </div>
+                            </div>`}
                         </div>`;
                 }).join('');
             }
 
             window.saveStudentProjectSubmission = async function (projTaskId, btn) {
                 const card = btn.closest('[data-proj-id]');
-                const stVal = card.querySelector('.proj-status').value;
+                const stVal = 'menunggu_review';
                 const hasExistingProof = card.dataset.hasProof === '1';
                 const newProof = projectProofDrafts[projTaskId];
                 const driveUrl = (currentUser?.project_drive_url || '').trim();
 
-                if ((stVal === 'menunggu_review' || stVal === 'selesai') && !driveUrl) {
+                if (!driveUrl) {
                     A.showToast('Isi & simpan Link Folder Google Drive Project kamu (1x di bagian atas) terlebih dahulu!');
                     document.getElementById('studentProjectDriveCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     setTimeout(() => document.getElementById('studentProjectDriveInput')?.focus(), 250);
                     return;
                 }
 
-                if ((stVal === 'menunggu_review' || stVal === 'selesai') && !hasExistingProof && !newProof) {
-                    A.showToast('Wajib upload foto/screenshot bukti terlebih dahulu sebelum mengajukan Review / Selesai!');
+                if (!hasExistingProof && !newProof) {
+                    A.showToast('Wajib upload foto/screenshot bukti terlebih dahulu sebelum melaporkan tugas selesai!');
                     return;
                 }
 
@@ -2820,8 +2731,8 @@
                     project_task_id: projTaskId,
                     student_id: currentUser.id,
                     status: stVal,
-                    proof_url: driveUrl || null,
-                    student_notes: card.querySelector('.proj-notes').value.trim() || null,
+                    proof_url: driveUrl,
+                    student_notes: card.querySelector('.proj-notes')?.value.trim() || null,
                     updated_at: new Date().toISOString()
                 };
                 if (newProof) payload.proof_image = newProof;
@@ -2837,7 +2748,7 @@
                     return;
                 }
                 delete projectProofDrafts[projTaskId];
-                A.showToast(stVal === 'menunggu_review' ? 'Bukti terkirim! Menunggu review pembimbing ✓' : 'Progres project tersimpan ✓');
+                A.showToast('Laporan tugas selesai terkirim! Menunggu review pembimbing ✓');
                 loadStudentProjects();
             };
 
