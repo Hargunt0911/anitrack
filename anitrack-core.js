@@ -3386,11 +3386,11 @@
             }
             try {
                 const { tasksWb, materialsWb, fullWb } = await buildExportWorkbooks();
-                const stamp = new Date().toISOString().slice(0, 10);
-                if (kind === 'tasks') global.XLSX.writeFile(tasksWb, `Rekap-DailyTask-${stamp}.xlsx`);
-                else if (kind === 'materials') global.XLSX.writeFile(materialsWb, `Daftar-MateriAjar-${stamp}.xlsx`);
-                else global.XLSX.writeFile(fullWb, `AniTrack-FullBackup-${stamp}.xlsx`);
-                showToast('File Excel (.xlsx) berhasil diunduh.');
+                const stamp = getJakartaYmd(new Date());
+                if (kind === 'tasks') global.XLSX.writeFile(tasksWb, `Rekap-DailyTask_AniTrack_${stamp}.xlsx`);
+                else if (kind === 'materials') global.XLSX.writeFile(materialsWb, `Daftar-MateriAjar_AniTrack_${stamp}.xlsx`);
+                else global.XLSX.writeFile(fullWb, `Full-Backup_AniTrack_${stamp}.xlsx`);
+                showToast('File Excel (.xlsx) berhasil diunduh ✓');
             } catch (err) {
                 showToast(`Gagal export: ${err.message}`);
             }
@@ -6805,12 +6805,14 @@
             renderProjectTrackerBody();
         };
 
-        global.downloadChecklistTemplateXlsx = function () {
-            if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
-            const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {} } = projectDataCache;
-            const statusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
-            const wb = global.XLSX.utils.book_new();
-            const curTab = projectChecklistState.subconc;
+        function buildChecklistExportMeta() {
+            const { allStudentsList = [], studentList = [] } = projectDataCache;
+            const isAdminStaff = isAnyAdmin(currentUser);
+            const curTab = projectChecklistState.subconc || '';
+            const clsFilter = projectChecklistState.className || '';
+            const cleanSlug = (str) => String(str || '').trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const mentorShort = cleanSlug((currentUser.full_name || currentUser.username || 'Guru').split(/\s+/).slice(0, 2).join(' '));
+
             const subconcsToBuild = SUBCONCS.includes(curTab)
                 ? [curTab]
                 : (curTab === '__group_2d'
@@ -6819,9 +6821,55 @@
                         ? SUBCONCS.filter((sc) => sc.startsWith('3D'))
                         : SUBCONCS));
 
+            const getSourceStudentsForSubconc = (sc) => {
+                const useAll = expectedRole === 'superadmin' || isAdminStaff || myPjSubconcs.includes(sc);
+                const pool = useAll ? allStudentsList : studentList;
+                return pool.filter((s) => s.sub_concentration === sc && (!clsFilter || s.class_name === clsFilter));
+            };
+
+            const parts = [];
+            if (SUBCONCS.includes(curTab)) {
+                parts.push(cleanSlug(curTab));
+                if (!isAdminStaff && expectedRole === 'mentor' && !myPjSubconcs.includes(curTab)) {
+                    parts.push(staffScopeMode === 'homeroom' && myHomeroomClass ? `WaliKelas-${cleanSlug(myHomeroomClass)}` : `Bimbingan-${mentorShort}`);
+                }
+            } else if (curTab === '__group_2d') {
+                parts.push('Semua-2D');
+                if (!isAdminStaff && expectedRole === 'mentor') {
+                    parts.push(staffScopeMode === 'homeroom' && myHomeroomClass ? `WaliKelas-${cleanSlug(myHomeroomClass)}` : `Bimbingan-${mentorShort}`);
+                }
+            } else if (curTab === '__group_3d') {
+                parts.push('Semua-3D');
+                if (!isAdminStaff && expectedRole === 'mentor') {
+                    parts.push(staffScopeMode === 'homeroom' && myHomeroomClass ? `WaliKelas-${cleanSlug(myHomeroomClass)}` : `Bimbingan-${mentorShort}`);
+                }
+            } else if (expectedRole === 'mentor' || staffScopeMode === 'mentees' || (staffScopeMode === 'homeroom' && myHomeroomClass)) {
+                parts.push(staffScopeMode === 'homeroom' && myHomeroomClass ? `WaliKelas-${cleanSlug(myHomeroomClass)}` : `Bimbingan-${mentorShort}`);
+            } else {
+                parts.push('Semua-Subkon');
+            }
+
+            if (clsFilter && !parts.some((p) => p.toLowerCase().includes(cleanSlug(clsFilter).toLowerCase()))) {
+                parts.push(`Kelas-${cleanSlug(clsFilter)}`);
+            }
+
+            return {
+                subconcsToBuild,
+                getSourceStudentsForSubconc,
+                scopeSlug: parts.filter(Boolean).join('_') || 'Semua-Subkon'
+            };
+        }
+
+        global.downloadChecklistTemplateXlsx = function () {
+            if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
+            const { checklistColsMap = {}, checklistRowMap = {} } = projectDataCache;
+            const statusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+            const wb = global.XLSX.utils.book_new();
+            const { subconcsToBuild, getSourceStudentsForSubconc, scopeSlug } = buildChecklistExportMeta();
+
             subconcsToBuild.forEach((sc) => {
                 const cols = checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS;
-                const scStudents = allStudentsList.filter((s) => s.sub_concentration === sc);
+                const scStudents = getSourceStudentsForSubconc(sc);
                 let rows = [];
                 if (scStudents.length) {
                     rows = scStudents.map((s, i) => {
@@ -6843,7 +6891,7 @@
                     const sample = {
                         No: 1,
                         'Nama Siswa': 'CONTOH NAMA SISWA (Sesuaikan dengan database)',
-                        Username: 'afido',
+                        Username: 'siswa_contoh',
                         Kelas: 'X ANI A',
                         'Link Google Drive': 'https://drive.google.com/drive/folders/...'
                     };
@@ -6865,9 +6913,10 @@
             ];
             global.XLSX.utils.book_append_sheet(wb, makeWorksheet(guideRows, [38, 12, 72]), 'Panduan Pengisian');
 
-            const labelSlug = SUBCONCS.includes(curTab) ? curTab.replace(/\s+/g, '-') : 'Semua-Subkon';
-            global.XLSX.writeFile(wb, `Format-ProjectUpdate-${labelSlug}-AniTrack.xlsx`);
-            showToast('Template Format Excel Project Update berhasil diunduh ✓');
+            const stamp = getJakartaYmd(new Date());
+            const fileName = `Format-ProjectUpdate_${scopeSlug}_${stamp}.xlsx`;
+            global.XLSX.writeFile(wb, fileName);
+            showToast(`Template diunduh: ${fileName} ✓`);
         };
 
         global.handleChecklistImportFile = async function (inp) {
@@ -7006,22 +7055,17 @@
 
         global.exportChecklistXlsx = function () {
             if (typeof global.XLSX === 'undefined') { showToast('Library Excel belum termuat.'); return; }
-            const { allStudentsList = [], checklistColsMap = {}, checklistRowMap = {}, mentorsList = [] } = projectDataCache;
+            const { checklistColsMap = {}, checklistRowMap = {}, mentorsList = [] } = projectDataCache;
             const mentorMap = Object.fromEntries(mentorsList.map((m) => [m.id, m.full_name]));
             const statusText = Object.fromEntries(CHECKLIST_STATUS_OPTIONS.map((o) => [o.value, o.label]));
             const wb = global.XLSX.utils.book_new();
-            const curTab = projectChecklistState.subconc;
-            const subconcsToExport = SUBCONCS.includes(curTab)
-                ? [curTab]
-                : (curTab === '__group_2d'
-                    ? SUBCONCS.filter((sc) => sc.startsWith('2D'))
-                    : (curTab === '__group_3d'
-                        ? SUBCONCS.filter((sc) => sc.startsWith('3D'))
-                        : SUBCONCS));
+            const { subconcsToBuild, getSourceStudentsForSubconc, scopeSlug } = buildChecklistExportMeta();
 
-            subconcsToExport.forEach((sc) => {
+            let sheetAdded = 0;
+            subconcsToBuild.forEach((sc) => {
                 const cols = checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS;
-                const scStudents = allStudentsList.filter((s) => s.sub_concentration === sc);
+                const scStudents = getSourceStudentsForSubconc(sc);
+                if (!scStudents.length && subconcsToBuild.length > 1) return;
                 const rows = scStudents.map((s, i) => {
                     const rd = checklistRowMap[s.id] || { items: {}, notes: '' };
                     const doneCnt = cols.filter((c) => normalizeChecklistStatus(rd.items?.[c]) === 'done').length;
@@ -7045,11 +7089,18 @@
                     return obj;
                 });
                 global.XLSX.utils.book_append_sheet(wb, makeWorksheet(rows), sc.slice(0, 31));
+                sheetAdded++;
             });
 
+            if (!sheetAdded) {
+                showToast('Tidak ada data siswa pada filter saat ini untuk diekspor.');
+                return;
+            }
+
             const stamp = getJakartaYmd(new Date());
-            global.XLSX.writeFile(wb, `Project-Update-AniTrack-${stamp}.xlsx`);
-            showToast('File Excel Project Update diunduh ✓');
+            const fileName = `Project-Update_${scopeSlug}_${stamp}.xlsx`;
+            global.XLSX.writeFile(wb, fileName);
+            showToast(`Excel diunduh: ${fileName} ✓`);
         };
 
         global.jumpToStudentProjectReview = function (taskId, studentQuery) {
