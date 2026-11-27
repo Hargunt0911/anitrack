@@ -3709,6 +3709,11 @@
             global.toggleMaterialForm(true);
         };
 
+        global.openQuickAddProjectTask = function () {
+            global.switchTab('projects');
+            global.toggleProjectTaskForm(true);
+        };
+
         global.handleMentorsAction = function () {
             global.switchTab(expectedRole === 'superadmin' ? 'plotting' : 'tasks');
         };
