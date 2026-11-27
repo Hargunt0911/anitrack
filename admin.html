@@ -216,6 +216,15 @@
                         <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Drive &amp; Export .xlsx</span>
                     </button>
 
+                    <button onclick="switchTab('notif')" data-tab="notif"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Pesan Otomatis</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Pesan Otomatis (WA &amp; Telegram)</span>
+                    </button>
+
                     <button onclick="switchTab('profile')" data-tab="profile"
                         class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
                         <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
@@ -1238,8 +1247,21 @@
                             </div>
                         </div>
                     </div>
+                </section>
 
-                    <!-- ==================== NOTIFIKASI OTOMATIS DEADLINE JAM 07:00 WIB (WHATSAPP & TELEGRAM) ==================== -->
+                <!-- ==================== TAB 4B: PESAN OTOMATIS (WA BOT PC LOKAL & TELEGRAM) ==================== -->
+                <section id="tab-notif" class="hidden space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Pesan Otomatis (WhatsApp &amp; Telegram)</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Atur template pengingat pagi jam 07:00 WIB, balas otomatis kata kunci WA Bot, antrean siswa, &amp; riwayat pengiriman.</p>
+                        </div>
+                        <button type="button" onclick="loadWaAutomationPanel()"
+                            class="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold shadow-card transition cursor-pointer shrink-0">
+                            ↻ Muat Ulang Antrean
+                        </button>
+                    </div>
+
                     <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-5">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div class="space-y-1">
@@ -1247,15 +1269,11 @@
                                     <span class="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#E7F9EE] text-[#15803D]">Otomatis Setiap Jam 07:00 WIB</span>
                                     <span id="waScheduleBadge" class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Belum Aktif</span>
                                 </div>
-                                <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">🔔 Notifikasi Otomatis Deadline Project (WhatsApp &amp; Telegram)</h3>
+                                <h3 class="text-base sm:text-lg font-extrabold text-[#1E293B]">🔔 Pengingat Otomatis Deadline &amp; Balas Otomatis</h3>
                                 <p class="text-xs text-slate-500 leading-relaxed">
-                                    <strong>Pilih Kanal Pengiriman:</strong> Anda bisa mengaktifkan <strong>WhatsApp saja</strong>, <strong>Telegram Bot saja (100% Gratis)</strong>, atau <strong>keduanya bersamaan</strong> setiap pukul <strong>07:00 WIB</strong> untuk siswa H-2 s/d Hari-H dan yang melewati deadline.
+                                    <strong>Pilih Kanal Pengiriman:</strong> Gunakan <strong>Bot WA PC Lokal (Gratis Tanpa API &amp; Tanpa Watermark)</strong>, <strong>Telegram Bot</strong>, atau keduanya bersamaan.
                                 </p>
                             </div>
-                            <button type="button" onclick="loadWaAutomationPanel()"
-                                class="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer shrink-0">
-                                ↻ Muat Ulang Antrean
-                            </button>
                         </div>
 
                         <!-- Pilihan 2 Kanal Pengiriman (WhatsApp &/atau Telegram) -->
@@ -1263,39 +1281,39 @@
                             <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-[#BBF7D0] bg-[#F5FBF7] cursor-pointer select-none">
                                 <input id="waChannelEnabled" type="checkbox" checked onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#16A34A]" />
                                 <div class="space-y-0.5">
-                                    <div class="text-xs font-extrabold text-[#15803D]">💬 Pilihan 1: Kirim via WhatsApp Gateway</div>
-                                    <div class="text-[11px] text-slate-600">Kirim pengingat personal langsung ke nomor WA masing-masing siswa (via Fonnte / Wablas / Webhook).</div>
+                                    <div class="text-xs font-extrabold text-[#15803D]">💬 Pilihan 1: Kirim via WhatsApp</div>
+                                    <div class="text-[11px] text-slate-600">Kirim pengingat personal &amp; balas otomatis kata kunci langsung lewat <strong>Bot WA PC Lokal (Gratis)</strong> atau gateway cloud.</div>
                                 </div>
                             </label>
                             <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-[#BAE6FD] bg-[#F0F9FF] cursor-pointer select-none">
                                 <input id="tgChannelEnabled" type="checkbox" onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#0284C7]" />
                                 <div class="space-y-0.5">
                                     <div class="text-xs font-extrabold text-[#0369A1]">✈️ Pilihan 2: Kirim via Telegram Bot (Gratis Resmi)</div>
-                                    <div class="text-[11px] text-slate-600">Kirim rekap pengingat harian ke Grup Telegram Utama atau Grup per Kelas tanpa biaya &amp; tanpa scan QR.</div>
+                                    <div class="text-[11px] text-slate-600">Kirim DM pribadi siswa atau rekap Grup Telegram tanpa biaya, tanpa scan QR, dan 0% risiko banned.</div>
                                 </div>
                             </label>
                         </div>
 
-                        <!-- Pengaturan Gateway WA & Telegram Bot -->
+                        <!-- Pengaturan Kanal WA & Telegram Bot -->
                         <div class="bg-[#F7FAFF] border border-[#DCEBFF] rounded-2xl p-4 sm:p-5 space-y-4">
                             <div id="waGatewaySettingsWrap" class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                                <div class="md:col-span-12 text-xs font-extrabold text-[#15803D]">💬 Konfigurasi WhatsApp Gateway</div>
-                                <div class="md:col-span-3">
-                                    <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Provider WA Gateway</label>
+                                <div class="md:col-span-12 text-xs font-extrabold text-[#15803D]">💬 Konfigurasi WhatsApp</div>
+                                <div id="waProviderCol" class="md:col-span-6">
+                                    <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Mode Pengiriman WA</label>
                                     <select id="waProviderSelect" onchange="onWaProviderChange()"
                                         class="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0095FF]">
-                                        <option value="local_pc">Bot WA PC Lokal (Gratis — Tanpa Watermark)</option>
-                                        <option value="fonnte">Fonnte (Cloud Gateway)</option>
-                                        <option value="wablas">Wablas</option>
+                                        <option value="local_pc">Bot WA PC Lokal (Gratis — Tanpa API Token &amp; Tanpa Watermark)</option>
+                                        <option value="fonnte">Fonnte (Cloud Gateway — Butuh API Token)</option>
+                                        <option value="wablas">Wablas (Cloud Gateway — Butuh API Token)</option>
                                         <option value="custom_webhook">Custom Webhook URL</option>
                                     </select>
                                 </div>
-                                <div class="md:col-span-5">
+                                <div id="waApiTokenWrap" class="hidden md:col-span-4">
                                     <label for="waApiTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">API Token WA Gateway</label>
                                     <input id="waApiTokenInput" type="password" placeholder="Tempel Token API Fonnte / Wablas di sini..."
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div class="md:col-span-4">
+                                <div id="waAppUrlCol" class="md:col-span-6">
                                     <label for="waAppUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Link Portal AniTrack (Opsional)</label>
                                     <input id="waAppUrlInput" type="url" oninput="updateWaTemplatePreview()" placeholder="https://anitrack.republikanimasi.my.id"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
@@ -1305,8 +1323,8 @@
                                     <input id="waCustomUrlInput" type="url" placeholder="https://pati.wablas.com/api/send-message"
                                         class="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div id="waLocalPcHint" class="hidden md:col-span-12 rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] px-3.5 py-2.5 text-[11.5px] text-[#15803D] leading-relaxed">
-                                    <strong>🤖 Mode Bot WA PC Lokal Aktif:</strong> Tidak perlu API Token berbayar. Bot di PC kantor (<code>wa-bot/jalankan-senyap.vbs</code>) otomatis membaca <strong>Template Pengingat Pagi</strong>, <strong>Template Balas Otomatis</strong>, dan <strong>Mode Dummy</strong> langsung dari halaman ini tanpa perlu restart PC!
+                                <div id="waLocalPcHint" class="md:col-span-12 rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] px-3.5 py-2.5 text-[11.5px] text-[#15803D] leading-relaxed">
+                                    <strong>🤖 Mode Bot WA PC Lokal Aktif (Tanpa API Token):</strong> Bot berjalan senyap di PC kantor (<code>wa-bot/jalankan-senyap.vbs</code>) dan otomatis menyinkronkan <strong>Template Pengingat Pagi</strong>, <strong>Balas Otomatis Kata Kunci</strong>, serta <strong>Mode Dummy</strong> dari halaman ini secara real-time!
                                 </div>
                                 <div class="md:col-span-4">
                                     <label for="waTestPhoneInput" class="block text-xs font-semibold text-slate-600 mb-1">Nomor WA Tes / Dummy</label>
@@ -1462,7 +1480,7 @@
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                                 <label class="inline-flex items-center gap-2.5 cursor-pointer select-none">
                                     <input id="waScheduleEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#16A34A]" />
-                                    <span class="text-xs font-bold text-[#1E293B]">Aktifkan pengiriman otomatis setiap hari jam 07:00 WIB (via Google Apps Script Trigger)</span>
+                                    <span class="text-xs font-bold text-[#1E293B]">Aktifkan pengiriman otomatis setiap hari jam 07:00 WIB</span>
                                 </label>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <button id="saveWaConfigBtn" type="button" onclick="saveWaReminderConfig()"
@@ -1484,8 +1502,8 @@
                                 </div>
                             </div>
                             <div id="waConfigFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
-                            <div class="text-[11px] text-slate-500 leading-relaxed border-t border-[#DCEBFF] pt-2.5">
-                                <strong>Cara Aktifkan 100% Otomatis:</strong> Daftar akun di <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] font-semibold hover:underline">fonnte.com</a> → hubungkan WhatsApp sekolah → salin <strong>Token</strong> ke atas → pastikan <code class="font-mono bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">google-drive-sync.gs</code> versi terbaru sudah di-Deploy di Google Apps Script → klik <strong>Simpan &amp; Pasang Jadwal 07:00</strong>. Setelah aktif, pengingat berjalan otomatis di server Google setiap jam 07:00 WIB walau komputer mati.
+                            <div id="waCloudGuideFooter" class="hidden text-[11px] text-slate-500 leading-relaxed border-t border-[#DCEBFF] pt-2.5">
+                                <strong>Cara Aktifkan Gateway Cloud (Fonnte/Wablas):</strong> Daftar akun di <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] font-semibold hover:underline">fonnte.com</a> → hubungkan WhatsApp sekolah → salin <strong>Token</strong> ke atas → klik <strong>Simpan &amp; Pasang Jadwal 07:00</strong>.
                             </div>
                         </div>
 
@@ -1620,7 +1638,8 @@
                     projects: 'Project Tracker',
                     'project-update': 'Project Update',
                     plotting: 'Akun & Plotting',
-                    storage: 'Drive & Notifikasi WA',
+                    storage: 'Drive & Backup',
+                    notif: 'Pesan Otomatis',
                     profile: 'Akun Saya'
                 },
                 extraRefresh: () => Promise.all([loadPlottingStudents(), loadWaAutomationPanel()]),
@@ -2681,8 +2700,15 @@
 
             window.onWaProviderChange = function () {
                 const prov = document.getElementById('waProviderSelect')?.value || 'local_pc';
-                document.getElementById('waCustomUrlWrap')?.classList.toggle('hidden', prov === 'fonnte' || prov === 'local_pc');
-                document.getElementById('waLocalPcHint')?.classList.toggle('hidden', prov !== 'local_pc');
+                const isLocal = prov === 'local_pc';
+                document.getElementById('waApiTokenWrap')?.classList.toggle('hidden', isLocal);
+                document.getElementById('waCustomUrlWrap')?.classList.toggle('hidden', isLocal || prov === 'fonnte');
+                document.getElementById('waLocalPcHint')?.classList.toggle('hidden', !isLocal);
+                document.getElementById('waCloudGuideFooter')?.classList.toggle('hidden', isLocal);
+                const provCol = document.getElementById('waProviderCol');
+                const urlCol = document.getElementById('waAppUrlCol');
+                if (provCol) provCol.className = isLocal ? 'md:col-span-6' : 'md:col-span-4';
+                if (urlCol) urlCol.className = isLocal ? 'md:col-span-6' : 'md:col-span-4';
             };
 
             window.resetWaAutoReplyDefault = function () {
@@ -2836,7 +2862,11 @@
                             const tgChk = document.getElementById('tgChannelEnabled');
                             if (waChk) waChk.checked = cfg.waEnabled !== undefined ? Boolean(cfg.waEnabled) : true;
                             if (tgChk) tgChk.checked = Boolean(cfg.tgEnabled);
-                            if (cfg.provider) document.getElementById('waProviderSelect').value = cfg.provider;
+                            // Jika belum pernah isi API Token cloud (Fonnte/Wablas), otomatis pakai Bot WA PC Lokal
+                            const effectiveProv = (!cfg.apiToken && (!cfg.provider || cfg.provider === 'fonnte'))
+                                ? 'local_pc'
+                                : (cfg.provider || 'local_pc');
+                            document.getElementById('waProviderSelect').value = effectiveProv;
                             if (cfg.apiToken) document.getElementById('waApiTokenInput').value = cfg.apiToken;
                             if (cfg.customUrl) document.getElementById('waCustomUrlInput').value = cfg.customUrl;
                             const waTestInp = document.getElementById('waTestPhoneInput');
@@ -3075,6 +3105,11 @@
                     return;
                 }
                 const cfg = readWaConfigForm();
+                if (cfg.provider === 'local_pc') {
+                    setWaConfigFeedback('Mode Bot WA PC Lokal berjalan langsung dari PC kantor (tanpa API cloud). Klik "💾 Simpan" di sini lalu tes kirim lewat panel lokal http://127.0.0.1:3001 di PC kantor.', false);
+                    A.showToast('Untuk Bot WA PC Lokal, jalankan tes dari panel PC kantor (127.0.0.1:3001).');
+                    return;
+                }
                 if (!A.getGasUrl()) {
                     setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
                     return;
@@ -3178,12 +3213,17 @@
                     return;
                 }
                 const cfg = readWaConfigForm();
+                const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
+                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgSendDm || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
+                if (cfg.provider === 'local_pc' && !tgReady) {
+                    setWaConfigFeedback('Mode Bot WA PC Lokal dijalankan otomatis/manual dari PC kantor (http://127.0.0.1:3001). Perubahan template di sini otomatis tersinkron ke PC kantor.', false);
+                    A.showToast('Bot WA PC Lokal dipicu dari panel PC kantor (127.0.0.1:3001).');
+                    return;
+                }
                 if (!A.getGasUrl()) {
                     setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
                     return;
                 }
-                const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
-                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgSendDm || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
                 if (!waReady && !tgReady) {
                     setWaConfigFeedback('Aktifkan dan lengkapi minimal 1 kanal (WhatsApp atau Telegram Bot) terlebih dahulu.', true);
                     return;
