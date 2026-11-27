@@ -543,6 +543,45 @@ function buildAutoReplyMenuText(waCfg = {}) {
   ].join('\n');
 }
 
+function isSameJakartaDay(isoStr, todayYmd) {
+  if (!isoStr) return false;
+  try {
+    const ymd = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date(isoStr));
+    return ymd === todayYmd;
+  } catch {
+    return false;
+  }
+}
+
+function formatWibTimeShort(isoStr) {
+  if (!isoStr) return '';
+  try {
+    return new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date(isoStr)) + ' WIB';
+  } catch {
+    return '';
+  }
+}
+
+function formatDailyStatusLabel(st) {
+  const map = {
+    belum_mulai: 'Belum Mulai',
+    sedang_dikerjakan: 'Sedang Dikerjakan',
+    menunggu_review: 'Menunggu Review',
+    revisi: 'Revisi',
+    selesai: 'Selesai'
+  };
+  return map[st] || st || '-';
+}
+
 async function buildStudentProgressReply(student, allProfiles, tasks, subs, colsMap, rowMap, mode = 'all', waCfg = {}) {
   const todayStr = getTodayJakartaYmd();
   const todayMs = parseYmdToUtcMs(todayStr);
@@ -551,6 +590,16 @@ async function buildStudentProgressReply(student, allProfiles, tasks, subs, cols
   subs.forEach((ps) => {
     if (ps.student_id === student.id) subMap[ps.project_task_id] = ps;
   });
+
+  // Ambil Daily Task terakhir siswa dari Supabase
+  let dailyRows = [];
+  try {
+    dailyRows = await fetchSupabase(
+      `student_progress?select=status,student_notes,updated_at&student_id=eq.${encodeURIComponent(student.id)}&order=updated_at.desc&limit=5`
+    );
+  } catch { /* ignore */ }
+  const todayDaily = (dailyRows || []).find((r) => isSameJakartaDay(r.updated_at, todayStr)) || null;
+  const latestDaily = (dailyRows && dailyRows[0]) || null;
 
   const eligibleTasks = tasks.filter((t) => !t.sub_concentration || t.sub_concentration === student.sub_concentration);
   let accCount = 0;
@@ -579,20 +628,40 @@ async function buildStudentProgressReply(student, allProfiles, tasks, subs, cols
   overdueItems.sort((a, b) => b.lateDays - a.lateDays);
   upcomingItems.sort((a, b) => a.diffDays - b.diffDays);
 
+  const mentorWaText = mentor ? formatWaLocal(mentor.whatsapp_number) : '-';
   const lines = [
     `📌 *UPDATE PROGRES ANITRACK*`,
     `👤 *${student.full_name}* (@${student.username})`,
     `🏫 ${student.class_name || '-'} • ${student.sub_concentration || 'Belum pilih subkon'}`,
-    mentor ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWaLocal(mentor.whatsapp_number) !== '-' ? ` (${formatWaLocal(mentor.whatsapp_number)})` : ''}` : '',
+    mentor
+      ? `👨‍🏫 Pembimbing: *${mentor.full_name}*\n📞 WA Pembimbing: ${mentorWaText !== '-' ? mentorWaText : 'Belum diisi'}`
+      : '👨‍🏫 Pembimbing: _Belum di-plot_',
     ''
-  ].filter((x) => x !== '');
+  ];
 
   if (mode !== 'tasks_only') {
     lines.push(formatProjectUpdateBlock(student, colsMap, rowMap));
     lines.push('');
   }
 
-  lines.push(`📋 *RINGKASAN PROJECT TRACKER:*`);
+  // Daily Task Hari Ini
+  lines.push('📝 *DAILY TASK HARI INI:*');
+  if (todayDaily) {
+    const timeLabel = formatWibTimeShort(todayDaily.updated_at);
+    lines.push(`✅ Sudah mengisi (${timeLabel}) — Status: *${formatDailyStatusLabel(todayDaily.status)}*`);
+    if (todayDaily.student_notes && String(todayDaily.student_notes).trim()) {
+      const noteShort = String(todayDaily.student_notes).trim().slice(0, 100);
+      lines.push(`💬 Catatan: _${noteShort}${String(todayDaily.student_notes).trim().length > 100 ? '...' : ''}_`);
+    }
+  } else {
+    lines.push('⚠️ *Belum mengisi Daily Task hari ini.*');
+    if (latestDaily?.updated_at) {
+      lines.push(`_Terakhir mengisi: ${String(latestDaily.updated_at).slice(0, 10)} (${formatDailyStatusLabel(latestDaily.status)})_`);
+    }
+  }
+  lines.push('');
+
+  lines.push(`📋 *RINGKASAN DEADLINE PROJECT:*`);
   lines.push(`• Tuntas (ACC): *${accCount}/${eligibleTasks.length}* tugas`);
   if (reviewCount) lines.push(`• Menunggu Review Guru: *${reviewCount}*`);
   if (revisiCount) lines.push(`• Perlu Revisi: *${revisiCount}*`);

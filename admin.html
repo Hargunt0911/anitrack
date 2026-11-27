@@ -219,10 +219,19 @@
                     <button onclick="switchTab('notif')" data-tab="notif"
                         class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
                         <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Pengingat Pagi</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Pengingat Pagi (07:00)</span>
+                    </button>
+
+                    <button onclick="switchTab('autoreply')" data-tab="autoreply"
+                        class="tab-link nav-item relative w-full h-11 rounded-xl flex items-center justify-center gap-3 px-2.5 text-slate-400 hover:text-[#0095FF] hover:bg-[#F4F8FF] transition cursor-pointer">
+                        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Pesan Otomatis</span>
-                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Pesan Otomatis (WA &amp; Telegram)</span>
+                        <span class="sidebar-label hidden text-xs font-semibold whitespace-nowrap">Balas Otomatis</span>
+                        <span class="nav-tooltip hidden lg:block absolute left-14 z-50 px-2.5 py-1 rounded-lg bg-[#1E293B] text-white text-[11px] font-medium whitespace-nowrap shadow-md">Balas Otomatis WA</span>
                     </button>
 
                     <button onclick="switchTab('profile')" data-tab="profile"
@@ -1249,320 +1258,366 @@
                     </div>
                 </section>
 
-                <!-- ==================== TAB 4B: PESAN OTOMATIS (BERSIH & TERPISAH PER SUB-TAB) ==================== -->
+                <!-- ==================== TAB 4B: PENGINGAT PAGI (07:00 WIB) — SIMPEL & BERFOKUS 1 HAL ==================== -->
                 <section id="tab-notif" class="hidden space-y-5">
-                    <!-- Header + Tombol Simpan Utama -->
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="space-y-1">
+                        <div class="space-y-0.5">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Pesan Otomatis</h2>
+                                <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Pengingat Pagi (07:00 WIB)</h2>
                                 <span id="waScheduleBadge" class="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Belum Aktif</span>
                             </div>
-                            <p class="text-xs text-slate-500">Kelola pengingat pagi jam 07:00 WIB dan balas otomatis WA Bot tanpa perlu menyentuh PC kantor.</p>
+                            <p class="text-xs text-slate-500">Pesan yang dikirim otomatis setiap jam 07:00 WIB ke siswa yang mendekati atau melewati deadline.</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
-                            <button type="button" onclick="loadWaAutomationPanel()"
+                            <button type="button" onclick="openNotifChannelsModal()"
                                 class="px-3.5 py-2.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold shadow-card transition cursor-pointer">
-                                ↻ Segarkan
+                                ⚙️ Pengaturan Kanal
                             </button>
                             <button id="saveWaConfigBtn" type="button" onclick="saveWaReminderConfig()"
                                 class="px-4 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold shadow-sm transition cursor-pointer">
-                                💾 Simpan Pengaturan
+                                💾 Simpan
                             </button>
                         </div>
-                    </div>
-
-                    <!-- Sub-Tab Navigasi (1 Fokus Per Layar) -->
-                    <div class="bg-white border border-[#EDF1F7] rounded-2xl p-1.5 shadow-card inline-flex flex-wrap gap-1 w-full sm:w-auto">
-                        <button type="button" onclick="switchNotifSubTab('morning')" data-notif-tab="morning"
-                            class="notif-subtab-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0095FF] text-white transition cursor-pointer">
-                            ⏰ Pengingat Pagi (07:00)
-                        </button>
-                        <button type="button" onclick="switchNotifSubTab('autoreply')" data-notif-tab="autoreply"
-                            class="notif-subtab-btn px-3.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-[#1E293B] hover:bg-[#F3F6FB] transition cursor-pointer">
-                            💬 Balas Otomatis WA
-                        </button>
-                        <button type="button" onclick="switchNotifSubTab('queue')" data-notif-tab="queue"
-                            class="notif-subtab-btn px-3.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-[#1E293B] hover:bg-[#F3F6FB] transition cursor-pointer">
-                            📋 Antrean Hari Ini
-                        </button>
-                        <button type="button" onclick="switchNotifSubTab('logs')" data-notif-tab="logs"
-                            class="notif-subtab-btn px-3.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-[#1E293B] hover:bg-[#F3F6FB] transition cursor-pointer">
-                            📜 Riwayat Kirim
-                        </button>
-                        <button type="button" onclick="switchNotifSubTab('channels')" data-notif-tab="channels"
-                            class="notif-subtab-btn px-3.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-[#1E293B] hover:bg-[#F3F6FB] transition cursor-pointer">
-                            ⚙️ Kanal &amp; Telegram
-                        </button>
                     </div>
 
                     <div id="waConfigFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
 
-                    <!-- ==================== SUB-TAB 1: PENGINGAT PAGI (07:00 WIB) ==================== -->
-                    <div id="notif-pane-morning" class="notif-subpane space-y-4">
-                        <!-- Baris Sakelar Utama: Jadwal 07:00 + Mode Dummy -->
-                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
-                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
-                                <label class="lg:col-span-5 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#F5FBF7] border border-[#BBF7D0] cursor-pointer select-none">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                        <!-- Kolom Kiri: Pengaturan Simpel (Tanpa Kode Rumit) -->
+                        <div class="lg:col-span-7 space-y-4">
+                            <!-- Langkah 1: Jadwal & Mode Uji Coba -->
+                            <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-3.5">
+                                <div class="text-xs font-extrabold uppercase tracking-wider text-slate-400">1. Jadwal &amp; Mode Uji Coba</div>
+                                <label class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[#F5FBF7] border border-[#BBF7D0] cursor-pointer select-none">
+                                    <div>
+                                        <div class="text-xs font-extrabold text-[#15803D]">Kirim Otomatis Setiap Jam 07:00 WIB</div>
+                                        <div class="text-[11px] text-slate-500">Aktifkan untuk siswa H-2 s/d lewat deadline yang belum lapor selesai.</div>
+                                    </div>
                                     <input id="waScheduleEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#16A34A] shrink-0" />
-                                    <div>
-                                        <div class="text-xs font-extrabold text-[#15803D]">Aktifkan Pengingat Otomatis Jam 07:00 WIB</div>
-                                        <div class="text-[11px] text-slate-500">Kirim otomatis ke siswa H-2 s/d lewat deadline.</div>
-                                    </div>
                                 </label>
-                                <label class="lg:col-span-4 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-[#FFFDF5] border border-[#FDE68A] cursor-pointer select-none">
-                                    <input id="waDummyModeEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#D97706] shrink-0" />
-                                    <div>
-                                        <div class="text-xs font-extrabold text-[#92400E]">🧪 Mode Percobaan Dummy</div>
-                                        <div class="text-[11px] text-[#92400E]/80">Hanya kirim ke nomor tes (aman, tidak ke siswa).</div>
+                                <div class="p-3.5 rounded-xl bg-[#FFFDF5] border border-[#FDE68A] space-y-2.5">
+                                    <label class="flex items-center justify-between gap-3 cursor-pointer select-none">
+                                        <div>
+                                            <div class="text-xs font-extrabold text-[#92400E]">🧪 Mode Percobaan (Dummy)</div>
+                                            <div class="text-[11px] text-[#92400E]/80">Saat dicentang, pesan hanya dikirim 1 contoh ke nomor tes di bawah — aman, tidak dikirim ke siswa asli.</div>
+                                        </div>
+                                        <input id="waDummyModeEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#D97706] shrink-0" />
+                                    </label>
+                                    <div class="flex items-center gap-2 pt-1">
+                                        <label for="waTestPhoneInput" class="text-[11px] font-bold text-[#92400E] shrink-0">Nomor Tes:</label>
+                                        <input id="waTestPhoneInput" type="tel" value="081259699623" placeholder="081259699623"
+                                            class="w-44 px-3 py-1.5 bg-white border border-[#FDE68A] rounded-lg text-xs font-mono focus:outline-none focus:border-[#D97706]" />
                                     </div>
-                                </label>
-                                <div class="lg:col-span-3">
-                                    <label for="waTestPhoneInput" class="block text-[11px] font-bold text-slate-500 mb-1">Nomor WA Tes / Dummy</label>
-                                    <input id="waTestPhoneInput" type="tel" value="081259699623" placeholder="081259699623"
-                                        class="w-full px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Editor Template Pengingat Pagi + Pratinjau -->
-                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <label for="waMessageTemplateInput" class="block text-sm font-extrabold text-[#1E293B]">
-                                        ✏️ Template Pesan Pengingat Pagi
-                                    </label>
-                                    <p class="text-xs text-slate-500 mt-0.5">Atur kata-katanya sekali di sini — data nama, daftar tugas, Project Update, &amp; pembimbing otomatis diisi sistem.</p>
-                                </div>
-                                <button type="button" onclick="resetWaTemplateDefault()"
-                                    class="px-3 py-1.5 rounded-lg bg-[#F7F9FC] hover:bg-[#FFF1F5] border border-[#E2E8F0] text-slate-600 hover:text-[#E11D48] text-xs font-bold transition cursor-pointer">
-                                    ↺ Reset Default
-                                </button>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="text-[11px] font-semibold text-slate-400 mr-1">Sisipkan:</span>
-                                <button type="button" onclick="insertWaPlaceholder('{nama}')" class="px-2.5 py-1 rounded-lg bg-[#F7FAFF] hover:bg-[#EAF4FF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {nama}</button>
-                                <button type="button" onclick="insertWaPlaceholder('{kelas}')" class="px-2.5 py-1 rounded-lg bg-[#F7FAFF] hover:bg-[#EAF4FF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {kelas}</button>
-                                <button type="button" onclick="insertWaPlaceholder('{subkonsentrasi}')" class="px-2.5 py-1 rounded-lg bg-[#F7FAFF] hover:bg-[#EAF4FF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {subkonsentrasi}</button>
-                                <button type="button" onclick="insertWaPlaceholder('{daftar_tugas}')" class="px-2.5 py-1 rounded-lg bg-[#F7FAFF] hover:bg-[#EAF4FF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[11px] font-bold cursor-pointer">+ {daftar_tugas}</button>
-                                <button type="button" onclick="insertWaPlaceholder('{project_update}')" class="px-2.5 py-1 rounded-lg bg-[#E3F6F3] hover:bg-[#4CB6A7] border border-[#BBE9E2] text-[#1D5E55] hover:text-white font-mono text-[11px] font-bold cursor-pointer">+ {project_update}</button>
-                                <button type="button" onclick="insertWaPlaceholder('{pembimbing}')" class="px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] border border-[#BBF7D0] text-[#15803D] hover:text-white font-mono text-[11px] font-bold cursor-pointer">+ {pembimbing}</button>
-                                <button type="button" onclick="insertWaPlaceholder('{link_anitrack}')" class="px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] border border-[#BBF7D0] text-[#15803D] hover:text-white font-mono text-[11px] font-bold cursor-pointer">+ {link_anitrack}</button>
-                            </div>
-
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <div>
-                                    <textarea id="waMessageTemplateInput" rows="10" oninput="updateWaTemplatePreview()"
-                                        placeholder="Tulis isi pesan pengingat pagi di sini..."
-                                        class="w-full px-4 py-3 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
-                                </div>
-                                <div class="rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] p-4 space-y-2">
-                                    <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#15803D]">👁 Pratinjau Hasil di WhatsApp</div>
-                                    <pre id="waTemplatePreview" class="text-xs text-[#1E293B] font-sans whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto"></pre>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ==================== SUB-TAB 2: BALAS OTOMATIS WA BOT ==================== -->
-                    <div id="notif-pane-autoreply" class="notif-subpane hidden space-y-4">
-                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-5">
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#EDF1F7]">
-                                <div>
-                                    <h3 class="text-sm sm:text-base font-extrabold text-[#1E293B]">💬 Balas Otomatis Kata Kunci (Chat Pribadi)</h3>
-                                    <p class="text-xs text-slate-500 mt-0.5">Siswa &amp; Orang Tua cukup chat kata kunci ke nomor WA Bot — hanya membalas chat pribadi (tidak membalas di grup). Perubahan otomatis aktif di PC kantor dalam &lt;15 detik.</p>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2 shrink-0">
-                                    <label class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] cursor-pointer select-none">
-                                        <input id="waAutoReplyEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#16A34A]" />
-                                        <span class="text-xs font-extrabold text-[#15803D]">Aktifkan</span>
-                                    </label>
-                                    <button type="button" onclick="resetWaAutoReplyDefault()"
-                                        class="px-3.5 py-2 rounded-xl bg-[#F7F9FC] hover:bg-[#FFF1F5] border border-[#E2E8F0] text-slate-600 hover:text-[#E11D48] text-xs font-bold transition cursor-pointer">
+                            <!-- Langkah 2: Tulis Kalimat Pembuka & Penutup Biasa -->
+                            <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="text-xs font-extrabold uppercase tracking-wider text-slate-400">2. Isi Pesan WhatsApp</div>
+                                    <button type="button" onclick="resetWaTemplateDefault()"
+                                        class="text-[11px] font-bold text-slate-500 hover:text-[#E11D48] transition cursor-pointer">
                                         ↺ Reset Default
                                     </button>
                                 </div>
+
+                                <div class="space-y-1.5">
+                                    <label for="waSimpleIntroInput" class="block text-xs font-bold text-[#1E293B]">Kalimat Pembuka</label>
+                                    <input id="waSimpleIntroInput" type="text" oninput="syncSimpleToRawWaTemplate()"
+                                        placeholder="Pengingat Project Tracker AniTrack — SMKN 4 Malang:"
+                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                                </div>
+
+                                <div class="rounded-xl bg-[#F7FAFF] border border-[#DCEBFF] px-3.5 py-2.5 text-[11px] text-[#0082E6]">
+                                    ✨ <strong>Bagian tengah otomatis diisi sistem:</strong> Nama siswa, kelas, daftar tugas/deadline, Checklist Project Update, &amp; nama pembimbing.
+                                </div>
+
+                                <div class="space-y-1.5">
+                                    <label for="waSimpleClosingInput" class="block text-xs font-bold text-[#1E293B]">Kalimat Penutup / Arahan</label>
+                                    <textarea id="waSimpleClosingInput" rows="2" oninput="syncSimpleToRawWaTemplate()"
+                                        placeholder="Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai di AniTrack."
+                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
+                                </div>
+
+                                <!-- Opsi Lanjutan Tersembunyi untuk Power User -->
+                                <details class="pt-2 border-t border-[#EDF1F7]">
+                                    <summary class="text-[11px] font-bold text-slate-400 hover:text-[#0095FF] cursor-pointer select-none">
+                                        🔧 Mode Lanjutan: Edit Template Bebas (opsional)
+                                    </summary>
+                                    <div class="mt-3 space-y-2">
+                                        <div class="flex flex-wrap items-center gap-1">
+                                            <button type="button" onclick="insertWaPlaceholder('{nama}')" class="px-2 py-0.5 rounded bg-[#F7FAFF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[10.5px] font-bold cursor-pointer">+ {nama}</button>
+                                            <button type="button" onclick="insertWaPlaceholder('{kelas}')" class="px-2 py-0.5 rounded bg-[#F7FAFF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[10.5px] font-bold cursor-pointer">+ {kelas}</button>
+                                            <button type="button" onclick="insertWaPlaceholder('{daftar_tugas}')" class="px-2 py-0.5 rounded bg-[#F7FAFF] border border-[#DCEBFF] text-[#0082E6] font-mono text-[10.5px] font-bold cursor-pointer">+ {daftar_tugas}</button>
+                                            <button type="button" onclick="insertWaPlaceholder('{project_update}')" class="px-2 py-0.5 rounded bg-[#E3F6F3] border border-[#BBE9E2] text-[#1D5E55] font-mono text-[10.5px] font-bold cursor-pointer">+ {project_update}</button>
+                                            <button type="button" onclick="insertWaPlaceholder('{pembimbing}')" class="px-2 py-0.5 rounded bg-[#E7F9EE] border border-[#BBF7D0] text-[#15803D] font-mono text-[10.5px] font-bold cursor-pointer">+ {pembimbing}</button>
+                                            <button type="button" onclick="insertWaPlaceholder('{link_anitrack}')" class="px-2 py-0.5 rounded bg-[#E7F9EE] border border-[#BBF7D0] text-[#15803D] font-mono text-[10.5px] font-bold cursor-pointer">+ {link_anitrack}</button>
+                                        </div>
+                                        <textarea id="waMessageTemplateInput" rows="7" oninput="updateWaTemplatePreview()"
+                                            class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-[11px] font-mono leading-relaxed focus:bg-white focus:outline-none focus:border-[#0095FF]"></textarea>
+                                    </div>
+                                </details>
                             </div>
 
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            <!-- Lipatan Antrean & Riwayat (Tertutup Default Agar Halaman Bersih) -->
+                            <details class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                                <summary class="px-5 py-3.5 flex flex-wrap items-center justify-between gap-2 cursor-pointer select-none hover:bg-[#FAFBFD]">
+                                    <span class="text-xs font-extrabold text-[#1E293B]">📋 Lihat Antrean Siswa Hari Ini</span>
+                                    <div id="waQueueSummary" class="flex flex-wrap items-center gap-1.5 text-[11px]"></div>
+                                </summary>
+                                <div class="p-4 pt-0">
+                                    <div id="waQueueList" class="border border-[#EDF1F7] rounded-xl overflow-hidden"></div>
+                                </div>
+                            </details>
+
+                            <details class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                                <summary class="px-5 py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none hover:bg-[#FAFBFD]">
+                                    <span class="text-xs font-extrabold text-[#1E293B]">📜 Lihat Riwayat Pengiriman Terbaru</span>
+                                    <span class="text-[11px] font-semibold text-slate-400">Klik untuk buka</span>
+                                </summary>
+                                <div class="p-4 pt-0">
+                                    <div id="waLogsList" class="border border-[#EDF1F7] rounded-xl overflow-hidden"></div>
+                                </div>
+                            </details>
+                        </div>
+
+                        <!-- Kolom Kanan: Mockup Layar Chat WhatsApp Asli -->
+                        <div class="lg:col-span-5 lg:sticky lg:top-20">
+                            <div class="rounded-2xl overflow-hidden border border-[#CBD5E1] shadow-card bg-[#ECE5DD]">
+                                <div class="bg-[#075E54] text-white px-4 py-3 flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center font-extrabold text-sm shrink-0">🤖</div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-extrabold truncate">AniTrack SMKN 4 Malang</div>
+                                        <div class="text-[10.5px] text-emerald-200">Pratinjau Pesan Pagi • 07:00 WIB</div>
+                                    </div>
+                                </div>
+                                <div class="p-4 max-h-[520px] overflow-y-auto">
+                                    <div class="bg-white rounded-2xl rounded-tl-sm p-3.5 shadow-sm border border-black/5 space-y-1">
+                                        <div id="waTemplatePreview" class="text-[12px] text-[#111B21] leading-relaxed whitespace-pre-wrap break-words"></div>
+                                        <div class="text-right text-[10px] text-slate-400">07:00 ✓✓</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================== TAB 4C: BALAS OTOMATIS WA + SIMULASI LIVE "CEK ZAHIRA" ==================== -->
+                <section id="tab-autoreply" class="hidden space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Balas Otomatis WhatsApp</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Balasan otomatis saat siswa atau orang tua chat kata kunci ke nomor WA Bot (khusus chat pribadi, bukan grup).</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 shrink-0">
+                            <label class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] cursor-pointer select-none">
+                                <input id="waAutoReplyEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#16A34A]" />
+                                <span class="text-xs font-extrabold text-[#15803D]">Aktif</span>
+                            </label>
+                            <button type="button" onclick="saveWaReminderConfig()"
+                                class="px-4 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold shadow-sm transition cursor-pointer">
+                                💾 Simpan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="waAutoReplyFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                        <!-- Kiri: 3 Kotak Balasan Sederhana -->
+                        <div class="lg:col-span-6 space-y-4">
+                            <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Atur Teks Balasan Kata Kunci</div>
+                                    <button type="button" onclick="resetWaAutoReplyDefault()"
+                                        class="text-[11px] font-bold text-slate-500 hover:text-[#E11D48] transition cursor-pointer">
+                                        ↺ Reset Default
+                                    </button>
+                                </div>
+
                                 <div class="space-y-1.5">
                                     <label for="waReplyMenuTemplateInput" class="block text-xs font-extrabold text-[#1E293B]">
-                                        1. Jika siswa / ortu ketik <code class="px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-mono">menu</code> / <code class="px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-mono">halo</code>
+                                        1. Saat diketik <span class="px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-mono">menu</span> atau <span class="px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#0082E6] font-mono">halo</span>
                                     </label>
-                                    <textarea id="waReplyMenuTemplateInput" rows="9"
-                                        placeholder="Tulis balasan menu di sini..."
-                                        class="w-full px-4 py-3 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
-                                    <p class="text-[11px] text-slate-400">Bisa gunakan <code class="font-mono">{link_anitrack}</code> dan <code class="font-mono">{link_pantau}</code>.</p>
+                                    <textarea id="waReplyMenuTemplateInput" rows="7"
+                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
                                 </div>
 
-                                <div class="space-y-4">
-                                    <div class="space-y-1.5">
-                                        <label for="waReplySiapTemplateInput" class="block text-xs font-extrabold text-[#1E293B]">
-                                            2. Jika siswa ketik <code class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-mono">siap</code> / <code class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-mono">ok</code>
-                                        </label>
-                                        <textarea id="waReplySiapTemplateInput" rows="4"
-                                            placeholder="Balasan saat siswa menyimpan nomor & menyapa bot..."
-                                            class="w-full px-4 py-3 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs font-mono leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
-                                    </div>
+                                <div class="space-y-1.5">
+                                    <label for="waReplySiapTemplateInput" class="block text-xs font-extrabold text-[#1E293B]">
+                                        2. Saat siswa ketik <span class="px-1.5 py-0.5 rounded bg-[#E7F9EE] text-[#15803D] font-mono">siap</span> (pertama kali simpan nomor)
+                                    </label>
+                                    <textarea id="waReplySiapTemplateInput" rows="3"
+                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
+                                </div>
 
-                                    <div class="space-y-1.5">
-                                        <label for="waReplyCekFooterInput" class="block text-xs font-extrabold text-[#1E293B]">
-                                            3. Catatan Penutup saat ketik <code class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#B88600] font-mono">cek</code> / <code class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#B88600] font-mono">cek &lt;nama&gt;</code> / <code class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#B88600] font-mono">tugas</code>
-                                        </label>
-                                        <textarea id="waReplyCekFooterInput" rows="3"
-                                            placeholder="Opsional — contoh: Semangat menyelesaikan project animasi! Hubungi pembimbing jika ada kendala."
-                                            class="w-full px-4 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs leading-relaxed focus:outline-none focus:border-[#0095FF]"></textarea>
-                                        <p class="text-[11px] text-slate-400">Nama siswa, checklist Project Update PJ Subkon, &amp; daftar deadline otomatis diisi bot langsung dari database.</p>
-                                    </div>
+                                <div class="space-y-1.5">
+                                    <label for="waReplyCekFooterInput" class="block text-xs font-extrabold text-[#1E293B]">
+                                        3. Catatan penutup saat ketik <span class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#B88600] font-mono">cek &lt;nama&gt;</span> (Opsional)
+                                    </label>
+                                    <input id="waReplyCekFooterInput" type="text"
+                                        placeholder="Contoh: Semangat! Hubungi guru pembimbing jika ada kendala."
+                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                                    <p class="text-[11px] text-slate-500">
+                                        Otomatis berisi: <strong>Nama &amp; WA Pembimbing</strong>, <strong>Checklist PJ Subkon</strong>, <strong>Daily Task Hari Ini</strong>, &amp; <strong>Daftar Deadline</strong>.
+                                    </p>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- ==================== SUB-TAB 3: ANTREAN SISWA HARI INI ==================== -->
-                    <div id="notif-pane-queue" class="notif-subpane hidden">
-                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <h3 class="text-sm sm:text-base font-extrabold text-[#1E293B]">📋 Antrean Siswa Penerima Pengingat Hari Ini</h3>
-                                    <p class="text-xs text-slate-500 mt-0.5">Daftar siswa yang masuk H-2 s/d Hari-H atau melewati deadline (belum lapor selesai).</p>
+                        <!-- Kanan: Simulasi Live Chat WhatsApp (Tes "cek zahira" langsung!) -->
+                        <div class="lg:col-span-6 lg:sticky lg:top-20">
+                            <div class="rounded-2xl overflow-hidden border border-[#CBD5E1] shadow-card bg-[#ECE5DD] flex flex-col">
+                                <div class="bg-[#075E54] text-white px-4 py-3 flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-sm shrink-0">💬</div>
+                                        <div class="min-w-0">
+                                            <div class="text-xs font-extrabold truncate">Simulasi Langsung Chat WA Bot</div>
+                                            <div class="text-[10.5px] text-emerald-200">Coba ketik <strong>cek zahira</strong> di bawah untuk lihat hasil aslinya</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div id="waQueueSummary" class="flex flex-wrap items-center gap-2 text-xs"></div>
+
+                                <!-- Tombol Cepat Tes -->
+                                <div class="bg-[#F0F2F5] px-3.5 py-2 border-b border-black/5 flex flex-wrap items-center gap-1.5">
+                                    <span class="text-[10.5px] font-bold text-slate-500">Coba klik:</span>
+                                    <button type="button" onclick="runWaAutoReplySim('cek zahira')" class="px-2.5 py-1 rounded-full bg-white hover:bg-[#DCF8C6] border border-[#CBD5E1] text-[11px] font-bold text-[#1E293B] cursor-pointer">cek zahira</button>
+                                    <button type="button" onclick="runWaAutoReplySim('menu')" class="px-2.5 py-1 rounded-full bg-white hover:bg-[#DCF8C6] border border-[#CBD5E1] text-[11px] font-bold text-[#1E293B] cursor-pointer">menu</button>
+                                    <button type="button" onclick="runWaAutoReplySim('siap')" class="px-2.5 py-1 rounded-full bg-white hover:bg-[#DCF8C6] border border-[#CBD5E1] text-[11px] font-bold text-[#1E293B] cursor-pointer">siap</button>
+                                </div>
+
+                                <!-- Area Chat Gelembung -->
+                                <div id="waSimChatLog" class="p-4 space-y-3 h-[380px] overflow-y-auto">
+                                    <div class="text-center">
+                                        <span class="inline-block px-3 py-1 rounded-lg bg-white/80 text-[11px] text-slate-500 shadow-2xs">
+                                            Klik <strong>cek zahira</strong> di atas atau ketik nama siswa lain di bawah 👇
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Input Chat -->
+                                <form onsubmit="event.preventDefault(); runWaAutoReplySim();" class="bg-[#F0F2F5] p-2.5 flex items-center gap-2 border-t border-black/5">
+                                    <input id="waSimInput" type="text" placeholder="Ketik pesan... misal: cek zahira"
+                                        class="flex-1 px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-full text-xs focus:outline-none focus:border-[#075E54]" />
+                                    <button type="submit"
+                                        class="px-4 py-2 rounded-full bg-[#075E54] hover:bg-[#054C44] text-white text-xs font-bold transition cursor-pointer shrink-0">
+                                        Kirim ➤
+                                    </button>
+                                </form>
                             </div>
-                            <div id="waQueueList" class="border border-[#EDF1F7] rounded-xl overflow-hidden"></div>
                         </div>
                     </div>
+                </section>
 
-                    <!-- ==================== SUB-TAB 4: RIWAYAT LOG PENGIRIMAN ==================== -->
-                    <div id="notif-pane-logs" class="notif-subpane hidden">
-                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-4">
+                <!-- Modal Tersembunyi: Pengaturan Lanjutan Kanal (Bot PC Lokal / Telegram / Cloud) -->
+                <div id="notifChannelsModal" onclick="if(event.target===this)this.classList.add('hidden')"
+                    class="fixed inset-0 z-[78] hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div class="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7] max-h-[88vh] flex flex-col">
+                        <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
                             <div>
-                                <h3 class="text-sm sm:text-base font-extrabold text-[#1E293B]">📜 Riwayat Log Pengiriman Terbaru</h3>
-                                <p class="text-xs text-slate-500 mt-0.5">Catatan pesan yang dikirim otomatis oleh Bot WA PC Lokal maupun Telegram Bot.</p>
+                                <div class="text-sm font-extrabold text-[#1E293B]">⚙️ Pengaturan Kanal Pengiriman (WA &amp; Telegram)</div>
+                                <div class="text-[11px] text-slate-500">Default sudah memakai <strong>Bot WA PC Lokal (Gratis)</strong>. Buka ini hanya jika ingin mengatur Telegram atau Gateway Cloud.</div>
                             </div>
-                            <div id="waLogsList" class="border border-[#EDF1F7] rounded-xl overflow-hidden"></div>
+                            <button type="button" onclick="document.getElementById('notifChannelsModal').classList.add('hidden')"
+                                class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
                         </div>
-                    </div>
-
-                    <!-- ==================== SUB-TAB 5: KANAL & TELEGRAM (LANJUTAN) ==================== -->
-                    <div id="notif-pane-channels" class="notif-subpane hidden space-y-4">
-                        <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 space-y-5">
-                            <!-- Pilihan Kanal Aktif -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-[#BBF7D0] bg-[#F5FBF7] cursor-pointer select-none">
+                        <div class="p-5 overflow-y-auto space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="flex items-start gap-3 p-3.5 rounded-xl border-2 border-[#BBF7D0] bg-[#F5FBF7] cursor-pointer select-none">
                                     <input id="waChannelEnabled" type="checkbox" checked onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#16A34A]" />
-                                    <div class="space-y-0.5">
-                                        <div class="text-xs font-extrabold text-[#15803D]">💬 WhatsApp (Bot PC Lokal / Gateway)</div>
-                                        <div class="text-[11px] text-slate-600">Aktifkan pengingat &amp; balas otomatis WhatsApp.</div>
+                                    <div>
+                                        <div class="text-xs font-extrabold text-[#15803D]">💬 WhatsApp</div>
+                                        <div class="text-[11px] text-slate-600">Bot PC Lokal / Cloud Gateway</div>
                                     </div>
                                 </label>
-                                <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-[#BAE6FD] bg-[#F0F9FF] cursor-pointer select-none">
+                                <label class="flex items-start gap-3 p-3.5 rounded-xl border-2 border-[#BAE6FD] bg-[#F0F9FF] cursor-pointer select-none">
                                     <input id="tgChannelEnabled" type="checkbox" onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#0284C7]" />
-                                    <div class="space-y-0.5">
-                                        <div class="text-xs font-extrabold text-[#0369A1]">✈️ Telegram Bot (Gratis Resmi)</div>
-                                        <div class="text-[11px] text-slate-600">DM pribadi siswa / Grup kelas (0% risiko banned).</div>
+                                    <div>
+                                        <div class="text-xs font-extrabold text-[#0369A1]">✈️ Telegram Bot</div>
+                                        <div class="text-[11px] text-slate-600">Gratis resmi (0% risiko banned)</div>
                                     </div>
                                 </label>
                             </div>
 
-                            <!-- Pengaturan WhatsApp -->
                             <div id="waGatewaySettingsWrap" class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2 border-t border-[#EDF1F7]">
-                                <div class="md:col-span-12 text-xs font-extrabold text-[#15803D]">💬 Mode Pengiriman WhatsApp</div>
                                 <div id="waProviderCol" class="md:col-span-6">
-                                    <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Metode Pengiriman</label>
+                                    <label for="waProviderSelect" class="block text-xs font-semibold text-slate-600 mb-1">Metode Pengiriman WA</label>
                                     <select id="waProviderSelect" onchange="onWaProviderChange()"
-                                        class="w-full px-3 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
-                                        <option value="local_pc">Bot WA PC Lokal (Gratis — Tanpa API Token &amp; Tanpa Watermark)</option>
-                                        <option value="fonnte">Fonnte (Cloud Gateway — Butuh API Token)</option>
-                                        <option value="wablas">Wablas (Cloud Gateway — Butuh API Token)</option>
+                                        class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                        <option value="local_pc">Bot WA PC Lokal (Gratis — Tanpa API Token)</option>
+                                        <option value="fonnte">Fonnte (Cloud Gateway)</option>
+                                        <option value="wablas">Wablas (Cloud Gateway)</option>
                                         <option value="custom_webhook">Custom Webhook URL</option>
                                     </select>
                                 </div>
                                 <div id="waApiTokenWrap" class="hidden md:col-span-4">
                                     <label for="waApiTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">API Token WA Gateway</label>
-                                    <input id="waApiTokenInput" type="password" placeholder="Tempel Token API Fonnte / Wablas di sini..."
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                    <input id="waApiTokenInput" type="password" placeholder="Token Fonnte / Wablas..."
+                                        class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                 </div>
                                 <div id="waAppUrlCol" class="md:col-span-6">
                                     <label for="waAppUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Link Portal AniTrack</label>
                                     <input id="waAppUrlInput" type="url" oninput="updateWaTemplatePreview()" placeholder="https://anitrack.republikanimasi.my.id"
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                        class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                 </div>
                                 <div id="waCustomUrlWrap" class="hidden md:col-span-12">
-                                    <label for="waCustomUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Endpoint URL Gateway (Khusus Wablas / Custom Webhook)</label>
+                                    <label for="waCustomUrlInput" class="block text-xs font-semibold text-slate-600 mb-1">Endpoint URL Gateway</label>
                                     <input id="waCustomUrlInput" type="url" placeholder="https://pati.wablas.com/api/send-message"
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                        class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
                                 </div>
-                                <div id="waLocalPcHint" class="md:col-span-12 rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] px-3.5 py-2.5 text-xs text-[#15803D] leading-relaxed">
-                                    <strong>🤖 Bot WA PC Lokal Aktif (Tanpa API Token):</strong> Jalankan <code>wa-bot/jalankan-senyap.vbs</code> di PC kantor. Bot otomatis menarik seluruh template &amp; Mode Dummy dari portal ini.
+                                <div id="waLocalPcHint" class="md:col-span-12 rounded-xl bg-[#E7F9EE] border border-[#BBF7D0] px-3.5 py-2.5 text-xs text-[#15803D]">
+                                    🤖 <strong>Bot WA PC Lokal aktif:</strong> Jalankan <code>wa-bot/jalankan-senyap.vbs</code> di PC kantor. Tanpa API Token &amp; tanpa watermark.
                                 </div>
                             </div>
 
-                            <!-- Pengaturan Telegram Bot API -->
-                            <div id="tgGatewaySettingsWrap" class="hidden pt-4 border-t border-[#EDF1F7] grid grid-cols-1 md:grid-cols-12 gap-3">
-                                <div class="md:col-span-12 flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-xs font-extrabold text-[#0369A1]">✈️ Konfigurasi Telegram Bot API</span>
-                                    <span class="text-[11px] text-slate-500">Buat bot di <code>@BotFather</code> → isi Username &amp; Token</span>
+                            <div id="tgGatewaySettingsWrap" class="hidden pt-3 border-t border-[#EDF1F7] grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label for="tgBotUsernameInput" class="block text-xs font-semibold text-slate-600 mb-1">Username Bot Telegram (tanpa @)</label>
+                                    <input id="tgBotUsernameInput" type="text" placeholder="AniTrackSMKN4Bot" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
                                 </div>
-                                <div class="md:col-span-3">
-                                    <label for="tgBotUsernameInput" class="block text-xs font-semibold text-slate-600 mb-1">Username Bot (tanpa @)</label>
-                                    <input id="tgBotUsernameInput" type="text" placeholder="AniTrackSMKN4Bot"
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <div>
+                                    <label for="tgBotTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">Telegram Bot Token (@BotFather)</label>
+                                    <input id="tgBotTokenInput" type="password" placeholder="7123456789:AAH..." class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
                                 </div>
-                                <div class="md:col-span-3">
-                                    <label for="tgBotTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">Telegram Bot Token</label>
-                                    <input id="tgBotTokenInput" type="password" placeholder="7123456789:AAHxxx..."
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <div>
+                                    <label for="tgAdminChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Pribadi (untuk Tes)</label>
+                                    <input id="tgAdminChatIdInput" type="text" placeholder="Angka dari @userinfobot" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
                                 </div>
-                                <div class="md:col-span-3">
-                                    <label for="tgAdminChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Pribadi (Tes)</label>
-                                    <input id="tgAdminChatIdInput" type="text" placeholder="Angka dari @userinfobot"
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                <div>
+                                    <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup Utama (Opsional)</label>
+                                    <input id="tgChatIdInput" type="text" placeholder="Kosongkan jika DM saja" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
                                 </div>
-                                <div class="md:col-span-3">
-                                    <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup (Opsional)</label>
-                                    <input id="tgChatIdInput" type="text" placeholder="Kosongkan jika DM saja"
-                                        class="w-full px-3.5 py-2.5 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                                </div>
-                                <div class="md:col-span-12 flex flex-wrap items-center justify-between gap-2 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl px-3.5 py-2.5">
-                                    <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl px-3 py-2">
+                                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[#0369A1]">
                                         <input id="tgSendDmEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#0284C7]" />
-                                        <span class="text-xs font-bold text-[#0369A1]">Kirim DM Pribadi langsung ke Telegram masing-masing siswa</span>
+                                        Kirim DM Pribadi ke Telegram siswa
                                     </label>
                                     <button id="syncTgStudentsBtn" type="button" onclick="syncTelegramStudentsNow()"
-                                        class="px-3 py-1.5 rounded-lg bg-white hover:bg-[#0284C7] border border-[#BAE6FD] text-[#0369A1] hover:text-white text-[11px] font-bold transition cursor-pointer">
-                                        ↻ Sinkronkan Akun Telegram Siswa
+                                        class="px-2.5 py-1 rounded-lg bg-white border border-[#BAE6FD] text-[#0369A1] text-[11px] font-bold cursor-pointer">
+                                        ↻ Sinkron Siswa Telegram
                                     </button>
                                 </div>
-                                <div class="md:col-span-12">
-                                    <label for="tgClassChatMapInput" class="block text-xs font-semibold text-slate-600 mb-1">Mapping Chat ID Grup Per Kelas (Opsional: <code class="font-mono">X ANI A = -100...</code>)</label>
-                                    <textarea id="tgClassChatMapInput" rows="2" placeholder="X ANI A = -1001111111111&#10;X ANI B = -1002222222222"
-                                        class="w-full px-3.5 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:border-[#0095FF]"></textarea>
+                                <div class="sm:col-span-2">
+                                    <label for="tgClassChatMapInput" class="block text-xs font-semibold text-slate-600 mb-1">Grup Per Kelas (Opsional: <code>X ANI A = -100...</code>)</label>
+                                    <textarea id="tgClassChatMapInput" rows="2" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono"></textarea>
                                 </div>
                             </div>
 
-                            <!-- Tombol Tes Cloud / Telegram (otomatis tersembunyi untuk WA PC Lokal) -->
-                            <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-[#EDF1F7]">
-                                <button id="testWaBtn" type="button" onclick="testSendWaReminder()"
-                                    class="hidden px-3.5 py-2 rounded-xl bg-white hover:bg-[#E7F9EE] border border-[#BBF7D0] text-[#15803D] text-xs font-bold transition cursor-pointer">
-                                    🧪 Tes WA Cloud
+                            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#EDF1F7]">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button id="testWaBtn" type="button" onclick="testSendWaReminder()" class="hidden px-3 py-2 rounded-xl bg-white border border-[#BBF7D0] text-[#15803D] text-xs font-bold cursor-pointer">🧪 Tes WA Cloud</button>
+                                    <button id="testTgBtn" type="button" onclick="testSendTelegramReminder()" class="hidden px-3 py-2 rounded-xl bg-white border border-[#BAE6FD] text-[#0369A1] text-xs font-bold cursor-pointer">✈️ Tes Telegram</button>
+                                    <button id="runWaNowBtn" type="button" onclick="runWaReminderNow()" class="hidden px-3 py-2 rounded-xl bg-[#0095FF] text-white text-xs font-bold cursor-pointer">📨 Jalankan Cloud</button>
+                                    <span id="waCloudGuideFooter" class="hidden text-[11px] text-slate-400">Gateway cloud: fonnte.com / Wablas</span>
+                                </div>
+                                <button type="button" onclick="saveWaReminderConfig(); document.getElementById('notifChannelsModal').classList.add('hidden');"
+                                    class="px-4 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold cursor-pointer">
+                                    💾 Simpan &amp; Tutup
                                 </button>
-                                <button id="testTgBtn" type="button" onclick="testSendTelegramReminder()"
-                                    class="hidden px-3.5 py-2 rounded-xl bg-white hover:bg-[#E0F2FE] border border-[#BAE6FD] text-[#0369A1] text-xs font-bold transition cursor-pointer">
-                                    ✈️ Tes Telegram
-                                </button>
-                                <button id="runWaNowBtn" type="button" onclick="runWaReminderNow()"
-                                    class="hidden px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold shadow-blueGlow transition cursor-pointer">
-                                    📨 Jalankan Cloud Sekarang
-                                </button>
-                                <span id="waCloudGuideFooter" class="hidden text-[11px] text-slate-500">
-                                    Token Cloud Gateway didapat dari <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] font-semibold hover:underline">fonnte.com</a> / Wablas.
-                                </span>
                             </div>
                         </div>
                     </div>
-                </section>
+                </div>
 
                 <!-- ==================== TAB 5: AKUN SAYA ==================== -->
                 <section id="tab-profile" class="hidden max-w-xl mx-auto lg:mx-0 space-y-5">
@@ -1679,7 +1734,8 @@
                     'project-update': 'Project Update',
                     plotting: 'Akun & Plotting',
                     storage: 'Drive & Backup',
-                    notif: 'Pesan Otomatis',
+                    notif: 'Pengingat Pagi',
+                    autoreply: 'Balas Otomatis',
                     profile: 'Akun Saya'
                 },
                 extraRefresh: () => Promise.all([loadPlottingStudents(), loadWaAutomationPanel()]),
@@ -2717,11 +2773,229 @@
 
             /* ==================== NOTIFIKASI WA OTOMATIS DEADLINE JAM 07:00 WIB ==================== */
             function setWaConfigFeedback(msg, isError = false) {
-                const el = document.getElementById('waConfigFeedback');
-                if (!el) return;
-                el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#15803D]'}`;
-                el.textContent = msg;
+                ['waConfigFeedback', 'waAutoReplyFeedback'].forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.className = `text-xs font-semibold min-h-[1rem] ${isError ? 'text-[#E11D48]' : 'text-[#15803D]'}`;
+                    el.textContent = msg;
+                });
             }
+
+            window.openNotifChannelsModal = function () {
+                document.getElementById('notifChannelsModal')?.classList.remove('hidden');
+            };
+
+            function formatWaRichHtml(raw) {
+                return A.esc(String(raw || ''))
+                    .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
+                    .replace(/_([^_\n]+)_/g, '<em>$1</em>')
+                    .replace(/`([^`\n]+)`/g, '<code class="px-1 py-0.5 rounded bg-slate-100 font-mono text-[11px]">$1</code>');
+            }
+
+            function populateSimpleInputsFromTemplate(tplStr) {
+                const introEl = document.getElementById('waSimpleIntroInput');
+                const closeEl = document.getElementById('waSimpleClosingInput');
+                if (!introEl || !closeEl) return;
+                const lines = String(tplStr || A.DEFAULT_WA_TEMPLATE).split(/\r?\n/);
+                const introLine = lines.find((l) => l.trim() && !/halo\s+\*?\{nama\}/i.test(l) && !/^\{(daftar_tugas|project_update|pembimbing|link_anitrack)/i.test(l.trim())) || 'Pengingat Project Tracker AniTrack — SMKN 4 Malang:';
+                const closeLine = [...lines].reverse().find((l) => l.trim() && !/halo\s+\*?\{nama\}/i.test(l) && !/^\{(daftar_tugas|project_update|pembimbing|link_anitrack)/i.test(l.trim()) && l !== introLine) || '📌 Segera upload file ke Folder Google Drive Project kamu, lalu klik Laporkan Tugas Selesai di AniTrack.';
+                introEl.value = introLine.replace(/\*/g, '').trim();
+                closeEl.value = closeLine.replace(/^📌\s*/, '').trim();
+            }
+
+            window.syncSimpleToRawWaTemplate = function () {
+                const intro = (document.getElementById('waSimpleIntroInput')?.value || '').trim() || 'Pengingat Project Tracker AniTrack — SMKN 4 Malang:';
+                const closing = (document.getElementById('waSimpleClosingInput')?.value || '').trim() || 'Segera upload file ke Folder Google Drive Project kamu, lalu lapor selesai di AniTrack.';
+                const ta = document.getElementById('waMessageTemplateInput');
+                if (ta) {
+                    ta.value = [
+                        'Halo *{nama}* ({kelas}),',
+                        intro,
+                        '',
+                        '{daftar_tugas}',
+                        '{project_update}',
+                        `📌 ${closing}`,
+                        '{pembimbing}',
+                        '{link_anitrack}'
+                    ].join('\n');
+                }
+                window.updateWaTemplatePreview();
+            };
+
+            let waSimCache = null;
+
+            window.runWaAutoReplySim = async function (presetText) {
+                const inp = document.getElementById('waSimInput');
+                const log = document.getElementById('waSimChatLog');
+                if (!log) return;
+                const rawText = String(presetText !== undefined ? presetText : (inp?.value || '')).trim();
+                if (!rawText) return;
+                if (inp && presetText === undefined) inp.value = '';
+
+                const appendBubble = (text, isOut) => {
+                    const wrap = document.createElement('div');
+                    wrap.className = `flex ${isOut ? 'justify-end' : 'justify-start'}`;
+                    wrap.innerHTML = `
+                        <div class="max-w-[88%] rounded-2xl ${isOut ? 'rounded-tr-sm bg-[#DCF8C6]' : 'rounded-tl-sm bg-white'} px-3.5 py-2.5 shadow-xs border border-black/5 space-y-1">
+                            <div class="text-[12px] text-[#111B21] leading-relaxed whitespace-pre-wrap break-words">${formatWaRichHtml(text)}</div>
+                            <div class="text-right text-[9.5px] text-slate-400">${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} ${isOut ? '✓✓' : ''}</div>
+                        </div>`;
+                    log.appendChild(wrap);
+                    log.scrollTop = log.scrollHeight;
+                };
+
+                appendBubble(rawText, true);
+
+                const cfg = readWaConfigForm();
+                const baseUrl = (cfg.appUrl || window.location.origin || 'https://anitrack.republikanimasi.my.id').replace(/\/+$/, '');
+                const pantauUrl = `${baseUrl}/pantau.html`;
+                const lower = rawText.toLowerCase().replace(/\s+/g, ' ');
+
+                if (/^(menu|bantu|help|info|halo|hai|hi|mulai|start)$/i.test(lower)) {
+                    const reply = (cfg.autoReplyMenuTemplate || DEFAULT_WA_REPLY_MENU)
+                        .replace(/\{link_anitrack\}/gi, baseUrl)
+                        .replace(/\{link_pantau\}/gi, pantauUrl);
+                    appendBubble(reply, false);
+                    return;
+                }
+                if (/^(siap|oke|ok|hadir|tersimpan)$/i.test(lower)) {
+                    appendBubble(cfg.autoReplySiapTemplate || DEFAULT_WA_REPLY_SIAP, false);
+                    return;
+                }
+
+                const cekMatch = lower.match(/^(cek|progres|progress|status|pantau|tugas|deadline)(?:\s+(.+))?$/i);
+                if (!cekMatch) {
+                    appendBubble('_(Bot mengabaikan chat biasa agar tidak mengganggu obrolan manual. Coba ketik: *menu*, *siap*, atau *cek zahira*)_', false);
+                    return;
+                }
+
+                const cmd = cekMatch[1].toLowerCase();
+                const qRaw = (cekMatch[2] || '').trim();
+
+                if (!waSimCache) {
+                    const [{ data: profiles }, { data: tasks }, { data: subs }, colsMap, { data: ckRows }, { data: dailyRows }] = await Promise.all([
+                        supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, role, mentor_id, whatsapp_number'),
+                        supabase.from('project_tasks').select('id, title, pipeline_stage, sub_concentration, due_date'),
+                        supabase.from('project_submissions').select('project_task_id, student_id, status'),
+                        A.loadChecklistColsMap(),
+                        supabase.from('app_settings').select('key, value, updated_at').like('key', `${A.CHECKLIST_ROW_PREFIX}%`),
+                        supabase.from('student_progress').select('student_id, status, student_notes, updated_at').order('updated_at', { ascending: false }).limit(400)
+                    ]);
+                    waSimCache = {
+                        profiles: profiles || [],
+                        tasks: tasks || [],
+                        subs: subs || [],
+                        colsMap: colsMap || {},
+                        rowMap: A.parseChecklistRowMap(ckRows || []),
+                        dailyRows: dailyRows || []
+                    };
+                }
+
+                const students = waSimCache.profiles.filter((p) => p.role === 'student');
+                const q = qRaw.replace(/^@+/, '').toLowerCase();
+                const matches = !q
+                    ? students.slice(0, 1)
+                    : (() => {
+                        const ex = students.filter((s) => String(s.username || '').toLowerCase() === q || String(s.full_name || '').toLowerCase() === q);
+                        return ex.length ? ex : students.filter((s) => String(s.full_name || '').toLowerCase().includes(q) || String(s.username || '').toLowerCase().includes(q));
+                    })();
+
+                if (!matches.length) {
+                    appendBubble(`❌ Siswa dengan kata kunci *"${qRaw}"* tidak ditemukan. Coba ketik nama depan siswa lain.`, false);
+                    return;
+                }
+                if (matches.length > 1) {
+                    const listText = matches.slice(0, 8).map((s, i) => `${i + 1}. *${s.full_name}* (${s.class_name || '-'}) → ketik: *cek ${s.username}*`).join('\n');
+                    appendBubble(`🔎 Ditemukan ${matches.length} siswa cocok dengan *"${qRaw}"*:\n\n${listText}`, false);
+                    return;
+                }
+
+                const s = matches[0];
+                const mentor = s.mentor_id ? waSimCache.profiles.find((p) => p.id === s.mentor_id) : null;
+                const mentorWa = mentor ? (A.formatWhatsappDisplay(mentor.whatsapp_number) || 'Belum diisi') : '-';
+                const todayYmd = A.getJakartaYmd(new Date());
+                const todayMs = Date.UTC(...todayYmd.split('-').map((n, i) => (i === 1 ? Number(n) - 1 : Number(n))));
+
+                const stuDaily = waSimCache.dailyRows.filter((r) => r.student_id === s.id);
+                const todayDaily = stuDaily.find((r) => A.isTodayIso(r.updated_at)) || null;
+                const latestDaily = stuDaily[0] || null;
+                const dailyLabels = { belum_mulai: 'Belum Mulai', sedang_dikerjakan: 'Sedang Dikerjakan', menunggu_review: 'Menunggu Review', revisi: 'Revisi', selesai: 'Selesai' };
+
+                const subMap = {};
+                waSimCache.subs.forEach((ps) => { if (ps.student_id === s.id) subMap[ps.project_task_id] = ps; });
+                const eligible = waSimCache.tasks.filter((t) => !t.sub_concentration || t.sub_concentration === s.sub_concentration);
+                let acc = 0, revw = 0, revi = 0;
+                const overdue = [], upcoming = [];
+                eligible.forEach((t) => {
+                    const st = subMap[t.id]?.status || 'belum_mulai';
+                    if (st === 'selesai') { acc++; return; }
+                    if (st === 'menunggu_review') { revw++; return; }
+                    if (st === 'revisi') revi++;
+                    if (!t.due_date) return;
+                    const parts = String(t.due_date).slice(0, 10).split('-').map(Number);
+                    const diff = Math.round((Date.UTC(parts[0], parts[1] - 1, parts[2]) - todayMs) / 86400000);
+                    if (diff < 0) overdue.push({ title: t.title, dueDate: String(t.due_date).slice(0, 10), lateDays: Math.abs(diff), status: st });
+                    else upcoming.push({ title: t.title, dueDate: String(t.due_date).slice(0, 10), diffDays: diff, status: st });
+                });
+                overdue.sort((a, b) => b.lateDays - a.lateDays);
+                upcoming.sort((a, b) => a.diffDays - b.diffDays);
+
+                const sc = s.sub_concentration || '';
+                const cols = (sc && Array.isArray(waSimCache.colsMap[sc]) && waSimCache.colsMap[sc].length) ? waSimCache.colsMap[sc] : A.DEFAULT_CHECKLIST_COLS;
+                const rd = waSimCache.rowMap[s.id] || { items: {}, notes: '' };
+                const normCk = (v) => { const x = String(v || '').toLowerCase(); return x === 'done' || x === 'selesai' || x === 'acc' ? 'done' : (x === 'revisi' ? 'revisi' : (x === 'wip' || x === 'proses' ? 'wip' : 'none')); };
+                const ckLbl = { none: 'None', wip: 'WIP', revisi: 'Revisi', done: 'Done' };
+                const doneCk = cols.filter((c) => normCk(rd.items?.[c]) === 'done').length;
+                const pctCk = cols.length ? Math.round((doneCk / cols.length) * 100) : 0;
+
+                const lines = [
+                    '📌 *UPDATE PROGRES ANITRACK*',
+                    `👤 *${s.full_name}* (@${s.username})`,
+                    `🏫 ${s.class_name || '-'} • ${sc || 'Belum pilih subkon'}`,
+                    mentor ? `👨‍🏫 Pembimbing: *${mentor.full_name}*\n📞 WA Pembimbing: ${mentorWa}` : '👨‍🏫 Pembimbing: _Belum di-plot_',
+                    ''
+                ];
+                if (cmd !== 'tugas' && cmd !== 'deadline') {
+                    lines.push(`📊 *PROJECT UPDATE (${sc || 'Animasi'} — ${doneCk}/${cols.length} Done • ${pctCk}%):*`);
+                    cols.forEach((c) => {
+                        const st = normCk(rd.items?.[c]);
+                        const ic = st === 'done' ? '✅' : (st === 'revisi' ? '🔴' : (st === 'wip' ? '🟡' : '⚪'));
+                        lines.push(`${ic} ${c}: *${ckLbl[st]}*`);
+                    });
+                    if (rd.notes && String(rd.notes).trim()) lines.push(`📝 Notes PJ Subkon: _${String(rd.notes).trim()}_`);
+                    lines.push('');
+                }
+                lines.push('📝 *DAILY TASK HARI INI:*');
+                if (todayDaily) {
+                    lines.push(`✅ Sudah mengisi — Status: *${dailyLabels[todayDaily.status] || todayDaily.status}*`);
+                    if (todayDaily.student_notes) lines.push(`💬 Catatan: _${String(todayDaily.student_notes).trim().slice(0, 100)}_`);
+                } else {
+                    lines.push('⚠️ *Belum mengisi Daily Task hari ini.*');
+                    if (latestDaily?.updated_at) lines.push(`_Terakhir mengisi: ${String(latestDaily.updated_at).slice(0, 10)} (${dailyLabels[latestDaily.status] || latestDaily.status})_`);
+                }
+                lines.push('');
+                lines.push('📋 *RINGKASAN DEADLINE PROJECT:*');
+                lines.push(`• Tuntas (ACC): *${acc}/${eligible.length}* tugas`);
+                if (revw) lines.push(`• Menunggu Review Guru: *${revw}*`);
+                if (revi) lines.push(`• Perlu Revisi: *${revi}*`);
+                if (overdue.length) {
+                    lines.push('');
+                    lines.push('🔴 *MELEBIHI DEADLINE:*');
+                    overdue.slice(0, 5).forEach((it, i) => lines.push(`${i + 1}. ${it.title}${it.status === 'revisi' ? ' [Revisi]' : ''} — *Telat ${it.lateDays} hari* (${it.dueDate})`));
+                }
+                if (upcoming.length) {
+                    lines.push('');
+                    lines.push('🟡 *DEADLINE TERDEKAT:*');
+                    upcoming.slice(0, 4).forEach((it, i) => lines.push(`${i + 1}. ${it.title}${it.status === 'revisi' ? ' [Revisi]' : ''} — *${it.diffDays === 0 ? 'HARI INI' : (it.diffDays === 1 ? 'Besok' : `H-${it.diffDays}`)}* (${it.dueDate})`));
+                }
+                if (cfg.autoReplyCekFooter) {
+                    lines.push('');
+                    lines.push(cfg.autoReplyCekFooter);
+                }
+                lines.push('');
+                lines.push(`🔗 Portal AniTrack: ${baseUrl}`);
+                appendBubble(lines.join('\n'), false);
+            };
 
             const DEFAULT_WA_REPLY_MENU = [
                 '🤖 *AniTrack — SMKN 4 Malang (Balas Otomatis)*',
@@ -2795,7 +3069,7 @@
                 const sampleLate = '🔴 *MELEBIHI DEADLINE (Belum Lapor Selesai):*\n1. *Storyline, Treatment & Storyboard* — Terlambat *2 hari* (2026-11-20)';
                 const sampleSoon = '🟡 *MENDEKATI DEADLINE:*\n1. *Character Turnaround & Model Sheet* — *Besok (H-1)* (2026-11-23)';
                 const sampleProjUpd = '📊 *PROJECT UPDATE (3D Modeller — 1/3 Done • 33%):*\n✅ Compose & Audio Video: *Done*\n🟡 Grading: *WIP*\n🔴 Final Film + Credit Title: *Revisi*\n📝 Notes PJ Subkon: _Perbaiki lighting scene 02_';
-                pre.textContent = A.renderWaReminderMessage(tpl, {
+                const rendered = A.renderWaReminderMessage(tpl, {
                     nama: 'Zahira Aulia Putri',
                     kelas: 'X ANI A',
                     subkonsentrasi: '3D Modeller',
@@ -2806,6 +3080,7 @@
                     pembimbing: '👨‍🏫 Pembimbing: *Guru Pembimbing* (WA: 0812-3456-7890)',
                     link_anitrack: appUrl ? `🔗 Buka AniTrack: ${appUrl}` : ''
                 });
+                pre.innerHTML = formatWaRichHtml(rendered);
             };
 
             window.insertWaPlaceholder = function (token) {
@@ -2822,6 +3097,7 @@
             window.resetWaTemplateDefault = function () {
                 const ta = document.getElementById('waMessageTemplateInput');
                 if (ta) ta.value = A.DEFAULT_WA_TEMPLATE;
+                populateSimpleInputsFromTemplate(A.DEFAULT_WA_TEMPLATE);
                 window.updateWaTemplatePreview();
                 A.showToast('Template pesan WA dikembalikan ke default.');
             };
@@ -2949,7 +3225,10 @@
                             if (tgMapEl) tgMapEl.value = formatTgClassMapText(cfg.tgClassChatMap);
                             if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
                             const tplEl = document.getElementById('waMessageTemplateInput');
-                            if (tplEl) tplEl.value = cfg.messageTemplate || A.DEFAULT_WA_TEMPLATE;
+                            if (tplEl) {
+                                tplEl.value = cfg.messageTemplate || A.DEFAULT_WA_TEMPLATE;
+                                populateSimpleInputsFromTemplate(tplEl.value);
+                            }
                             const arEnEl = document.getElementById('waAutoReplyEnabled');
                             if (arEnEl) arEnEl.checked = cfg.autoReplyEnabled !== undefined ? Boolean(cfg.autoReplyEnabled) : true;
                             const arMenuEl = document.getElementById('waReplyMenuTemplateInput');
@@ -2976,6 +3255,7 @@
                 } else if (isAdminStaff) {
                     const tplEl = document.getElementById('waMessageTemplateInput');
                     if (tplEl && !tplEl.value.trim()) tplEl.value = A.DEFAULT_WA_TEMPLATE;
+                    populateSimpleInputsFromTemplate(tplEl?.value || A.DEFAULT_WA_TEMPLATE);
                     const arMenuEl = document.getElementById('waReplyMenuTemplateInput');
                     if (arMenuEl && !arMenuEl.value.trim()) arMenuEl.value = DEFAULT_WA_REPLY_MENU;
                     const arSiapEl = document.getElementById('waReplySiapTemplateInput');
