@@ -2597,22 +2597,22 @@
             const cnt = studentCountByMentor[m.id] || 0;
             const waUrl = getWhatsappUrl(m.whatsapp_number);
             return `
-                <div class="bg-white rounded-xl p-3.5 border border-[#EDF1F7] shadow-card hover:shadow-cardHover transition flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-11 h-11 rounded-full ${avClass} font-bold text-xs flex items-center justify-center shrink-0 border-2 border-white shadow-sm overflow-hidden">
+                <div class="bg-[#FAFBFD] hover:bg-white rounded-xl p-2.5 border border-[#EDF1F7] transition flex items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-full ${avClass} font-bold text-[11px] flex items-center justify-center shrink-0 border border-white shadow-xs overflow-hidden">
                             ${renderAvatarMarkup(m.avatar_url, m.full_name)}
                         </div>
                         <div class="min-w-0">
-                            <div class="font-bold text-[13.5px] text-[#1E293B] truncate">${esc(m.full_name)}</div>
-                            <div class="text-[11px] text-slate-400 truncate mt-0.5">
+                            <div class="font-bold text-xs text-[#1E293B] truncate">${esc(m.full_name)}</div>
+                            <div class="text-[10.5px] text-slate-400 truncate">
                                 @${esc(m.username || 'mentor')} • ${cnt} Siswa
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        ${waUrl ? `<a href="${esc(waUrl)}" target="_blank" rel="noopener noreferrer" title="Chat WA ${esc(m.full_name)}" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white transition">💬 WA</a>` : ''}
+                    <div class="flex items-center gap-1 shrink-0">
+                        ${waUrl ? `<a href="${esc(waUrl)}" target="_blank" rel="noopener noreferrer" title="Chat WA ${esc(m.full_name)}" class="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white transition">💬 WA</a>` : ''}
                         <button onclick="${actionCallbackName}()"
-                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] transition cursor-pointer">
+                            class="px-2.5 py-1 rounded-lg text-[10.5px] font-semibold bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-slate-600 hover:text-[#0095FF] transition cursor-pointer">
                             Detail
                         </button>
                     </div>
@@ -2680,13 +2680,14 @@
         const statusBreakdown = document.getElementById('statusBreakdownList');
         if (statusBreakdown) {
             statusBreakdown.innerHTML = STATUS_OPTIONS.map((st) => `
-                <div class="flex items-center justify-between gap-2">
+                <button type="button" onclick="if(window.openDashboardDailyByStatus){openDashboardDailyByStatus('${st.value}');}"
+                    class="w-full flex items-center justify-between gap-2 px-2 py-1 -mx-2 rounded-lg hover:bg-[#F7FAFF] transition cursor-pointer text-left">
                     <div class="flex items-center gap-2 min-w-0">
                         <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${st.dot}"></span>
                         <span class="text-slate-600 truncate">${st.label}</span>
                     </div>
                     <span class="font-bold text-[#1E293B]">${counts[st.value] || 0}</span>
-                </div>
+                </button>
             `).join('');
         }
 
@@ -3485,9 +3486,29 @@
             global.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
+        global.toggleMaterialForm = function (forceOpen) {
+            const form = document.getElementById('addMaterialForm');
+            const btn = document.getElementById('toggleMaterialFormBtn');
+            if (!form) return;
+            const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : form.classList.contains('hidden');
+            form.classList.toggle('hidden', !shouldOpen);
+            if (btn) btn.textContent = shouldOpen ? '✕ Tutup Form Materi' : '+ Tambah Materi';
+            if (shouldOpen) setTimeout(() => document.getElementById('matTitle')?.focus(), 60);
+        };
+
+        global.toggleProjectTaskForm = function (forceOpen) {
+            const form = document.getElementById('addProjectTaskForm');
+            const btn = document.getElementById('toggleProjectFormBtn');
+            if (!form) return;
+            const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : form.classList.contains('hidden');
+            form.classList.toggle('hidden', !shouldOpen);
+            if (btn) btn.textContent = shouldOpen ? '✕ Tutup Form Tugas' : '+ Tambah Tugas Project';
+            if (shouldOpen) setTimeout(() => document.getElementById('projTitle')?.focus(), 60);
+        };
+
         global.handleHeroCta = function () {
             global.switchTab('materials');
-            setTimeout(() => document.getElementById('matTitle')?.focus(), 100);
+            global.toggleMaterialForm(true);
         };
 
         global.handleMentorsAction = function () {
@@ -3497,6 +3518,390 @@
         global.toggleMissingStudentsBox = function () {
             document.getElementById('missingStudentsBox')?.classList.toggle('hidden');
         };
+
+        let dashboardQueueTab = 'daily';
+        let dashboardQueueTabManual = false;
+        let dashboardDailyCache = { filledCount: 0, scopeTotal: 0, missingStudents: [], todayEntries: 0 };
+        let dashboardProjectCache = { reviewItems: [], revisionCount: 0, overdueCount: 0, earlyWarningCount: 0 };
+
+        global.setDashboardQueueTab = function (tab) {
+            dashboardQueueTab = tab === 'review' ? 'review' : 'daily';
+            dashboardQueueTabManual = true;
+            renderDashboardActionQueue();
+        };
+
+        global.openDashboardDailyMissing = function () {
+            global.switchTab('tasks');
+            const box = document.getElementById('missingStudentsBox');
+            if (box) box.classList.remove('hidden');
+        };
+
+        global.openDashboardDailyByStatus = function (statusVal) {
+            global.switchTab('tasks');
+            const sel = document.getElementById('filterTaskStatus');
+            if (sel) sel.value = statusVal || '';
+            loadDailyTaskFeed();
+        };
+
+        global.openProjectUpdateForSubconc = function (sc) {
+            if (sc) projectChecklistState.subconc = sc;
+            global.switchTab('project-update');
+            renderProjectUpdateView();
+        };
+
+        function renderDashboardActionQueue() {
+            const body = document.getElementById('dashActionQueueBody');
+            if (!body) return;
+
+            document.querySelectorAll('[data-dash-queue-tab]').forEach((btn) => {
+                const isAct = btn.dataset.dashQueueTab === dashboardQueueTab;
+                btn.className = isAct
+                    ? 'px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white text-[#0095FF] shadow-xs transition cursor-pointer'
+                    : 'px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer';
+            });
+
+            const q = (globalSearchTerm || '').trim().toLowerCase();
+
+            if (dashboardQueueTab === 'daily') {
+                const allMissing = dashboardDailyCache.missingStudents || [];
+                const filtered = !q ? allMissing : allMissing.filter((s) =>
+                    (s.full_name || '').toLowerCase().includes(q) ||
+                    (s.class_name || '').toLowerCase().includes(q) ||
+                    (s.sub_concentration || '').toLowerCase().includes(q)
+                );
+                if (!allMissing.length) {
+                    body.innerHTML = `
+                        <div class="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-5 py-7 text-center space-y-1.5">
+                            <div class="text-2xl">🎉</div>
+                            <div class="text-sm font-extrabold text-[#15803D]">Semua siswa sudah mengisi Daily Task hari ini!</div>
+                            <p class="text-xs text-[#166534]/80">Tidak ada siswa yang tertinggal untuk laporan harian hari ini.</p>
+                        </div>`;
+                    return;
+                }
+                if (!filtered.length) {
+                    body.innerHTML = `<div class="py-8 text-center text-xs text-slate-400">Tidak ada siswa yang cocok dengan pencarian "${esc(q)}".</div>`;
+                    return;
+                }
+                const visible = filtered.slice(0, 8);
+                body.innerHTML = `
+                    <div class="divide-y divide-[#F1F5F9]">
+                        ${visible.map((s, idx) => {
+                            const avCls = AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
+                            const waUrl = getWhatsappUrl(s.whatsapp_number, `Halo ${s.full_name}, jangan lupa isi Daily Task AniTrack hari ini ya.`);
+                            return `
+                                <div class="py-2.5 flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <div class="w-8 h-8 rounded-full ${avCls} font-bold text-[11px] flex items-center justify-center shrink-0 overflow-hidden">
+                                            ${renderAvatarMarkup(s.avatar_url, s.full_name)}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="text-xs font-bold text-[#1E293B] truncate">${esc(s.full_name)}</div>
+                                            <div class="text-[10.5px] text-slate-400 truncate">${esc(s.class_name || '-')} • ${esc(s.sub_concentration || 'Belum pilih subkon')}</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        ${waUrl
+                                            ? `<a href="${esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white text-[11px] font-bold transition">💬 Ingatkan WA</a>`
+                                            : `<span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-400 text-[10.5px] font-semibold">Tanpa WA</span>`}
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>
+                    ${filtered.length > visible.length ? `
+                    <div class="pt-3 mt-2 border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-xs">
+                        <span class="text-slate-400">Menampilkan ${visible.length} dari ${filtered.length} siswa belum setor</span>
+                        <button type="button" onclick="openDashboardDailyMissing()" class="font-bold text-[#0095FF] hover:underline cursor-pointer">Lihat semua →</button>
+                    </div>` : ''}`;
+                return;
+            }
+
+            // Tab: Review & Revisi Project
+            const allItems = dashboardProjectCache.reviewItems || [];
+            const filtered = !q ? allItems : allItems.filter((it) =>
+                (it.student?.full_name || '').toLowerCase().includes(q) ||
+                (it.student?.class_name || '').toLowerCase().includes(q) ||
+                (it.task?.title || '').toLowerCase().includes(q)
+            );
+            if (!allItems.length) {
+                body.innerHTML = `
+                    <div class="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-5 py-7 text-center space-y-1.5">
+                        <div class="text-2xl">✅</div>
+                        <div class="text-sm font-extrabold text-[#15803D]">Antrean review project bersih!</div>
+                        <p class="text-xs text-[#166534]/80">Belum ada pengajuan review baru maupun revisi aktif saat ini.</p>
+                    </div>`;
+                return;
+            }
+            if (!filtered.length) {
+                body.innerHTML = `<div class="py-8 text-center text-xs text-slate-400">Tidak ada antrean project yang cocok dengan pencarian "${esc(q)}".</div>`;
+                return;
+            }
+            const visible = filtered.slice(0, 8);
+            body.innerHTML = `
+                <div class="divide-y divide-[#F1F5F9]">
+                    ${visible.map((it) => {
+                        const isRev = it.status === 'revisi';
+                        const badgeCls = isRev ? 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]' : 'bg-[#FFF6D6] text-[#B88600] border-[#FDE68A]';
+                        const badgeLabel = isRev ? 'Revisi' : 'Menunggu Review';
+                        return `
+                            <div class="py-2.5 flex items-center justify-between gap-3">
+                                <div class="min-w-0 space-y-0.5">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <span class="text-xs font-bold text-[#1E293B] truncate">${esc(it.student?.full_name || '-')}</span>
+                                        <span class="text-[10px] font-mono text-slate-400">${esc(it.student?.class_name || '-')}</span>
+                                        <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeCls}">${badgeLabel}</span>
+                                    </div>
+                                    <div class="text-[11px] text-slate-500 truncate">
+                                        📋 ${esc(it.task?.title || 'Tugas Project')}${it.updatedAt ? ` • ${esc(formatDateTime(it.updatedAt))}` : ''}
+                                    </div>
+                                </div>
+                                <button type="button" onclick="switchTab('projects'); jumpToStudentProjectReview('${esc(it.task?.id || '')}', '${esc(it.student?.username || it.student?.full_name || '')}')"
+                                    class="px-3 py-1.5 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
+                                    Review →
+                                </button>
+                            </div>`;
+                    }).join('')}
+                </div>
+                ${filtered.length > visible.length ? `
+                <div class="pt-3 mt-2 border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-xs">
+                    <span class="text-slate-400">Menampilkan ${visible.length} dari ${filtered.length} antrean</span>
+                    <button type="button" onclick="switchTab('projects')" class="font-bold text-[#0095FF] hover:underline cursor-pointer">Buka Project Tracker →</button>
+                </div>` : ''}`;
+        }
+
+        function renderDashboardCommandCenter() {
+            const todayEl = document.getElementById('dashTodayBadge');
+            if (todayEl) {
+                todayEl.textContent = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+            }
+
+            const titleEl = document.getElementById('dashGreetingTitle');
+            if (titleEl && currentUser?.full_name) {
+                const firstName = String(currentUser.full_name).trim();
+                titleEl.textContent = expectedRole === 'superadmin'
+                    ? `Pusat Kendali Animasi • ${firstName}`
+                    : `Selamat bekerja, ${firstName}`;
+            }
+
+            const pillsEl = document.getElementById('dashContextPills');
+            if (pillsEl) {
+                const pills = [];
+                if (expectedRole === 'superadmin') {
+                    const scopeBtns = [
+                        { id: 'all', label: '🌐 Semua Siswa' },
+                        { id: 'mentees', label: '👥 Bimbingan Saya' },
+                        ...(myHomeroomClass ? [{ id: 'homeroom', label: `🏫 ${myHomeroomClass}` }] : [])
+                    ];
+                    pills.push(`<div class="inline-flex flex-wrap p-0.5 rounded-full bg-[#F3F6FB] border border-[#E2E8F0] gap-0.5">${scopeBtns.map((b) => `<button type="button" onclick="setStaffScopeMode('${b.id}')" class="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold transition cursor-pointer ${staffScopeMode === b.id ? 'bg-[#0095FF] text-white shadow-2xs' : 'text-slate-500 hover:text-[#1E293B]'}">${esc(b.label)}</button>`).join('')}</div>`);
+                } else {
+                    if (myHomeroomClass) {
+                        const scopeBtns = [
+                            { id: 'mentees', label: '👥 Bimbingan Saya' },
+                            { id: 'homeroom', label: `🏫 Wali Kelas ${myHomeroomClass}` }
+                        ];
+                        pills.push(`<div class="inline-flex flex-wrap p-0.5 rounded-full bg-[#F3F6FB] border border-[#E2E8F0] gap-0.5">${scopeBtns.map((b) => `<button type="button" onclick="setStaffScopeMode('${b.id}')" class="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold transition cursor-pointer ${staffScopeMode === b.id ? 'bg-[#0095FF] text-white shadow-2xs' : 'text-slate-500 hover:text-[#1E293B]'}">${esc(b.label)}</button>`).join('')}</div>`);
+                    }
+                }
+                if (myPjSubconcs.length) {
+                    pills.push(`<span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FFF6D6] text-[#9A6F00] text-[10.5px] font-extrabold">⭐ PJ ${esc(myPjSubconcs.join(', '))}</span>`);
+                }
+                pillsEl.innerHTML = pills.join('');
+            }
+
+            // 1. Daily Task Today KPI
+            const { filledCount, scopeTotal, missingStudents } = dashboardDailyCache;
+            const dailyPct = scopeTotal ? Math.round((filledCount / scopeTotal) * 100) : 0;
+            const elFilled = document.getElementById('dashDailyFilledToday');
+            if (elFilled) elFilled.textContent = filledCount;
+            const elTotal = document.getElementById('dashDailyScopeTotal');
+            if (elTotal) elTotal.textContent = scopeTotal;
+            const elAvgBar = document.getElementById('metricAvgBar');
+            if (elAvgBar) elAvgBar.style.width = `${Math.min(100, Math.max(0, dailyPct))}%`;
+            const elMissingNote = document.getElementById('dashDailyMissingNote');
+            if (elMissingNote) {
+                elMissingNote.textContent = missingStudents.length === 0 && scopeTotal > 0
+                    ? '✓ Semua siswa sudah setor'
+                    : `${missingStudents.length} belum isi hari ini`;
+                elMissingNote.className = missingStudents.length === 0 && scopeTotal > 0
+                    ? 'font-semibold text-[#15803D] truncate'
+                    : 'font-semibold text-amber-600 truncate';
+            }
+            const elTabMissing = document.getElementById('dashTabMissingCnt');
+            if (elTabMissing) elTabMissing.textContent = missingStudents.length;
+
+            // 2. Review & Revisi Project KPI
+            const { reviewItems, revisionCount, overdueCount, earlyWarningCount } = dashboardProjectCache;
+            const waitingOnly = reviewItems.filter((x) => x.status === 'menunggu_review').length;
+            const elRevCount = document.getElementById('dashReviewQueueCount');
+            if (elRevCount) elRevCount.textContent = waitingOnly;
+            const elRevNote = document.getElementById('dashRevisionQueueNote');
+            if (elRevNote) elRevNote.textContent = `${revisionCount} sedang revisi • ${overdueCount} lewat deadline`;
+            const elTabReview = document.getElementById('dashTabReviewCnt');
+            if (elTabReview) elTabReview.textContent = reviewItems.length;
+
+            // Auto-pilih tab Review bila semua Daily Task sudah beres dan ada review masuk
+            if (!dashboardQueueTabManual && missingStudents.length === 0 && reviewItems.length > 0) {
+                dashboardQueueTab = 'review';
+            }
+
+            // Early Warning Banner on Dashboard
+            const ewEl = document.getElementById('dashEarlyWarningSlot');
+            if (ewEl) {
+                if (earlyWarningCount > 0) {
+                    ewEl.classList.remove('hidden');
+                    ewEl.innerHTML = `
+                        <div onclick="switchTab('projects'); openProjectKpiModal('early_warning')"
+                            class="rounded-2xl bg-[#FFF0F4] hover:bg-[#FFE4EC] border border-[#FECDD6] border-l-4 border-l-[#E11D48] px-4 py-3.5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="w-9 h-9 rounded-xl bg-[#E11D48] text-white text-base flex items-center justify-center shrink-0">🚨</span>
+                                <div class="min-w-0">
+                                    <div class="text-xs sm:text-sm font-extrabold text-[#9F1239]">Peringatan Dini: ${earlyWarningCount} siswa butuh pembinaan segera</div>
+                                    <p class="text-[11px] text-[#BE123C]">Memiliki ≥ 2 poin masalah (keterlambatan atau revisi berulang) di Project Tracker.</p>
+                                </div>
+                            </div>
+                            <span class="self-start sm:self-center px-3 py-1.5 rounded-xl bg-[#E11D48] text-white text-[11px] font-bold shrink-0">Cek Daftar →</span>
+                        </div>`;
+                } else {
+                    ewEl.classList.add('hidden');
+                    ewEl.innerHTML = '';
+                }
+            }
+
+            // 3. Project Update Summary by Sub-Konsentrasi
+            const { allStudentsList = [], studentList = [], checklistColsMap = {}, checklistRowMap = {} } = projectDataCache;
+            const isAdminStaff = isAnyAdmin(currentUser);
+            const puPool = (expectedRole === 'superadmin' || isAdminStaff)
+                ? (staffScopeMode === 'all' ? allStudentsList : studentList)
+                : studentList;
+
+            let totalPctSum = 0;
+            let totalStuWithSc = 0;
+            let totalAllDone = 0;
+            let totalHasWip = 0;
+            let totalHasRev = 0;
+            let pct2dSum = 0, cnt2d = 0, pct3dSum = 0, cnt3d = 0;
+
+            const subconcCards = SUBCONCS.map((sc, idx) => {
+                const cols = checklistColsMap[sc] || DEFAULT_CHECKLIST_COLS;
+                const scPool = (expectedRole === 'mentor' && myPjSubconcs.includes(sc))
+                    ? allStudentsList.filter((s) => s.sub_concentration === sc)
+                    : puPool.filter((s) => s.sub_concentration === sc);
+
+                let sumPct = 0;
+                let doneAll = 0;
+                let wipCnt = 0;
+                let revCnt = 0;
+                scPool.forEach((s) => {
+                    const rd = checklistRowMap[s.id] || { items: {} };
+                    const vals = cols.map((c) => normalizeChecklistStatus(rd.items?.[c]));
+                    const doneC = vals.filter((v) => v === 'done').length;
+                    const p = cols.length ? Math.round((doneC / cols.length) * 100) : 0;
+                    sumPct += p;
+                    if (cols.length > 0 && doneC === cols.length) doneAll++;
+                    if (vals.includes('wip')) wipCnt++;
+                    if (vals.includes('revisi')) revCnt++;
+                });
+                const avg = scPool.length ? Math.round(sumPct / scPool.length) : 0;
+                totalPctSum += sumPct;
+                totalStuWithSc += scPool.length;
+                totalAllDone += doneAll;
+                totalHasWip += wipCnt;
+                totalHasRev += revCnt;
+                if (sc.startsWith('2D')) { pct2dSum += sumPct; cnt2d += scPool.length; }
+                else if (sc.startsWith('3D')) { pct3dSum += sumPct; cnt3d += scPool.length; }
+
+                const barColors = ['bg-[#0095FF]', 'bg-[#4CB6A7]', 'bg-[#6366F1]', 'bg-[#F59E0B]', 'bg-[#EC4899]'];
+                const isPj = myPjSubconcs.includes(sc);
+                return `
+                    <button type="button" onclick="openProjectUpdateForSubconc('${esc(sc)}')"
+                        class="w-full text-left rounded-xl p-3 bg-[#FAFBFD] hover:bg-[#F4F8FF] border border-[#EDF1F7] hover:border-[#BAE6FD] transition cursor-pointer space-y-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="text-xs font-extrabold text-[#1E293B] truncate">${esc(sc)}</span>
+                                ${isPj ? `<span class="px-1.5 py-0.5 rounded bg-[#FFF6D6] text-[#9A6F00] text-[9.5px] font-extrabold shrink-0">★ PJ</span>` : ''}
+                            </div>
+                            <span class="text-xs font-extrabold text-[#1E293B] shrink-0">${avg}%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-[#E2E8F0]/70 rounded-full overflow-hidden">
+                            <div class="h-full ${barColors[idx % barColors.length]} rounded-full transition-all duration-500" style="width:${avg}%"></div>
+                        </div>
+                        <div class="flex items-center justify-between text-[10.5px] text-slate-500 gap-2">
+                            <span>${scPool.length} siswa</span>
+                            <div class="flex items-center gap-2 font-semibold">
+                                <span class="text-[#15803D]">✓ ${doneAll}</span>
+                                <span class="text-[#B45309]">⏳ ${wipCnt}</span>
+                                <span class="${revCnt > 0 ? 'text-[#E11D48] font-bold' : 'text-slate-400'}">! ${revCnt}</span>
+                            </div>
+                        </div>
+                    </button>`;
+            }).join('');
+
+            const overallPuAvg = totalStuWithSc ? Math.round(totalPctSum / totalStuWithSc) : 0;
+            const elPuAvg = document.getElementById('dashProjectUpdateAvg');
+            if (elPuAvg) elPuAvg.textContent = `${overallPuAvg}%`;
+            const elPuBar = document.getElementById('dashProjectUpdateBar');
+            if (elPuBar) elPuBar.style.width = `${overallPuAvg}%`;
+            const elPuMeta = document.getElementById('dashProjectUpdateMeta');
+            if (elPuMeta) elPuMeta.textContent = `${totalAllDone} semua Done • ${totalHasWip} WIP • ${totalHasRev} Revisi`;
+            const elSubList = document.getElementById('dashSubconcUpdateList');
+            if (elSubList) elSubList.innerHTML = subconcCards;
+
+            const elSubFooter = document.getElementById('dashSubconcGroupFooter');
+            if (elSubFooter) {
+                const avg2d = cnt2d ? Math.round(pct2dSum / cnt2d) : 0;
+                const avg3d = cnt3d ? Math.round(pct3dSum / cnt3d) : 0;
+                elSubFooter.innerHTML = `
+                    <span>Rata-rata Kelompok</span>
+                    <div class="flex items-center gap-3 font-bold">
+                        <span class="text-[#0082E6]">2D: ${avg2d}% (${cnt2d})</span>
+                        <span class="text-[#1D5E55]">3D: ${avg3d}% (${cnt3d})</span>
+                    </div>`;
+            }
+
+            // 4. Admin Data Health Radar (khusus admin.html)
+            const healthListEl = document.getElementById('dashAdminHealthList');
+            const healthBadgeEl = document.getElementById('dashAdminHealthBadge');
+            if (healthListEl || healthBadgeEl) {
+                const poolAll = allStudentsList.length ? allStudentsList : studentList;
+                const noMentor = poolAll.filter((s) => !s.mentor_id).length;
+                const noSubconc = poolAll.filter((s) => !s.sub_concentration).length;
+                const noDrive = poolAll.filter((s) => !(s.project_drive_url || '').trim()).length;
+                const noWa = poolAll.filter((s) => !normalizeWhatsapp(s.whatsapp_number)).length;
+                const totalIssues = noMentor + noSubconc + noDrive;
+
+                if (healthBadgeEl) {
+                    const matTxt = document.getElementById('metricMaterials')?.textContent || '0';
+                    const taskTxt = document.getElementById('metricTasks')?.textContent || '0';
+                    healthBadgeEl.innerHTML = totalIssues === 0
+                        ? `<span class="text-[#15803D]">✓ Profil lengkap</span> • <span id="metricMaterials">${esc(matTxt)}</span> materi • <span id="metricTasks">${esc(taskTxt)}</span> task`
+                        : `<span class="text-amber-600">${noMentor} belum plot • ${noDrive} tanpa Drive</span><span id="metricMaterials" class="hidden">${esc(matTxt)}</span><span id="metricTasks" class="hidden">${esc(taskTxt)}</span>`;
+                }
+                if (healthListEl) {
+                    const rows = [
+                        { label: 'Belum di-plot Pembimbing', count: noMentor, tab: 'plotting', warn: 'rose' },
+                        { label: 'Belum pilih Sub-Konsentrasi', count: noSubconc, tab: 'plotting', warn: 'amber' },
+                        { label: 'Belum isi Link Google Drive', count: noDrive, tab: 'project-update', warn: 'amber' },
+                        { label: 'Belum isi Nomor WhatsApp', count: noWa, tab: 'plotting', warn: 'slate' }
+                    ];
+                    healthListEl.innerHTML = rows.map((r) => {
+                        const badge = r.count === 0
+                            ? `<span class="px-2 py-0.5 rounded-full bg-[#E7F9EE] text-[#15803D] font-bold text-[10.5px]">✓ Lengkap</span>`
+                            : (r.warn === 'rose'
+                                ? `<span class="px-2 py-0.5 rounded-full bg-[#FFF0F4] text-[#E11D48] font-extrabold text-[10.5px]">${r.count} siswa</span>`
+                                : (r.warn === 'amber'
+                                    ? `<span class="px-2 py-0.5 rounded-full bg-[#FFF6D6] text-[#B45309] font-extrabold text-[10.5px]">${r.count} siswa</span>`
+                                    : `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10.5px]">${r.count} siswa</span>`));
+                        return `
+                            <button type="button" onclick="switchTab('${r.tab}')"
+                                class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#FAFBFD] hover:bg-[#F4F8FF] border border-[#EDF1F7] transition cursor-pointer text-left">
+                                <span class="font-semibold text-slate-600 truncate">${r.label}</span>
+                                ${badge}
+                            </button>`;
+                    }).join('');
+                }
+            }
+
+            renderDashboardActionQueue();
+        }
 
         global.handlePdfFilePick = function (inp) {
             const file = inp.files?.[0];
@@ -3531,6 +3936,7 @@
                 renderMaterialsView();
             } else if (activeTab === 'overview') {
                 renderDashboardPopularMaterials(allMaterialsCache);
+                renderDashboardActionQueue();
             } else {
                 onSearchExtra(val, activeTab);
             }
@@ -3603,12 +4009,18 @@
                 ? Math.round((scopedProg.filter((r) => r.status === 'selesai').length / scopedProg.length) * 100)
                 : 0;
 
-            document.getElementById('metricMaterials').textContent = matCount ?? 0;
-            document.getElementById('metricTasks').textContent = scopedProg.length;
-            document.getElementById('metricStudents').textContent = studentList.length;
-            document.getElementById('metricMentors').textContent = mentors?.length ?? 0;
-            document.getElementById('metricAvg').textContent = todayCount;
-            document.getElementById('metricAvgBar').style.width = `${Math.min(100, Math.max(0, donePct))}%`;
+            const elMat = document.getElementById('metricMaterials');
+            if (elMat) elMat.textContent = matCount ?? 0;
+            const elTasks = document.getElementById('metricTasks');
+            if (elTasks) elTasks.textContent = scopedProg.length;
+            const elStu = document.getElementById('metricStudents');
+            if (elStu) elStu.textContent = studentList.length;
+            const elMen = document.getElementById('metricMentors');
+            if (elMen) elMen.textContent = mentors?.length ?? 0;
+            const elAvg = document.getElementById('metricAvg');
+            if (elAvg) elAvg.textContent = todayCount;
+            const elBar = document.getElementById('metricAvgBar');
+            if (elBar && !dashboardDailyCache.scopeTotal) elBar.style.width = `${Math.min(100, Math.max(0, donePct))}%`;
 
             const countByMentor = {};
             studentList.forEach((s) => {
@@ -3618,6 +4030,7 @@
             renderDashboardPopularMaterials(allMaterialsCache);
             renderDashboardMentors(mentors || [], countByMentor);
             renderBottomAnalytics(studentList, scopedProg, allMaterialsCache);
+            renderDashboardCommandCenter();
         }
 
         function renderMaterialsView() {
@@ -3960,6 +4373,7 @@
                 fb.textContent = (pdfFile || videoFile) ? 'Terunggah ke Drive & tersimpan ✓' : 'Materi tersimpan ✓';
                 showToast('Materi baru berhasil ditambahkan!');
                 setTimeout(() => { fb.textContent = ''; }, 2400);
+                global.toggleMaterialForm(false);
                 loadMaterials();
                 refreshMetrics();
             } else {
@@ -3999,6 +4413,13 @@
 
             const filledTodayIds = new Set(scopedRows.filter((r) => isTodayIso(r.updated_at)).map((r) => r.student_id));
             const missingStudents = studentList.filter((s) => !filledTodayIds.has(s.id));
+            dashboardDailyCache = {
+                filledCount: filledTodayIds.size,
+                scopeTotal: studentList.length,
+                missingStudents,
+                todayEntries: scopedRows.filter((r) => isTodayIso(r.updated_at)).length
+            };
+            renderDashboardCommandCenter();
             document.getElementById('staffComplianceSummary').textContent =
                 `${filledTodayIds.size} dari ${studentList.length} siswa sudah mengisi Daily Task hari ini.`;
             document.getElementById('missingCountBadge').textContent = missingStudents.length;
@@ -5204,8 +5625,29 @@
                 });
             updateNotificationCenter(staffNotifs, `staff_${currentUser.id}`);
 
+            const dashReviewItems = Object.values(subMap)
+                .filter((ps) => ps.status === 'menunggu_review' || ps.status === 'revisi')
+                .map((ps) => ({
+                    status: ps.status,
+                    updatedAt: ps.updated_at || '',
+                    student: stuById[ps.student_id],
+                    task: taskById[ps.project_task_id]
+                }))
+                .filter((it) => it.student && it.task)
+                .sort((a, b) => {
+                    if (a.status !== b.status) return a.status === 'menunggu_review' ? -1 : 1;
+                    return String(b.updatedAt).localeCompare(String(a.updatedAt));
+                });
+            dashboardProjectCache = {
+                reviewItems: dashReviewItems,
+                revisionCount: revisionAssignments,
+                overdueCount: overdueTasksCount,
+                earlyWarningCount
+            };
+
             renderProjectTrackerBody();
             renderProjectUpdateView();
+            renderDashboardCommandCenter();
         }
         global.loadProjectTracker = loadProjectTracker;
 
@@ -7410,6 +7852,7 @@
             fb.textContent = 'Tugas project & deadline tersimpan ✓';
             showToast('Tugas project baru berhasil ditambahkan!');
             setTimeout(() => { fb.textContent = ''; }, 2400);
+            global.toggleProjectTaskForm(false);
             loadProjectTracker();
         });
 
