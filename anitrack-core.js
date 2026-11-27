@@ -6078,16 +6078,13 @@
                         </div>
                     </div>
 
-                    <!-- Scrollbar Atas Tersinkronisasi + Info Singkat Shift + Scroll (Sticky saat Scroll Bawah) -->
-                    <div id="checklistNavBar" class="sticky top-[64px] sm:top-[68px] z-20 pt-2 pb-1 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7] space-y-1">
-                        <div class="px-4 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <!-- Info Singkat Geser Kanan/Kiri (Sticky saat Scroll Bawah) -->
+                    <div id="checklistNavBar" class="sticky top-[64px] sm:top-[68px] z-20 px-4 py-2 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7]">
+                        <div class="flex items-center justify-between gap-2 text-[11px] text-slate-500">
                             <span class="inline-flex items-center gap-1.5 font-medium">
                                 <span class="text-[#0082E6] font-extrabold">↔</span>
-                                <span>Geser kanan/kiri: tahan <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-[10.5px] font-bold text-[#1E293B] shadow-2xs">Shift</kbd> + <strong>Scroll mouse</strong>, seret tabel, atau geser scrollbar</span>
+                                <span>Geser kanan/kiri: tahan <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-[10.5px] font-bold text-[#1E293B] shadow-2xs">Shift</kbd> + <strong>Scroll mouse</strong>, seret tabel, atau geser scrollbar di bawah</span>
                             </span>
-                        </div>
-                        <div id="checklistTopScroll" class="anitrack-xscroll overflow-x-auto overflow-y-hidden h-[14px]">
-                            <div id="checklistTopScrollInner" class="h-[1px]"></div>
                         </div>
                     </div>
 
@@ -7082,39 +7079,17 @@
         };
 
         function initChecklistScrollSync() {
-            const topSc = document.getElementById('checklistTopScroll');
-            const topInner = document.getElementById('checklistTopScrollInner');
             const navBar = document.getElementById('checklistNavBar');
             const mainSc = document.getElementById('checklistTableScroll');
             const tbl = document.getElementById('checklistMainTable');
             if (!mainSc || !tbl) return;
 
-            const syncTopFromMain = () => {
-                if (!topSc) return;
-                const mainMax = Math.max(0, mainSc.scrollWidth - mainSc.clientWidth);
-                const topMax = Math.max(0, topSc.scrollWidth - topSc.clientWidth);
-                if (mainMax <= 0 || topMax <= 0) { topSc.scrollLeft = 0; return; }
-                topSc.scrollLeft = Math.round((mainSc.scrollLeft / mainMax) * topMax);
-            };
-
-            const syncMainFromTop = () => {
-                if (!topSc) return;
-                const mainMax = Math.max(0, mainSc.scrollWidth - mainSc.clientWidth);
-                const topMax = Math.max(0, topSc.scrollWidth - topSc.clientWidth);
-                if (mainMax <= 0 || topMax <= 0) { mainSc.scrollLeft = 0; return; }
-                mainSc.scrollLeft = Math.round((topSc.scrollLeft / topMax) * mainMax);
-            };
-
             const syncDimensions = () => {
-                const mainClientW = mainSc.clientWidth;
                 const mainScrollW = Math.max(mainSc.scrollWidth, tbl.scrollWidth);
-                const needScroll = mainScrollW > mainClientW + 4;
-                if (topSc) topSc.style.width = `${mainClientW}px`;
-                if (topInner) topInner.style.width = `${mainScrollW}px`;
+                const needScroll = mainScrollW > mainSc.clientWidth + 4;
                 if (navBar) navBar.classList.toggle('hidden', !needScroll);
                 mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
                 mainSc.classList.toggle('cursor-grab', needScroll);
-                syncTopFromMain();
             };
 
             syncDimensions();
@@ -7122,7 +7097,6 @@
                 syncDimensions();
                 if (projectChecklistScrollPos.left) mainSc.scrollLeft = projectChecklistScrollPos.left;
                 if (projectChecklistScrollPos.top) mainSc.scrollTop = projectChecklistScrollPos.top;
-                syncTopFromMain();
                 mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
             });
 
@@ -7130,25 +7104,10 @@
             if (mainSc.dataset.scrollBound === '1') return;
             mainSc.dataset.scrollBound = '1';
 
-            let lockSync = false;
-            if (topSc) {
-                topSc.addEventListener('scroll', () => {
-                    if (lockSync) return;
-                    lockSync = true;
-                    syncMainFromTop();
-                    projectChecklistScrollPos.left = mainSc.scrollLeft;
-                    mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
-                    lockSync = false;
-                }, { passive: true });
-            }
             mainSc.addEventListener('scroll', () => {
                 projectChecklistScrollPos.left = mainSc.scrollLeft;
                 projectChecklistScrollPos.top = mainSc.scrollTop;
                 mainSc.classList.toggle('is-scrolled', mainSc.scrollLeft > 4);
-                if (lockSync || !topSc) return;
-                lockSync = true;
-                syncTopFromMain();
-                lockSync = false;
             }, { passive: true });
 
             if (typeof ResizeObserver !== 'undefined') {
