@@ -2057,6 +2057,7 @@
             nextFn = 'shiftDashCalendarMonth(1)',
             selectDateFn = 'selectDashCalendarDate',
             fullCalFn = 'openFullProjectCalendar()',
+            fullCalLabel = '📋 Kelola Tugas →',
             onTaskClickAttrFn = null,
             getTaskMetaFn = null
         } = opts;
@@ -2195,7 +2196,7 @@
                     </div>
                     <button type="button" onclick="${fullCalFn}"
                         class="px-3 py-1.5 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer">
-                        🗓️ Kalender Penuh &amp; Gantt →
+                        ${esc(fullCalLabel)}
                     </button>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-12">
@@ -2234,7 +2235,7 @@
                         ${!selectedDate && datedTasks.length > agendaTasks.length ? `
                         <div class="pt-2 border-t border-[#EDF1F7] flex items-center justify-between text-[11px]">
                             <span class="text-slate-400">Menampilkan ${agendaTasks.length} dari ${datedTasks.length} tugas terjadwal</span>
-                            <button type="button" onclick="${fullCalFn}" class="font-bold text-[#0095FF] hover:underline cursor-pointer">Lihat timeline lengkap →</button>
+                            <button type="button" onclick="${fullCalFn}" class="font-bold text-[#0095FF] hover:underline cursor-pointer">${esc(fullCalLabel)}</button>
                         </div>` : ''}
                     </div>
                 </div>
@@ -3749,9 +3750,7 @@
         };
 
         global.openFullProjectCalendar = function () {
-            projectCalendarState.year = dashCalState.year;
-            projectCalendarState.month = dashCalState.month;
-            projectViewMode = 'calendar';
+            projectViewMode = 'tasks';
             global.switchTab('projects');
             renderProjectTrackerBody();
         };
@@ -3772,6 +3771,7 @@
                 nextFn: 'shiftDashCalendarMonth(1)',
                 selectDateFn: 'selectDashCalendarDate',
                 fullCalFn: 'openFullProjectCalendar()',
+                fullCalLabel: '📋 Kelola Tugas →',
                 onTaskClickAttrFn: (t) => `onclick="openDashCalendarTask('${esc(t.id)}')"`,
                 getTaskMetaFn: (t) => {
                     const elig = studentList.filter((s) => !t.sub_concentration || s.sub_concentration === t.sub_concentration);
@@ -3813,119 +3813,95 @@
             const body = document.getElementById('dashActionQueueBody');
             if (!body) return;
 
-            document.querySelectorAll('[data-dash-queue-tab]').forEach((btn) => {
-                const isAct = btn.dataset.dashQueueTab === dashboardQueueTab;
-                btn.className = isAct
-                    ? 'px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white text-[#0095FF] shadow-xs transition cursor-pointer'
-                    : 'px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer';
-            });
-
             const q = (globalSearchTerm || '').trim().toLowerCase();
 
-            if (dashboardQueueTab === 'daily') {
-                const allMissing = dashboardDailyCache.missingStudents || [];
-                const filtered = !q ? allMissing : allMissing.filter((s) =>
-                    (s.full_name || '').toLowerCase().includes(q) ||
-                    (s.class_name || '').toLowerCase().includes(q) ||
-                    (s.sub_concentration || '').toLowerCase().includes(q)
-                );
-                if (!allMissing.length) {
-                    body.innerHTML = `
-                        <div class="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-5 py-7 text-center space-y-1.5">
-                            <div class="text-2xl">🎉</div>
-                            <div class="text-sm font-extrabold text-[#15803D]">Semua siswa sudah mengisi Daily Task hari ini!</div>
-                            <p class="text-xs text-[#166534]/80">Tidak ada siswa yang tertinggal untuk laporan harian hari ini.</p>
-                        </div>`;
-                    return;
-                }
-                if (!filtered.length) {
-                    body.innerHTML = `<div class="py-8 text-center text-xs text-slate-400">Tidak ada siswa yang cocok dengan pencarian "${esc(q)}".</div>`;
-                    return;
-                }
-                const visible = filtered.slice(0, 8);
-                body.innerHTML = `
-                    <div class="divide-y divide-[#F1F5F9]">
-                        ${visible.map((s, idx) => {
-                            const avCls = AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
-                            const waUrl = getWhatsappUrl(s.whatsapp_number, `Halo ${s.full_name}, jangan lupa isi Daily Task AniTrack hari ini ya.`);
-                            return `
-                                <div class="py-2.5 flex items-center justify-between gap-3">
-                                    <div class="flex items-center gap-2.5 min-w-0">
-                                        <div class="w-8 h-8 rounded-full ${avCls} font-bold text-[11px] flex items-center justify-center shrink-0 overflow-hidden">
-                                            ${renderAvatarMarkup(s.avatar_url, s.full_name)}
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="text-xs font-bold text-[#1E293B] truncate">${esc(s.full_name)}</div>
-                                            <div class="text-[10.5px] text-slate-400 truncate">${esc(s.class_name || '-')} • ${esc(s.sub_concentration || 'Belum pilih subkon')}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        ${waUrl
-                                            ? `<a href="${esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white text-[11px] font-bold transition">💬 Ingatkan WA</a>`
-                                            : `<span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-400 text-[10.5px] font-semibold">Tanpa WA</span>`}
-                                    </div>
-                                </div>`;
-                        }).join('')}
-                    </div>
-                    ${filtered.length > visible.length ? `
-                    <div class="pt-3 mt-2 border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-xs">
-                        <span class="text-slate-400">Menampilkan ${visible.length} dari ${filtered.length} siswa belum setor</span>
-                        <button type="button" onclick="openDashboardDailyMissing()" class="font-bold text-[#0095FF] hover:underline cursor-pointer">Lihat semua →</button>
-                    </div>` : ''}`;
-                return;
-            }
-
-            // Tab: Review & Revisi Project
-            const allItems = dashboardProjectCache.reviewItems || [];
-            const filtered = !q ? allItems : allItems.filter((it) =>
+            // Bagian 1: Antrean Review & Revisi Project (Langsung Tampil Tanpa Klik Tab)
+            const allReviews = dashboardProjectCache.reviewItems || [];
+            const filteredReviews = !q ? allReviews : allReviews.filter((it) =>
                 (it.student?.full_name || '').toLowerCase().includes(q) ||
                 (it.student?.class_name || '').toLowerCase().includes(q) ||
                 (it.task?.title || '').toLowerCase().includes(q)
             );
-            if (!allItems.length) {
-                body.innerHTML = `
-                    <div class="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-5 py-7 text-center space-y-1.5">
-                        <div class="text-2xl">✅</div>
-                        <div class="text-sm font-extrabold text-[#15803D]">Antrean review project bersih!</div>
-                        <p class="text-xs text-[#166534]/80">Belum ada pengajuan review baru maupun revisi aktif saat ini.</p>
-                    </div>`;
-                return;
-            }
-            if (!filtered.length) {
-                body.innerHTML = `<div class="py-8 text-center text-xs text-slate-400">Tidak ada antrean project yang cocok dengan pencarian "${esc(q)}".</div>`;
-                return;
-            }
-            const visible = filtered.slice(0, 8);
-            body.innerHTML = `
-                <div class="divide-y divide-[#F1F5F9]">
-                    ${visible.map((it) => {
-                        const isRev = it.status === 'revisi';
-                        const badgeCls = isRev ? 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]' : 'bg-[#FFF6D6] text-[#B88600] border-[#FDE68A]';
-                        const badgeLabel = isRev ? 'Revisi' : 'Menunggu Review';
-                        return `
-                            <div class="py-2.5 flex items-center justify-between gap-3">
-                                <div class="min-w-0 space-y-0.5">
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        <span class="text-xs font-bold text-[#1E293B] truncate">${esc(it.student?.full_name || '-')}</span>
-                                        <span class="text-[10px] font-mono text-slate-400">${esc(it.student?.class_name || '-')}</span>
-                                        <span class="px-2 py-0.5 rounded-full border text-[10px] font-bold ${badgeCls}">${badgeLabel}</span>
-                                    </div>
-                                    <div class="text-[11px] text-slate-500 truncate">
-                                        📋 ${esc(it.task?.title || 'Tugas Project')}${it.updatedAt ? ` • ${esc(formatDateTime(it.updatedAt))}` : ''}
-                                    </div>
-                                </div>
-                                <button type="button" onclick="switchTab('projects'); jumpToStudentProjectReview('${esc(it.task?.id || '')}', '${esc(it.student?.username || it.student?.full_name || '')}')"
-                                    class="px-3 py-1.5 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
-                                    Review →
-                                </button>
-                            </div>`;
-                    }).join('')}
-                </div>
-                ${filtered.length > visible.length ? `
-                <div class="pt-3 mt-2 border-t border-[#EDF1F7] flex items-center justify-between gap-2 text-xs">
-                    <span class="text-slate-400">Menampilkan ${visible.length} dari ${filtered.length} antrean</span>
-                    <button type="button" onclick="switchTab('projects')" class="font-bold text-[#0095FF] hover:underline cursor-pointer">Buka Project Tracker →</button>
-                </div>` : ''}`;
+            const reviewSectionHtml = !allReviews.length
+                ? `<div class="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs">
+                        <span class="font-bold text-[#15803D]">✓ Tidak ada pengajuan review project yang menunggu</span>
+                        <button type="button" onclick="switchTab('projects')" class="text-[11px] font-bold text-[#15803D] hover:underline shrink-0 cursor-pointer">Project Tracker →</button>
+                   </div>`
+                : `<div class="space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-extrabold text-[#1E293B]">📩 Antrean Review &amp; Revisi Project (${filteredReviews.length})</span>
+                            ${filteredReviews.length > 4 ? `<button type="button" onclick="switchTab('projects')" class="text-[11px] font-bold text-[#0095FF] hover:underline cursor-pointer">Semua →</button>` : ''}
+                        </div>
+                        <div class="divide-y divide-[#F1F5F9] rounded-xl border border-[#EDF1F7] bg-[#FAFBFD]/60 px-3">
+                            ${filteredReviews.slice(0, 4).map((it) => {
+                                const isRev = it.status === 'revisi';
+                                const badgeCls = isRev ? 'bg-[#FFF0F4] text-[#E11D48] border-[#FECDD6]' : 'bg-[#FFF6D6] text-[#B88600] border-[#FDE68A]';
+                                const badgeLabel = isRev ? 'Revisi' : 'Review';
+                                return `
+                                    <div class="py-2.5 flex items-center justify-between gap-3">
+                                        <div class="min-w-0 space-y-0.5">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="text-xs font-bold text-[#1E293B] truncate">${esc(it.student?.full_name || '-')}</span>
+                                                <span class="text-[10px] font-mono text-slate-400">${esc(it.student?.class_name || '-')}</span>
+                                                <span class="px-1.5 py-0.5 rounded-full border text-[9.5px] font-bold ${badgeCls}">${badgeLabel}</span>
+                                            </div>
+                                            <div class="text-[11px] text-slate-500 truncate">📋 ${esc(it.task?.title || 'Tugas Project')}</div>
+                                        </div>
+                                        <button type="button" onclick="switchTab('projects'); jumpToStudentProjectReview('${esc(it.task?.id || '')}', '${esc(it.student?.username || it.student?.full_name || '')}')"
+                                            class="px-3 py-1.5 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
+                                            Review →
+                                        </button>
+                                    </div>`;
+                            }).join('')}
+                        </div>
+                   </div>`;
+
+            // Bagian 2: Belum Daily Task Hari Ini (Langsung Tampil Tanpa Klik Tab)
+            const allMissing = dashboardDailyCache.missingStudents || [];
+            const filteredMissing = !q ? allMissing : allMissing.filter((s) =>
+                (s.full_name || '').toLowerCase().includes(q) ||
+                (s.class_name || '').toLowerCase().includes(q) ||
+                (s.sub_concentration || '').toLowerCase().includes(q)
+            );
+            const maxDailyShow = filteredReviews.length > 0 ? 5 : 7;
+            const dailySectionHtml = !allMissing.length
+                ? `<div class="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-4 py-5 text-center space-y-1">
+                        <div class="text-xl">🎉</div>
+                        <div class="text-xs sm:text-sm font-extrabold text-[#15803D]">Semua siswa sudah mengisi Daily Task hari ini!</div>
+                   </div>`
+                : (!filteredMissing.length
+                    ? `<div class="py-6 text-center text-xs text-slate-400">Tidak ada siswa belum Daily Task yang cocok dengan "${esc(q)}".</div>`
+                    : `<div class="space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-extrabold text-[#1E293B]">⏰ Belum Daily Task Hari Ini (${filteredMissing.length})</span>
+                                ${filteredMissing.length > maxDailyShow ? `<button type="button" onclick="openDashboardDailyMissing()" class="text-[11px] font-bold text-[#0095FF] hover:underline cursor-pointer">Lihat semua (${filteredMissing.length}) →</button>` : ''}
+                            </div>
+                            <div class="divide-y divide-[#F1F5F9]">
+                                ${filteredMissing.slice(0, maxDailyShow).map((s, idx) => {
+                                    const avCls = AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
+                                    const waUrl = getWhatsappUrl(s.whatsapp_number, `Halo ${s.full_name}, jangan lupa isi Daily Task AniTrack hari ini ya.`);
+                                    return `
+                                        <div class="py-2 flex items-center justify-between gap-3">
+                                            <div class="flex items-center gap-2.5 min-w-0">
+                                                <div class="w-8 h-8 rounded-full ${avCls} font-bold text-[11px] flex items-center justify-center shrink-0 overflow-hidden">
+                                                    ${renderAvatarMarkup(s.avatar_url, s.full_name)}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="text-xs font-bold text-[#1E293B] truncate">${esc(s.full_name)}</div>
+                                                    <div class="text-[10.5px] text-slate-400 truncate">${esc(s.class_name || '-')} • ${esc(s.sub_concentration || 'Belum pilih subkon')}</div>
+                                                </div>
+                                            </div>
+                                            <div class="shrink-0">
+                                                ${waUrl
+                                                    ? `<a href="${esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white text-[11px] font-bold transition">💬 Ingatkan WA</a>`
+                                                    : `<span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-400 text-[10.5px] font-semibold">Tanpa WA</span>`}
+                                            </div>
+                                        </div>`;
+                                }).join('')}
+                            </div>
+                       </div>`);
+
+            body.innerHTML = `${reviewSectionHtml}${dailySectionHtml}`;
         }
 
         function renderDashboardCommandCenter() {
@@ -4992,53 +4968,8 @@
             });
 
             const classes = [...new Set(studentList.map((s) => s.class_name).filter(Boolean))].sort();
-
-            const modeSwitcherHtml = `
-                <div class="flex flex-wrap items-center justify-between gap-2.5 bg-white border border-[#EDF1F7] rounded-2xl shadow-card px-4 py-2.5">
-                    <div class="inline-flex flex-wrap p-1 bg-[#F3F6FB] rounded-xl gap-1">
-                        <button type="button" onclick="setProjectViewMode('tasks')"
-                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'tasks' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            📋 Daftar Tugas &amp; Review (${filteredTasks.length})
-                        </button>
-                        <button type="button" onclick="setProjectViewMode('classes')"
-                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'classes' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            🏫 Rekap Per Kelas (${classes.length})
-                        </button>
-                        <button type="button" onclick="setProjectViewMode('calendar')"
-                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'calendar' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            🗓️ Kalender &amp; Gantt
-                        </button>
-                        <button type="button" onclick="setProjectViewMode('matrix')"
-                            class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${projectViewMode === 'matrix' ? 'bg-[#0095FF] text-white shadow-sm' : 'text-slate-500 hover:text-[#1E293B]'}">
-                            🧩 Matrix Semua Siswa (${studentList.length})
-                        </button>
-                    </div>
-                    <span class="text-[11px] text-slate-400 hidden sm:inline">
-                        ${projectViewMode === 'calendar'
-                            ? 'Kalender bulanan deadline & Timeline Gantt lintas Pre-Production, Production, hingga Post-Production.'
-                            : (projectViewMode === 'classes'
-                                ? 'Akordion progres rata-rata tiap kelas, Link Pantau Ortu, Flowchart, & Cetak PDF Rapor.'
-                                : (projectViewMode === 'tasks' ? 'Klik "Review Siswa" untuk periksa hasil di Drive, ACC, atau kirim catatan revisi.' : 'Klik kotak status pada tabel untuk langsung me-review siswa tersebut.'))}
-                    </span>
-                </div>`;
-
-            // ==================== MODE 6: KALENDER DEADLINE & TIMELINE GANTT PRODUKSI ====================
-            if (projectViewMode === 'calendar') {
-                const calHtml = buildCalendarAndGanttHtml(filteredTasks, projectCalendarState.year, projectCalendarState.month, {
-                    prevFn: 'shiftProjectCalendarMonth(-1)',
-                    todayFn: 'resetProjectCalendarMonth()',
-                    nextFn: 'shiftProjectCalendarMonth(1)',
-                    onTaskClickAttrFn: (t) => `onclick="jumpToCalendarTask('${t.id}')"`,
-                    getProgressFn: (t) => {
-                        const elig = studentList.filter((s) => !t.sub_concentration || s.sub_concentration === t.sub_concentration);
-                        const done = elig.filter((s) => subMap[`${t.id}__${s.id}`]?.status === 'selesai').length;
-                        const pct = elig.length ? Math.round((done / elig.length) * 100) : 0;
-                        return { pct, label: `${done}/${elig.length} ACC (${pct}%)` };
-                    }
-                });
-                container.innerHTML = `${modeSwitcherHtml}${calHtml}`;
-                return;
-            }
+            const modeSwitcherHtml = '';
+            if (projectViewMode !== 'tasks') projectViewMode = 'tasks';
 
             // ==================== MODE 5: REKAP AKORDION PER KELAS + FLOWCHART + CETAK PDF RAPOR ====================
             if (projectViewMode === 'classes') {
@@ -5726,127 +5657,86 @@
             if (summaryEl) {
                 const showScopeSwitcher = expectedRole === 'superadmin' || Boolean(myHomeroomClass);
                 const homeroomSwitcherHtml = showScopeSwitcher ? `
-                    <div class="flex flex-wrap items-center gap-2 pt-1">
-                        <span class="text-[11px] font-bold text-white/90">Cakupan Tampilan:</span>
-                        <div class="inline-flex flex-wrap p-0.5 rounded-xl bg-white/15 border border-white/25 gap-1">
-                            ${expectedRole === 'superadmin' ? `
-                            <button type="button" onclick="setStaffScopeMode('all')"
-                                class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'all' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
-                                🌐 Semua Siswa
-                            </button>` : ''}
-                            <button type="button" onclick="setStaffScopeMode('mentees')"
-                                class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'mentees' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
-                                👥 Siswa Bimbingan Saya
-                            </button>
-                            ${myHomeroomClass ? `
-                            <button type="button" onclick="setStaffScopeMode('homeroom')"
-                                class="px-3 py-1 rounded-lg text-[11px] font-extrabold transition cursor-pointer ${staffScopeMode === 'homeroom' ? 'bg-white text-[#1D5E55] shadow-sm' : 'text-white/90 hover:bg-white/10'}">
-                                🏫 Wali Kelas ${esc(myHomeroomClass)}
-                            </button>` : ''}
-                        </div>
+                    <div class="inline-flex flex-wrap p-0.5 rounded-xl bg-[#F3F6FB] border border-[#E2E8F0] gap-0.5">
+                        ${expectedRole === 'superadmin' ? `
+                        <button type="button" onclick="setStaffScopeMode('all')"
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${staffScopeMode === 'all' ? 'bg-[#0095FF] text-white shadow-2xs' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            🌐 Semua Siswa
+                        </button>` : ''}
+                        <button type="button" onclick="setStaffScopeMode('mentees')"
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${staffScopeMode === 'mentees' ? 'bg-[#0095FF] text-white shadow-2xs' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            👥 Bimbingan Saya
+                        </button>
+                        ${myHomeroomClass ? `
+                        <button type="button" onclick="setStaffScopeMode('homeroom')"
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${staffScopeMode === 'homeroom' ? 'bg-[#0095FF] text-white shadow-2xs' : 'text-slate-500 hover:text-[#1E293B]'}">
+                            🏫 ${esc(myHomeroomClass)}
+                        </button>` : ''}
                     </div>` : '';
 
                 summaryEl.innerHTML = `
-                    <div class="rounded-2xl bg-gradient-to-r from-[#45B1A2] via-[#4FB8AA] to-[#58C2B4] text-white p-5 sm:p-6 shadow-card space-y-4">
-                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                            <div class="space-y-1.5">
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    <span class="inline-block text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20">Project Tracker Keseluruhan</span>
-                                    ${myHomeroomClass ? `<span class="inline-block text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#FFF6D6] text-[#9A6F00]">🏫 Wali Kelas ${esc(myHomeroomClass)}</span>` : ''}
-                                </div>
-                                <h3 class="text-lg sm:text-xl font-extrabold">Progres Total Project Animasi</h3>
-                                <p class="text-xs text-white/90">Pantau deadline, Lencana Emas, status penyelesaian, audit log catatan guru, hingga arsip snapshot.</p>
-                                ${homeroomSwitcherHtml}
-                            </div>
-                            <div class="w-full lg:w-80 space-y-2.5 shrink-0">
-                                <div class="bg-white/15 border border-white/20 rounded-2xl p-4 space-y-2 num-tabular">
-                                    <div class="flex items-center justify-between text-xs font-bold">
-                                        <span>Ketuntasan Project (ACC)</span>
-                                        <span class="text-lg font-extrabold text-[#FFF6D6]">${overallPct}%</span>
-                                    </div>
-                                    <div class="w-full h-2.5 rounded-full bg-white/25 overflow-hidden">
-                                        <div class="h-full bg-[#F7C200] rounded-full transition-all duration-500" style="width:${overallPct}%"></div>
-                                    </div>
-                                    <div class="text-[11px] text-white/90">${doneAssignments} / ${totalAssignments} penugasan ACC • 🌟 ${goldAssignments} Lencana Emas</div>
-                                </div>
+                    <div class="rounded-2xl bg-white border border-[#EDF1F7] p-4 sm:p-5 shadow-card space-y-3.5">
+                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div class="space-y-1.5 min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <button type="button" onclick="openStaffLeaderboard()"
-                                        class="px-3 py-2 rounded-xl bg-[#FFF6D6] text-[#9A6F00] hover:bg-[#F7C200] hover:text-white text-[11px] font-extrabold shadow-xs transition cursor-pointer shrink-0">
-                                        🏆 Leaderboard
-                                    </button>
-                                    <button type="button" onclick="openShowcaseGallery()"
-                                        class="px-3 py-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer shrink-0">
-                                        🎬 Galeri Karya
-                                    </button>
-                                    <button type="button" onclick="printAllStudentsReportPdf('')"
-                                        class="px-3 py-2 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer shrink-0">
-                                        🖨️ PDF Rapor
-                                    </button>
-                                    <button type="button" onclick="saveProjectArchiveSnapshot(this)"
-                                        class="flex-1 px-3 py-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                        📦 Arsip
-                                    </button>
-                                    <button type="button" onclick="openProjectArchivesModal()"
-                                        class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/25 transition cursor-pointer shrink-0">
-                                        🗂️ (${archives.length})
-                                    </button>
+                                    <h2 class="text-lg font-extrabold text-[#1E293B]">Project Tracker &amp; Review Siswa</h2>
+                                    ${homeroomSwitcherHtml}
                                 </div>
+                                <p class="text-xs text-slate-500">Klik <strong>Review Siswa</strong> pada tugas di bawah untuk langsung memeriksa hasil, ACC, atau memberi catatan revisi.</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+                                <button type="button" onclick="printAllStudentsReportPdf('')"
+                                    class="px-3 py-1.5 rounded-xl bg-[#E3F6F3] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    🖨️ PDF Rapor
+                                </button>
+                                <button type="button" onclick="openStaffLeaderboard()"
+                                    class="px-3 py-1.5 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white text-xs font-bold transition cursor-pointer">
+                                    🏆 Leaderboard
+                                </button>
+                                <button type="button" onclick="openShowcaseGallery()"
+                                    class="px-3 py-1.5 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer">
+                                    🎬 Galeri
+                                </button>
+                                <button type="button" onclick="saveProjectArchiveSnapshot(this)"
+                                    class="px-3 py-1.5 rounded-xl bg-white border border-[#E2E8F0] hover:border-[#0095FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer">
+                                    📦 Arsip
+                                </button>
+                                ${archives.length > 0 ? `
+                                <button type="button" onclick="openProjectArchivesModal()"
+                                    class="px-2.5 py-1.5 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 text-xs font-bold transition cursor-pointer">
+                                    🗂️ (${archives.length})
+                                </button>` : ''}
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 num-tabular">
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Total Tugas</div>
-                                <div class="text-lg font-extrabold">${allTasks.length}</div>
-                            </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-[#F1F5F9] text-xs num-tabular">
+                            <span class="px-2.5 py-1 rounded-lg bg-[#E3F6F3] text-[#1D5E55] font-extrabold">✓ ${overallPct}% ACC (${doneAssignments}/${totalAssignments})</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-[#F3F6FB] text-slate-600 font-bold">📋 ${allTasks.length} Tugas</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-[#FFF6D6] text-[#B45309] font-bold">📩 ${reviewAssignments} Menunggu Review</span>
+                            <span class="px-2.5 py-1 rounded-lg ${revisionAssignments > 0 ? 'bg-[#FFF0F4] text-[#E11D48]' : 'bg-[#F3F6FB] text-slate-500'} font-bold">! ${revisionAssignments} Revisi</span>
+                            ${overdueTasksCount > 0 ? `<span class="px-2.5 py-1 rounded-lg bg-[#FFF0F4] text-[#E11D48] font-bold">⏱ ${overdueTasksCount} Lewat DL</span>` : ''}
                             <button type="button" onclick="openProjectKpiModal('gold')"
-                                class="text-left bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3.5 py-2.5 transition cursor-pointer" title="Klik untuk melihat daftar peraih Lencana Emas">
-                                <div class="text-[11px] text-white/90 flex items-center justify-between"><span>🌟 Lencana Emas</span><span class="text-[10px] opacity-80">↗</span></div>
-                                <div class="text-lg font-extrabold text-[#FFF6D6]">${goldAssignments}</div>
+                                class="px-2.5 py-1 rounded-lg bg-[#FFFDF5] hover:bg-[#FFF6D6] border border-[#FDE68A] text-[#9A6F00] font-bold transition cursor-pointer">
+                                🌟 ${goldAssignments} Emas ↗
                             </button>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Menunggu Review</div>
-                                <div class="text-lg font-extrabold text-[#FFF6D6]">${reviewAssignments}</div>
-                            </div>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Sedang Revisi</div>
-                                <div class="text-lg font-extrabold text-[#FFE4EC]">${revisionAssignments}</div>
-                            </div>
-                            <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                                <div class="text-[11px] text-white/85">Lewat Deadline</div>
-                                <div class="text-lg font-extrabold text-[#FFE4EC]">${overdueTasksCount}</div>
-                            </div>
+                            ${problemStudentsCount > 0 ? `
                             <button type="button" onclick="openProjectKpiModal('issues')"
-                                class="text-left bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3.5 py-2.5 transition cursor-pointer" title="Klik untuk melihat daftar siswa bermasalah">
-                                <div class="text-[11px] text-white/90 flex items-center justify-between"><span>⚠️ Bermasalah</span><span class="text-[10px] opacity-80">↗</span></div>
-                                <div class="text-lg font-extrabold text-[#FFE4EC]">${problemStudentsCount}</div>
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 num-tabular">
-                            ${stageStats.map((st) => `
-                                <div class="bg-white/12 rounded-xl px-3.5 py-2.5 space-y-1.5">
-                                    <div class="flex items-center justify-between text-[11px] font-bold">
-                                        <span>${st.stage}</span>
-                                        <span>${st.pct}% (${st.done}/${st.total})</span>
-                                    </div>
-                                    <div class="w-full h-1.5 rounded-full bg-white/25 overflow-hidden">
-                                        <div class="h-full bg-white rounded-full" style="width:${st.pct}%"></div>
-                                    </div>
-                                </div>`).join('')}
+                                class="px-2.5 py-1 rounded-lg bg-[#FFF0F4] hover:bg-[#FFE4EC] border border-[#FECDD6] text-[#E11D48] font-bold transition cursor-pointer">
+                                ⚠️ ${problemStudentsCount} Bermasalah ↗
+                            </button>` : ''}
                         </div>
                     </div>
                     ${earlyWarningCount > 0 ? `
                     <div onclick="openProjectKpiModal('early_warning')"
-                        class="mt-3 rounded-2xl bg-[#FFF0F4] hover:bg-[#FFE4EC] border-l-4 border-[#E11D48] border border-[#FECDD6] p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition">
+                        class="mt-3 rounded-2xl bg-[#FFF0F4] hover:bg-[#FFE4EC] border-l-4 border-[#E11D48] border border-[#FECDD6] px-4 py-3 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition">
                         <div class="flex items-center gap-3">
-                            <span class="w-10 h-10 rounded-xl bg-[#E11D48] text-white text-lg flex items-center justify-center shrink-0">🚨</span>
+                            <span class="w-9 h-9 rounded-xl bg-[#E11D48] text-white text-base flex items-center justify-center shrink-0">🚨</span>
                             <div>
-                                <div class="text-sm font-extrabold text-[#9F1239]">Peringatan Dini Aktif!</div>
-                                <p class="text-xs text-[#BE123C] mt-0.5">Terdapat <strong>${earlyWarningCount} siswa</strong> dengan akumulasi <strong>≥ 2 poin masalah</strong> (keterlambatan / revisi berulang) yang membutuhkan pembinaan segera.</p>
+                                <div class="text-xs sm:text-sm font-extrabold text-[#9F1239]">Peringatan Dini: ${earlyWarningCount} siswa butuh pembinaan</div>
+                                <p class="text-[11px] text-[#BE123C]">Akumulasi ≥ 2 poin masalah (keterlambatan / revisi berulang).</p>
                             </div>
                         </div>
-                        <span class="self-start sm:self-center px-3.5 py-2 rounded-xl bg-[#E11D48] text-white text-xs font-bold shrink-0">Cek Detail →</span>
+                        <span class="self-start sm:self-center px-3 py-1.5 rounded-xl bg-[#E11D48] text-white text-xs font-bold shrink-0">Cek Detail →</span>
                     </div>` : ''}`;
             }
 

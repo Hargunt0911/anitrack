@@ -443,23 +443,16 @@
                     <!-- Main Actionable Workspace: Perlu Perhatian Hari Ini + Ringkasan Project Update -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
                         <div class="lg:col-span-7 bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
-                            <div class="px-5 py-4 border-b border-[#EDF1F7] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="px-5 py-4 border-b border-[#EDF1F7] flex items-center justify-between gap-3">
                                 <div>
                                     <h2 class="text-[15px] font-extrabold text-[#1E293B]">Perlu Perhatian Hari Ini</h2>
-                                    <p class="text-[11px] text-slate-400 mt-0.5">Pantau siswa yang belum setor Daily Task atau antrean review lintas kelas.</p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Langsung tindak lanjuti antrean review project &amp; siswa belum Daily Task lintas kelas.</p>
                                 </div>
-                                <div class="inline-flex p-1 rounded-xl bg-[#F3F6FB] gap-1 self-start sm:self-center shrink-0 num-tabular">
-                                    <button type="button" data-dash-queue-tab="daily" onclick="setDashboardQueueTab('daily')"
-                                        class="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white text-[#0095FF] shadow-xs transition cursor-pointer">
-                                        ⏰ Belum Daily (<span id="dashTabMissingCnt">0</span>)
-                                    </button>
-                                    <button type="button" data-dash-queue-tab="review" onclick="setDashboardQueueTab('review')"
-                                        class="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-[#1E293B] transition cursor-pointer">
-                                        📩 Review Project (<span id="dashTabReviewCnt">0</span>)
-                                    </button>
-                                </div>
+                                <button type="button" onclick="openDashboardDailyMissing()" class="text-xs font-bold text-[#0095FF] hover:underline shrink-0 cursor-pointer">
+                                    Daily Task →
+                                </button>
                             </div>
-                            <div id="dashActionQueueBody" class="p-4 sm:p-5">
+                            <div id="dashActionQueueBody" class="p-4 sm:p-5 space-y-4">
                                 <div class="py-8 text-center text-xs text-slate-400">Memuat antrean tindakan...</div>
                             </div>
                         </div>
@@ -792,7 +785,7 @@
                 <section id="tab-projects" class="hidden space-y-5">
                     <div id="staffProjectSummary"></div>
 
-                    <!-- Toolbar Ringkas Tambah & Import Tugas Project -->
+                    <!-- Toolbar & Filter Project Tracker (1 Baris Langsung Pakai) -->
                     <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
                         <div class="flex flex-wrap items-center gap-2">
                             <button id="toggleProjectFormBtn" type="button" onclick="toggleProjectTaskForm()"
@@ -801,15 +794,31 @@
                             </button>
                             <button type="button" onclick="downloadProjectTemplateXlsx()"
                                 class="px-3 py-2 rounded-xl bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#2F8F81] hover:text-white text-xs font-bold transition cursor-pointer">
-                                📥 Format Excel (.xlsx)
+                                📥 Format Excel
                             </button>
                             <label for="importProjectFile"
                                 class="px-3 py-2 rounded-xl bg-[#FFF6D6] hover:bg-[#F7C200] text-[#B88600] hover:text-white text-xs font-bold transition cursor-pointer">
-                                📤 Import Excel (.xlsx)
+                                📤 Import Excel
                             </label>
                             <input id="importProjectFile" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleProjectImportFile(this)" />
+                            <span id="projectTaskFeedback" class="text-xs font-semibold text-[#3FA496]"></span>
                         </div>
-                        <span id="projectTaskFeedback" class="text-xs font-semibold text-[#3FA496]"></span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="filterProjectStage" onchange="loadProjectTracker()" class="px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Tahap</option>
+                                <option value="Pre-Production">Pre-Production</option>
+                                <option value="Production">Production</option>
+                                <option value="Post-Production">Post-Production</option>
+                            </select>
+                            <select id="filterProjectSubconc" onchange="loadProjectTracker()" class="px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#0095FF]">
+                                <option value="">Semua Konsentrasi</option>
+                                <option value="2D Animator">2D Animator</option>
+                                <option value="2D Motion Graphic">2D Motion Graphic</option>
+                                <option value="3D Animator">3D Animator</option>
+                                <option value="3D Modeller">3D Modeller</option>
+                                <option value="3D Motion Graphic">3D Motion Graphic</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Form Tambah Tugas Project + Deadline (Collapsible) -->
@@ -893,27 +902,6 @@
                                 </thead>
                                 <tbody id="projectImportTableBody"></tbody>
                             </table>
-                        </div>
-                    </div>
-
-                    <!-- Filter Project Tracker -->
-                    <div class="flex flex-wrap items-center justify-between gap-2.5">
-                        <h3 class="text-base font-extrabold text-[#1E293B]">Daftar Tugas Project &amp; Review Siswa</h3>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <select id="filterProjectStage" onchange="loadProjectTracker()" class="px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 shadow-card focus:outline-none focus:border-[#0095FF]">
-                                <option value="">Semua Tahap</option>
-                                <option value="Pre-Production">Pre-Production</option>
-                                <option value="Production">Production</option>
-                                <option value="Post-Production">Post-Production</option>
-                            </select>
-                            <select id="filterProjectSubconc" onchange="loadProjectTracker()" class="px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 shadow-card focus:outline-none focus:border-[#0095FF]">
-                                <option value="">Semua Konsentrasi</option>
-                                <option value="2D Animator">2D Animator</option>
-                                <option value="2D Motion Graphic">2D Motion Graphic</option>
-                                <option value="3D Animator">3D Animator</option>
-                                <option value="3D Modeller">3D Modeller</option>
-                                <option value="3D Motion Graphic">3D Motion Graphic</option>
-                            </select>
                         </div>
                     </div>
 
@@ -1540,7 +1528,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126u"></script>
+    <script src="./anitrack-core.js?v=20261126v"></script>
     <script>
         (function () {
             const A = window.AniTrack;

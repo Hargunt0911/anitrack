@@ -959,7 +959,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126u"></script>
+    <script src="./anitrack-core.js?v=20261126v"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2068,7 +2068,8 @@
                     todayFn: 'resetStuDashCalMonth()',
                     nextFn: 'shiftStuDashCalMonth(1)',
                     selectDateFn: 'selectStuDashCalDate',
-                    fullCalFn: 'openMyCalendar()',
+                    fullCalFn: "switchTab('projects')",
+                    fullCalLabel: '📋 Daftar Tugas →',
                     onTaskClickAttrFn: () => `onclick="switchTab('projects')"`,
                     getTaskMetaFn: (t) => {
                         const st = subMap[t.id]?.status || 'belum_mulai';
@@ -2250,10 +2251,6 @@
                                     <button type="button" onclick="openMyFlowchart()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#1D5E55] hover:bg-[#FFF6D6] text-[11px] font-extrabold shadow-xs transition cursor-pointer">
                                         🗺️ Flowchart
-                                    </button>
-                                    <button type="button" onclick="openMyCalendar()"
-                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] text-[11px] font-extrabold border border-white/30 transition cursor-pointer">
-                                        🗓️ Kalender &amp; Gantt
                                     </button>
                                     <button type="button" onclick="openStudentLeaderboard()"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF6D6] text-[#9A6F00] hover:bg-[#F7C200] hover:text-white text-[11px] font-extrabold shadow-xs transition cursor-pointer">
