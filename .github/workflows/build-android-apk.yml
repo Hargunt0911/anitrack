@@ -1,0 +1,95 @@
+name: Build AniTrack Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile-app/**'
+      - 'logo-anitrack.png'
+      - '.github/workflows/build-android-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build AniTrack-Android.apk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Capacitor Dependencies
+        working-directory: mobile-app
+        run: npm install --no-audit --no-fund
+
+      - name: Generate App Icon & Splash Source Images
+        working-directory: mobile-app
+        run: npm run prepare:assets
+
+      - name: Add Android Platform
+        working-directory: mobile-app
+        run: npx cap add android
+
+      - name: Generate Android Launcher Icons & Splash Drawables
+        working-directory: mobile-app
+        run: >
+          npx capacitor-assets generate --android
+          --iconBackgroundColor "#FFFFFF"
+          --iconBackgroundColorDark "#111827"
+          --splashBackgroundColor "#F3F6FB"
+          --splashBackgroundColorDark "#0B1120"
+
+      - name: Sync Capacitor Android Project
+        working-directory: mobile-app
+        run: npx cap sync android
+
+      - name: Patch Android Back Navigation
+        working-directory: mobile-app
+        run: npm run patch:android
+
+      - name: Build Android APK (Gradle)
+        working-directory: mobile-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Prepare Output APK File
+        working-directory: mobile-app
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/AniTrack-Android.apk
+          ls -lh dist/AniTrack-Android.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AniTrack-Android-APK
+          path: mobile-app/dist/AniTrack-Android.apk
+          retention-days: 90
+
+      - name: Publish Direct Download Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: AniTrack Android APK (Terbaru)
+          body: |
+            File APK resmi **AniTrack — SMKN 4 Malang Animasi**.
+            - Otomatis memuat versi terbaru dari `https://anitrack.republikanimasi.my.id` (setiap pembaruan web otomatis tampil tanpa perlu instal ulang APK).
+            - Jika Android meminta izin saat instalasi, pilih **Izinkan dari sumber ini / Tetap instal**.
+          files: mobile-app/dist/AniTrack-Android.apk
+          make_latest: true

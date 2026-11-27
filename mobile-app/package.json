@@ -1,0 +1,20 @@
+{
+  "name": "anitrack-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AniTrack SMKN 4 Malang — Android App Wrapper (Capacitor)",
+  "scripts": {
+    "prepare:assets": "node scripts/prepare-assets.mjs",
+    "patch:android": "node scripts/patch-android.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.1",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.1.2",
+    "sharp": "^0.33.5"
+  }
+}

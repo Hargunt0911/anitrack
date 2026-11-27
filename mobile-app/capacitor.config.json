@@ -1,0 +1,18 @@
+{
+  "appId": "id.sch.smkn4malang.anitrack",
+  "appName": "AniTrack",
+  "webDir": "www",
+  "server": {
+    "url": "https://anitrack.republikanimasi.my.id",
+    "cleartext": false,
+    "errorPath": "index.html",
+    "allowNavigation": [
+      "anitrack.republikanimasi.my.id",
+      "*.republikanimasi.my.id"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#F3F6FB"
+  }
+}

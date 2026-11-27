@@ -4,6 +4,11 @@ wa-bot/.env
 wa-bot/auth_info/
 wa-bot/node_modules/
 wa-bot/.bot.pid
+mobile-app/node_modules/
+mobile-app/android/
+mobile-app/ios/
+mobile-app/assets/
+mobile-app/dist/
 *.key
 *.pem
 *.log

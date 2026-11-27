@@ -1227,16 +1227,16 @@
             button, a, [role="button"], label { touch-action: manipulation; }
             #appToast { top: calc(1rem + env(safe-area-inset-top)) !important; }
             header.sticky { padding-top: env(safe-area-inset-top); }
-            .mob-link { min-height: 48px; transition: background-color 150ms ease, color 150ms ease, transform 120ms ease; }
+            .mob-link { min-height: 52px; transition: background-color 150ms ease, color 150ms ease, transform 120ms ease; }
             .mob-link:active { transform: scale(0.95); }
-            .mob-link.text-\\[\\#0095FF\\] { background-color: rgba(0, 149, 255, 0.1); }
-            html.dark .mob-link.text-\\[\\#0095FF\\] { background-color: rgba(56, 189, 248, 0.16); }
+            .mob-link.text-\\[\\#0095FF\\] { background-color: rgba(0, 149, 255, 0.12); }
+            html.dark .mob-link.text-\\[\\#0095FF\\] { background-color: rgba(56, 189, 248, 0.18); }
 
             @media (max-width: 1023px) {
                 #sidebar {
                     height: 100dvh !important;
                     max-height: 100dvh;
-                    width: min(82vw, 272px) !important;
+                    width: min(84vw, 286px) !important;
                     overflow-y: auto;
                     overscroll-behavior: contain;
                     -webkit-overflow-scrolling: touch;
@@ -1244,31 +1244,130 @@
                     padding-bottom: max(1.25rem, env(safe-area-inset-bottom)) !important;
                 }
                 #sidebar .sidebar-label {
-                    max-width: 175px !important;
+                    max-width: 190px !important;
                     opacity: 1 !important;
                     margin-left: 12px !important;
                     transform: translateX(0) !important;
                     pointer-events: auto !important;
+                    font-size: 0.9375rem !important;
+                    font-weight: 700 !important;
                 }
                 #sidebar .nav-item {
-                    min-height: 44px;
-                    padding-right: 12px !important;
+                    min-height: 48px !important;
+                    padding-top: 0.65rem !important;
+                    padding-bottom: 0.65rem !important;
+                    padding-right: 14px !important;
                 }
                 #sidebar .nav-tooltip { display: none !important; }
             }
 
             @media (max-width: 639px) {
-                /* Cegah auto-zoom paksa di iPhone Safari saat mengetik input/select */
+                /* 1. Tipografi nyaman dibaca di layar HP (tidak ada font mikro 9–11px yang menyiksa mata) */
+                .text-\\[9px\\], .text-\\[9\\.5px\\], .text-\\[10px\\], .text-\\[10\\.5px\\] {
+                    font-size: 0.75rem !important;
+                    line-height: 1.35 !important;
+                }
+                .text-\\[11px\\] {
+                    font-size: 0.8125rem !important;
+                    line-height: 1.4 !important;
+                }
+                p.text-xs, div.text-xs, span.text-xs, label.text-xs, li.text-xs, td.text-xs, th.text-xs {
+                    font-size: 0.84rem !important;
+                    line-height: 1.45 !important;
+                }
+                /* Label bottom nav tetap pas untuk 5 tab tanpa patah baris */
+                nav.fixed .mob-link span {
+                    font-size: 11px !important;
+                    line-height: 1.15 !important;
+                    font-weight: 700 !important;
+                }
+                nav.fixed .mob-link svg {
+                    width: 22px !important;
+                    height: 22px !important;
+                }
+
+                /* 2. Ukuran sentuh tombol nyaman untuk jari (standar Android Material & Apple HIG) */
+                main button:not(.mob-link):not(.nav-item):not([data-compact-btn]),
+                main a.rounded-xl,
+                main a.rounded-lg,
+                main label[for].rounded-xl,
+                section button:not(.mob-link):not(.nav-item):not([data-compact-btn]),
+                [id$="Modal"] button:not([data-compact-btn]),
+                #anitrackPwaModal button {
+                    min-height: 40px;
+                    font-size: 0.84rem !important;
+                    line-height: 1.25 !important;
+                }
+                main button.bg-\\[\\#0095FF\\],
+                main button.bg-\\[\\#16A34A\\],
+                main button.bg-\\[\\#15803D\\],
+                main button.bg-\\[\\#4CB6A7\\],
+                main button.bg-gradient-to-r,
+                section button[type="submit"],
+                [id$="Modal"] button.bg-\\[\\#0095FF\\],
+                #anitrackPwaModal button.bg-\\[\\#0095FF\\] {
+                    min-height: 44px !important;
+                    font-size: 0.875rem !important;
+                    padding-top: 0.625rem !important;
+                    padding-bottom: 0.625rem !important;
+                }
+                /* Tombol aksi di dalam tabel (misal: Ortu, PDF, Hapus, Edit) tetap lega disentuh tanpa merusak tabel */
+                td button, td a.rounded-lg, td a.rounded-xl {
+                    min-height: 36px !important;
+                    padding: 0.375rem 0.65rem !important;
+                    font-size: 0.8rem !important;
+                }
+                /* Header topbar HP lebih lega disentuh & rapi di layar sempit 360px */
+                header button.w-9.h-9 {
+                    width: 40px !important;
+                    height: 40px !important;
+                }
+                header > div {
+                    padding-left: 0.75rem !important;
+                    padding-right: 0.75rem !important;
+                }
+
+                /* 3. Input, Select, Textarea & Checkbox anti auto-zoom iOS Safari dan nyaman disentuh */
                 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
                 select, textarea {
                     font-size: 16px !important;
                 }
-                /* Pastikan kolom nama siswa sticky di Project Update tidak memakan seluruh layar HP */
+                input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+                select {
+                    min-height: 44px;
+                }
+                td select {
+                    min-height: 38px !important;
+                    font-size: 14px !important;
+                }
+                input[type="checkbox"], input[type="radio"] {
+                    width: 20px !important;
+                    height: 20px !important;
+                    flex-shrink: 0;
+                }
+
+                /* 4. Ruang bawah konten agar tidak pernah tertutup bottom nav bar */
+                main {
+                    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom)) !important;
+                }
+
+                /* 5. Kolom sticky Project Update & Popover Notifikasi rapi di layar HP */
                 .ck-sticky-col {
                     min-width: 136px !important;
                     max-width: 158px !important;
                     padding-left: 0.65rem !important;
                     padding-right: 0.65rem !important;
+                }
+                #anitrackNotifPopover {
+                    top: calc(68px + env(safe-area-inset-top)) !important;
+                    left: 0.75rem !important;
+                    right: 0.75rem !important;
+                    width: auto !important;
+                    max-width: none !important;
+                }
+                #anitrackNotifPopover button {
+                    min-height: 36px !important;
+                    min-width: 36px !important;
                 }
                 /* Pastikan modal tetap bisa di-scroll nyaman di HP layar kecil */
                 [id$="Modal"] > div, #anitrackPwaModal > div {
@@ -1335,7 +1434,8 @@
     function isPwaStandalone() {
         try {
             return Boolean(
-                (global.matchMedia && global.matchMedia('(display-mode: standalone)').matches)
+                global.Capacitor
+                || (global.matchMedia && global.matchMedia('(display-mode: standalone)').matches)
                 || global.navigator.standalone === true
             );
         } catch {
@@ -1439,6 +1539,16 @@
                     </ol>
                 `);
 
+        const apkDownloadBox = !isIos
+            ? `
+                <a href="https://github.com/Hargunt0911/anitrack/releases/latest/download/AniTrack-Android.apk" target="_blank" rel="noopener"
+                    class="w-full py-2.5 px-4 rounded-xl bg-[#E7F9EE] hover:bg-[#DCFCE7] border border-[#86EFAC] text-[#15803D] text-sm font-bold inline-flex items-center justify-center gap-2 transition">
+                    <span>🤖</span>
+                    <span>Download File APK Android (.apk)</span>
+                </a>
+            `
+            : '';
+
         modal.innerHTML = `
             <div class="w-full max-w-md bg-white border border-[#EDF1F7] rounded-2xl shadow-2xl overflow-hidden">
                 <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
@@ -1450,9 +1560,10 @@
                         </div>
                     </div>
                     <button type="button" onclick="document.getElementById('anitrackPwaModal').classList.add('hidden')"
-                        class="w-8 h-8 rounded-xl bg-white border border-[#E2E8F0] text-slate-500 hover:text-slate-800 text-sm font-bold flex items-center justify-center shrink-0 cursor-pointer">✕</button>
+                        class="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] text-slate-500 hover:text-slate-800 text-sm font-bold flex items-center justify-center shrink-0 cursor-pointer">✕</button>
                 </div>
                 <div class="p-5 space-y-4">
+                    ${apkDownloadBox}
                     ${stepsHtml}
                     <button type="button" onclick="document.getElementById('anitrackPwaModal').classList.add('hidden')"
                         class="w-full py-2.5 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-sm font-bold shadow-blueGlow transition cursor-pointer">
