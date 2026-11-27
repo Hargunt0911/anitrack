@@ -75,7 +75,7 @@
         AniTrack • Sistem Monitoring Project Animasi SMKN 4 Malang • Tautan Khusus Orang Tua / Wali (Read-Only)
     </footer>
 
-    <script src="./anitrack-core.js?v=20261127a"></script>
+    <script src="./anitrack-core.js?v=20261127b"></script>
     <script>
         (async function () {
             const A = window.AniTrack;
@@ -100,7 +100,7 @@
             }
 
             if (!token || !supabase) {
-                renderError('Tautan pantau orang tua tidak memiliki kode token yang sah. Silakan minta tautan terbaru kepada Guru Pembimbing atau Wali Kelas.');
+                renderError('Tautan pantau orang tua wajib dibuka dengan kode khusus per siswa (pantau.html?token=...). Guru / Admin dapat mengambil linknya dengan mengklik tombol "👨‍👩‍👧 Ortu" di menu Project Update.');
                 return;
             }
 

@@ -6145,6 +6145,10 @@
                                                         : ''}
                                                     ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" title="Ubah / Isi Link Drive" class="px-1.5 py-0.5 rounded-md bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-500 font-bold leading-tight cursor-pointer">✎</button>` : ''}
                                                     ${renderWhatsappLink(s.whatsapp_number, true, waText)}` : ''}
+                                                    <button type="button" onclick="openStudentParentLink('${s.id}')" title="Buka / Salin Link Portal Pantau Orang Tua"
+                                                        class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-[#FFF6D6] hover:bg-[#F7C200] text-[#9A6F00] hover:text-white font-bold leading-tight transition cursor-pointer">👨‍👩‍👧 Ortu</button>
+                                                    <button type="button" onclick="printStudentReportPdf('${s.id}')" title="Cetak PDF Rapor Siswa"
+                                                        class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-[#E2F5F2] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white font-bold leading-tight transition cursor-pointer">🖨️ PDF</button>
                                                 </div>
                                             </div>
                                         </td>
