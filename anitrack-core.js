@@ -2723,42 +2723,20 @@
         function applyDesktopSidebarState() {
             const sb = document.getElementById('sidebar');
             if (!sb) return;
+            sb.style.width = '';
             sb.classList.add('-translate-x-full');
-            sb.style.width = sidebarExpanded ? '220px' : '74px';
-            sb.querySelectorAll('.sidebar-label').forEach((el) => el.classList.toggle('hidden', !sidebarExpanded));
-            sb.querySelectorAll('.nav-tooltip').forEach((el) => el.classList.toggle('!hidden', sidebarExpanded));
-            sb.querySelectorAll('.nav-item').forEach((el) => {
-                el.classList.toggle('justify-center', !sidebarExpanded);
-                el.classList.toggle('justify-start', sidebarExpanded);
-                el.classList.toggle('px-2.5', !sidebarExpanded);
-                el.classList.toggle('px-3.5', sidebarExpanded);
-            });
-            const brand = sb.querySelector('.sidebar-brand-wrap');
-            if (brand) {
-                brand.classList.toggle('justify-center', !sidebarExpanded);
-                brand.classList.toggle('justify-start', sidebarExpanded);
-                brand.classList.toggle('px-1.5', sidebarExpanded);
-            }
+            sb.classList.toggle('sidebar-expanded', sidebarExpanded);
         }
 
         global.toggleMobileSidebar = function (open) {
             const sb = document.getElementById('sidebar');
             const bd = document.getElementById('sidebarBackdrop');
             if (!sb || !bd) return;
+            sb.style.width = '';
             if (open) {
+                sb.classList.add('sidebar-expanded');
                 sb.classList.remove('-translate-x-full');
                 bd.classList.remove('hidden');
-                sb.style.width = '240px';
-                sb.querySelectorAll('.sidebar-label').forEach((el) => el.classList.remove('hidden'));
-                sb.querySelectorAll('.nav-item').forEach((el) => {
-                    el.classList.remove('justify-center', 'px-2.5');
-                    el.classList.add('justify-start', 'px-3.5');
-                });
-                const brand = sb.querySelector('.sidebar-brand-wrap');
-                if (brand) {
-                    brand.classList.remove('justify-center');
-                    brand.classList.add('justify-start', 'px-1.5');
-                }
             } else {
                 sb.classList.add('-translate-x-full');
                 bd.classList.add('hidden');

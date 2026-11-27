@@ -35,7 +35,49 @@
         html { overflow-y: scroll; scrollbar-gutter: stable; }
         html, body { background-color: #F3F6FB; color: #1E293B; overflow-x: clip; -webkit-tap-highlight-color: transparent; }
         .num-tabular { font-variant-numeric: tabular-nums; }
-        #sidebar { transition: width 200ms ease, transform 200ms ease; }
+        #sidebar {
+            width: 240px;
+            transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: width, transform;
+        }
+        @media (min-width: 1024px) {
+            #sidebar { width: 74px; }
+            #sidebar.sidebar-expanded { width: 220px; }
+        }
+        #sidebar .sidebar-brand-wrap {
+            justify-content: flex-start !important;
+            gap: 0 !important;
+            padding-left: 2.5px !important;
+            padding-right: 2.5px !important;
+        }
+        #sidebar .nav-item {
+            justify-content: flex-start !important;
+            gap: 0 !important;
+            padding-left: 14.5px !important;
+            padding-right: 0 !important;
+        }
+        #sidebar.sidebar-expanded .nav-item { padding-right: 12px !important; }
+        #sidebar .sidebar-label {
+            display: block !important;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 0;
+            opacity: 0;
+            margin-left: 0;
+            transform: translateX(-6px);
+            pointer-events: none;
+            transition: opacity 120ms ease, transform 140ms ease, max-width 240ms cubic-bezier(0.22, 1, 0.36, 1), margin-left 240ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #sidebar.sidebar-expanded .sidebar-label {
+            max-width: 145px;
+            opacity: 1;
+            margin-left: 12px;
+            transform: translateX(0);
+            pointer-events: auto;
+            transition: opacity 200ms ease 55ms, transform 220ms cubic-bezier(0.22, 1, 0.36, 1) 35ms, max-width 280ms cubic-bezier(0.22, 1, 0.36, 1), margin-left 280ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #sidebar.sidebar-expanded .sidebar-brand-wrap .sidebar-label { margin-left: 10px; }
+        #sidebar.sidebar-expanded .nav-tooltip { display: none !important; }
         .nav-tooltip { pointer-events: none; opacity: 0; transform: translateX(-4px); transition: opacity 150ms ease, transform 150ms ease; }
         .nav-item:hover .nav-tooltip { opacity: 1; transform: translateX(0); }
         input[type="range"] { accent-color: #0095FF; }
@@ -961,7 +1003,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126q"></script>
+    <script src="./anitrack-core.js?v=20261126r"></script>
     <script>
         window.AniTrack.initStaffPortal({
             role: 'mentor',
