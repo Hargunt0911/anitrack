@@ -4554,7 +4554,7 @@
             }
             if ((pdfFile || videoFile) && !getGasUrl()) {
                 fb.className = 'text-xs font-semibold text-[#E11D48]';
-                fb.textContent = 'Atur URL Apps Script di menu Drive & Backup dulu untuk unggah file, atau tempel link manual.';
+                fb.textContent = 'Upload file otomatis ke Google Drive belum diaktifkan oleh Superadmin — silakan tempel link manual.';
                 return;
             }
 

@@ -408,19 +408,21 @@
                             </div>
                         </button>
 
-                        <button type="button" onclick="switchTab('tasks')"
+                        <button type="button" onclick="switchTab('project-update')"
                             class="text-left bg-white border border-[#EDF1F7] hover:border-[#BBF7D0] rounded-2xl p-4 shadow-card hover:shadow-cardHover transition cursor-pointer space-y-2">
                             <div class="flex items-center justify-between gap-2">
-                                <span class="text-xs font-bold text-slate-500">Ketuntasan Task</span>
-                                <span class="w-8 h-8 rounded-xl bg-[#E7F9EE] text-[#15803D] flex items-center justify-center text-sm shrink-0">✓</span>
+                                <span class="text-xs font-bold text-slate-500">Project Update</span>
+                                <span class="w-8 h-8 rounded-xl bg-[#E7F9EE] text-[#15803D] flex items-center justify-center text-sm shrink-0">📊</span>
                             </div>
                             <div class="flex items-baseline gap-1.5">
-                                <span id="passPctLabel" class="text-2xl font-extrabold text-[#1E293B]">0%</span>
-                                <span class="text-xs font-semibold text-slate-400">selesai</span>
+                                <span id="stuDashCkPct" class="text-2xl font-extrabold text-[#1E293B]">0%</span>
+                                <span class="text-xs font-semibold text-slate-400">tahapan</span>
                             </div>
-                            <div class="text-[11px] font-semibold text-slate-500">
-                                <span id="metricCompleted">0</span> task tuntas
+                            <div id="stuDashCkMeta" class="text-[11px] font-semibold text-slate-500 truncate">
+                                Memuat status PJ Subkon...
                             </div>
+                            <span id="passPctLabel" class="hidden">0%</span>
+                            <span id="metricCompleted" class="hidden">0</span>
                         </button>
                     </div>
 
@@ -696,16 +698,11 @@
                         </button>
                     </div>
 
-                    <div>
-                        <h2 class="text-xl font-extrabold tracking-tight text-[#1E293B]">Daily Task &amp; Progres Saya</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Catat target dan progres pengerjaan harianmu sendiri setiap hari.</p>
-                    </div>
-
                     <form id="studentSelfTaskForm"
                         class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-5 sm:p-6 space-y-4">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
-                                <h3 class="text-base font-bold text-[#1E293B]">Isi Daily Task Hari Ini</h3>
+                                <h2 class="text-lg font-extrabold tracking-tight text-[#1E293B]">Daily Task Hari Ini</h2>
                                 <p id="todayDateDisplay" class="text-xs text-slate-400 mt-0.5"></p>
                             </div>
                             <span id="taskFeedback" class="text-xs font-semibold text-[#3FA496]"></span>
@@ -959,7 +956,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126y"></script>
+    <script src="./anitrack-core.js?v=20261127a"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -1283,7 +1280,7 @@
                                     <div class="min-w-0">
                                         <span class="inline-block px-2 py-0.5 rounded-full bg-[#EAF4FF] text-[#0082E6] text-[10px] font-extrabold uppercase tracking-wider mb-0.5">Pembimbing Kamu</span>
                                         <div class="font-extrabold text-sm text-[#1E293B] truncate">${A.esc(myMentor.full_name)}</div>
-                                        <div class="text-[11px] font-mono text-slate-500 truncate">@${A.esc(myMentor.username || 'mentor')}</div>
+                                        <div class="text-[11px] font-mono text-slate-500 truncate">@${A.esc(myMentor.username || 'mentor')}${myMentor.whatsapp_number ? ` • ${A.esc(A.formatWhatsappDisplay(myMentor.whatsapp_number))}` : ''}</div>
                                     </div>
                                 </div>
                                 ${waUrl
@@ -2279,7 +2276,7 @@
                                 <div class="w-full h-2.5 rounded-full bg-white/25 overflow-hidden">
                                     <div class="h-full bg-[#F7C200] rounded-full transition-all duration-500" style="width:${overallPct}%"></div>
                                 </div>
-                                <div class="text-[11px] text-white/90">${accCount} / ${total} ACC • 🌟 ${myIssueStats.goldCount} Lencana Emas</div>
+                                <div class="text-[11px] text-white/90">${accCount} / ${total} Tugas Tuntas (ACC)</div>
                             </div>
                         </div>
 
@@ -2325,38 +2322,30 @@
                     const ckPct = myChecklistCols.length ? Math.round((doneCk / myChecklistCols.length) * 100) : 0;
                     const scLabel = currentUser.sub_concentration || 'Sub-Konsentrasi Belum Diatur';
 
+                    const elDashCkPct = document.getElementById('stuDashCkPct');
+                    const elDashCkMeta = document.getElementById('stuDashCkMeta');
+                    if (elDashCkPct) elDashCkPct.textContent = `${ckPct}%`;
+                    if (elDashCkMeta) elDashCkMeta.textContent = `${doneCk}/${myChecklistCols.length} Done${revCk ? ` • ${revCk} Revisi` : (wipCk ? ` • ${wipCk} WIP` : '')}`;
+
+                    // Di Dashboard tampilkan hanya jika ada catatan penting PJ Subkon atau revisi (detail lengkap ada di menu Project Update agar tidak dobel)
                     const dashCkEl = document.getElementById('dashboardProjectUpdateCard');
                     if (dashCkEl) {
-                        dashCkEl.classList.remove('hidden');
-                        dashCkEl.innerHTML = `
-                            <div class="bg-white border border-[#DCEBFF] rounded-2xl shadow-card p-4 sm:p-5 space-y-3">
-                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                    <div>
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="text-[10.5px] font-extrabold uppercase tracking-wider text-[#0082E6]">📊 Project Update • ${A.esc(scLabel)}</span>
-                                            <button type="button" onclick="switchTab('project-update')" class="text-[11px] font-bold text-[#0095FF] hover:underline cursor-pointer">Buka Menu Project Update →</button>
+                        if (myChecklistData.notes || revCk > 0) {
+                            dashCkEl.classList.remove('hidden');
+                            dashCkEl.innerHTML = `
+                                <div onclick="switchTab('project-update')" class="rounded-2xl ${revCk > 0 ? 'bg-[#FFF5F7] border-[#FECDD6] border-l-[#E11D48]' : 'bg-[#FFFDF5] border-[#FDE68A] border-l-[#D97706]'} border border-l-4 shadow-card px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:opacity-95 transition">
+                                    <div class="space-y-0.5 min-w-0">
+                                        <div class="text-xs font-extrabold ${revCk > 0 ? 'text-[#BE123C]' : 'text-[#92400E]'}">
+                                            ${revCk > 0 ? `🔴 ${revCk} Tahapan Project Update Perlu Revisi` : '📝 Catatan Terbaru dari Guru PJ Sub-Konsentrasi'}
                                         </div>
-                                        <p class="text-[11px] text-slate-500 mt-0.5">Status tahapan produksi resmi dari Guru PJ Sub-Konsentrasi.</p>
+                                        ${myChecklistData.notes ? `<p class="text-xs text-slate-700 line-clamp-2">${A.esc(myChecklistData.notes)}</p>` : `<p class="text-xs text-slate-600">Segera buka menu Project Update untuk melihat rincian tahapan yang perlu diperbaiki.</p>`}
                                     </div>
-                                    <div class="w-full sm:w-52 shrink-0 num-tabular">
-                                        <div class="flex items-center justify-between text-[11px] font-bold mb-1">
-                                            <span class="${ckPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCk}/${myChecklistCols.length} Done</span>
-                                            <span class="font-mono ${ckPct === 100 ? 'text-[#15803D]' : 'text-slate-500'}">${ckPct}%</span>
-                                        </div>
-                                        <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200/70">
-                                            <div class="h-full rounded-full transition-all duration-300" style="width:${ckPct}%;background:#4CAF50;"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    ${myChecklistCols.map((col) => {
-                                        const stVal = A.normalizeChecklistStatus(myChecklistData.items?.[col]);
-                                        const stOpt = A.CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || A.CHECKLIST_STATUS_OPTIONS[0];
-                                        return `<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${stOpt.cls} text-xs font-bold"><span>${A.esc(col)}:</span><span>${stOpt.label}</span></div>`;
-                                    }).join('')}
-                                </div>
-                                ${myChecklistData.notes ? `<div class="rounded-xl bg-[#FFFDF5] border border-[#FDE68A] px-3 py-2 text-xs text-[#92400E]"><strong>📝 Notes PJ Subkon:</strong> ${A.esc(myChecklistData.notes)}</div>` : ''}
-                            </div>`;
+                                    <span class="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white border border-black/10 text-xs font-bold text-[#1E293B] shrink-0">Lihat Detail →</span>
+                                </div>`;
+                        } else {
+                            dashCkEl.classList.add('hidden');
+                            dashCkEl.innerHTML = '';
+                        }
                     }
 
                     const pageEl = document.getElementById('studentProjectUpdateContainer');

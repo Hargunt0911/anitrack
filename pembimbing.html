@@ -268,36 +268,6 @@
 
             <main class="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-5 pb-24 lg:pb-8 space-y-6">
 
-                <!-- ==================== BANNER WAJIB NOMOR WA GURU PEMBIMBING ==================== -->
-                <div id="mentorWaRequiredBanner"
-                    class="hidden rounded-2xl bg-[#FFFDF5] border-2 border-[#F7C200] shadow-card p-5 space-y-3">
-                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div class="flex items-start gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-[#FFF6D6] text-[#B88600] font-extrabold text-lg flex items-center justify-center shrink-0">
-                                📱
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFF6D6] text-[#9A6F00]">
-                                    Wajib Diisi Oleh Setiap Guru Pembimbing
-                                </span>
-                                <h2 class="text-sm sm:text-base font-extrabold text-[#1E293B]">Lengkapi Nomor WhatsApp Aktif Anda</h2>
-                                <p class="text-xs text-slate-600 leading-relaxed">
-                                    Nomor WA aktif pembimbing ditampilkan pada pesan pengingat deadline siswa dan Dashboard agar siswa bimbingan mudah menghubungi Anda saat konsultasi atau revisi.
-                                </p>
-                            </div>
-                        </div>
-                        <form onsubmit="event.preventDefault(); saveQuickMentorWhatsapp();" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full lg:w-auto">
-                            <input id="quickMentorWaInput" type="tel" required placeholder="Contoh: 081234567890"
-                                class="w-full sm:w-56 px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm font-mono font-semibold text-[#1E293B] focus:outline-none focus:border-[#0095FF]" />
-                            <button id="quickMentorWaSaveBtn" type="submit"
-                                class="px-5 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold shadow-sm transition cursor-pointer shrink-0">
-                                Simpan Nomor WA
-                            </button>
-                        </form>
-                    </div>
-                    <div id="quickMentorWaFeedback" class="text-xs font-semibold min-h-[1rem]"></div>
-                </div>
-
                 <!-- ==================== TAB 0: DASHBOARD PEMBIMBING (COMMAND CENTER) ==================== -->
                 <section id="tab-overview" class="space-y-5">
                     <!-- Top Welcome & Quick Actions Bar -->
@@ -439,9 +409,9 @@
                     <!-- Kalender Mini Interaktif & Deadline Terdekat -->
                     <div id="dashCalendarCard"></div>
 
-                    <!-- Secondary Calm Row: Materi Terbaru & Kontak Tim Pembimbing -->
+                    <!-- Secondary Calm Row: Materi Terbaru & Kontak Tim Pembimbing (Lipat Rapi) -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-                        <div class="lg:col-span-6 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card space-y-3.5">
+                        <div class="lg:col-span-7 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card space-y-3.5">
                             <div class="flex items-center justify-between">
                                 <h3 class="text-[14.5px] font-bold text-[#1E293B]">Materi Ajar Terbaru</h3>
                                 <div class="flex items-center gap-2">
@@ -453,12 +423,17 @@
                             <div id="dashboardMaterialsList" class="space-y-2.5"></div>
                         </div>
 
-                        <div class="lg:col-span-6 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card space-y-3.5">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-[14.5px] font-bold text-[#1E293B]">Tim Pembimbing</h3>
-                                <button type="button" onclick="handleMentorsAction()" class="text-[11px] font-semibold text-slate-400 hover:text-[#0095FF] cursor-pointer">Monitoring</button>
-                            </div>
-                            <div id="dashboardMentorsList" class="space-y-2.5 max-h-[260px] overflow-y-auto pr-1 anitrack-xscroll"></div>
+                        <div class="lg:col-span-5 bg-white rounded-2xl p-5 border border-[#EDF1F7] shadow-card">
+                            <details class="group">
+                                <summary class="list-none flex items-center justify-between cursor-pointer select-none">
+                                    <div>
+                                        <h3 class="text-[14.5px] font-bold text-[#1E293B]">👥 Kontak Tim Pembimbing</h3>
+                                        <p class="text-[11px] text-slate-400 mt-0.5">Klik untuk melihat kontak WA sesama pembimbing.</p>
+                                    </div>
+                                    <span class="text-xs text-slate-400 group-open:rotate-180 transition">▼</span>
+                                </summary>
+                                <div id="dashboardMentorsList" class="space-y-2.5 mt-3.5 max-h-[260px] overflow-y-auto pr-1 anitrack-xscroll"></div>
+                            </details>
                         </div>
                     </div>
                 </section>
@@ -941,7 +916,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126y"></script>
+    <script src="./anitrack-core.js?v=20261127a"></script>
     <script>
         window.AniTrack.initStaffPortal({
             role: 'mentor',

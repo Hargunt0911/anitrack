@@ -378,9 +378,9 @@
                                 class="px-3.5 py-2 rounded-xl bg-[#E3F6F3] hover:bg-[#4CB6A7] text-[#1D5E55] hover:text-white text-xs font-bold transition cursor-pointer">
                                 + Materi
                             </button>
-                            <button type="button" onclick="switchTab('storage')"
+                            <button type="button" onclick="switchTab('autoreply')"
                                 class="px-3.5 py-2 rounded-xl bg-white hover:bg-[#F7FAFF] border border-[#E2E8F0] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer">
-                                📥 Backup / Export
+                                💬 Balas Otomatis WA
                             </button>
                         </div>
                     </div>
@@ -442,14 +442,14 @@
                         <button type="button" onclick="switchTab('plotting')"
                             class="text-left bg-white border border-[#EDF1F7] hover:border-[#C7D2FE] rounded-2xl p-4 shadow-card hover:shadow-cardHover transition cursor-pointer space-y-2.5">
                             <div class="flex items-center justify-between gap-2">
-                                <span class="text-xs font-bold text-slate-500">Siswa &amp; Kelengkapan Data</span>
+                                <span class="text-xs font-bold text-slate-500">Total Siswa &amp; Guru</span>
                                 <span class="w-8 h-8 rounded-xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center text-sm shrink-0">🏫</span>
                             </div>
                             <div class="flex items-baseline gap-1.5">
                                 <span id="metricStudents" class="text-2xl font-extrabold text-[#1E293B]">0</span>
                                 <span class="text-xs font-semibold text-slate-400">siswa • <span id="metricMentors">0</span> guru</span>
                             </div>
-                            <div id="dashAdminHealthBadge" class="text-[11px] font-semibold text-slate-500 truncate">
+                            <div class="text-[11px] font-semibold text-slate-500 truncate">
                                 <span id="metricMaterials">0</span> materi • <span id="metricTasks">0</span> riwayat task
                             </div>
                         </button>
@@ -1700,7 +1700,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126y"></script>
+    <script src="./anitrack-core.js?v=20261127a"></script>
     <script>
         (function () {
             const A = window.AniTrack;

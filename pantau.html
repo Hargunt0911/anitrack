@@ -75,7 +75,7 @@
         AniTrack • Sistem Monitoring Project Animasi SMKN 4 Malang • Tautan Khusus Orang Tua / Wali (Read-Only)
     </footer>
 
-    <script src="./anitrack-core.js?v=20261126y"></script>
+    <script src="./anitrack-core.js?v=20261127a"></script>
     <script>
         (async function () {
             const A = window.AniTrack;
@@ -129,7 +129,8 @@
                 { data: student },
                 { data: projTasks },
                 { data: projSubs },
-                { data: dailyTasks },
+                { data: dailyProgRows },
+                { data: dailyTaskDefs },
                 { data: fbLogRow },
                 checklistColsMap,
                 { data: myChecklistRow }
@@ -137,7 +138,8 @@
                 supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, avatar_url, mentor_id, project_drive_url').eq('id', studentId).maybeSingle(),
                 supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
                 supabase.from('project_submissions').select('*').eq('student_id', studentId),
-                supabase.from('daily_tasks').select('id, task_title, status, progress_percent, created_at').eq('student_id', studentId).order('created_at', { ascending: false }).limit(14),
+                supabase.from('student_progress').select('task_id, status, progress_percent, student_notes, updated_at').eq('student_id', studentId).order('updated_at', { ascending: false }).limit(14),
+                supabase.from('daily_tasks').select('id, title'),
                 supabase.from('app_settings').select('value').eq('key', `${A.PROJECT_FB_LOG_PREFIX}${studentId}`).maybeSingle(),
                 A.loadChecklistColsMap(),
                 supabase.from('app_settings').select('value').eq('key', `${A.CHECKLIST_ROW_PREFIX}${studentId}`).maybeSingle()
@@ -172,7 +174,14 @@
             const subMapComposite = Object.fromEntries((projSubs || []).map((ps) => [`${ps.project_task_id}__${student.id}`, ps]));
             const stats = A.computeStudentIssueStats(student, myTasks, subMapComposite);
             const pct = stats.eligibleCount ? Math.round((stats.accCount / stats.eligibleCount) * 100) : 0;
-            const dailyList = dailyTasks || [];
+            const dailyDefMap = Object.fromEntries((dailyTaskDefs || []).map((t) => [t.id, t.title]));
+            const dailyList = (dailyProgRows || []).map((r) => ({
+                task_title: dailyDefMap[r.task_id] || 'Aktivitas Harian',
+                status: r.status || 'belum_mulai',
+                progress_percent: r.progress_percent || 0,
+                student_notes: r.student_notes || '',
+                created_at: r.updated_at
+            }));
 
             reportPayload = {
                 student,
@@ -203,7 +212,7 @@
                                 </span>
                                 <h1 class="text-xl sm:text-2xl font-extrabold truncate">${esc(student.full_name)}</h1>
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-white/90">
-                                    <span>👨‍🏫 Pembimbing: <strong>${esc(mentor?.full_name || 'Belum di-plot')}</strong></span>
+                                    <span>👨‍🏫 Pembimbing: <strong>${esc(mentor?.full_name || 'Belum di-plot')}</strong>${mentor?.whatsapp_number ? ` <span class="font-mono text-white/85">(${esc(A.formatWhatsappDisplay(mentor.whatsapp_number))})</span>` : ''}</span>
                                     ${mentor?.whatsapp_number ? `<a href="${esc(A.getWhatsappUrl(mentor.whatsapp_number, mentorWaMsg))}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-0.5 rounded-lg bg-[#25D366] text-white font-bold text-[11px] hover:opacity-90">💬 Hubungi Pembimbing</a>` : ''}
                                     ${student.project_drive_url ? `<a href="${esc(student.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-0.5 rounded-lg bg-white/20 hover:bg-white text-white hover:text-[#1D5E55] font-bold text-[11px] transition">📁 Folder Drive ↗</a>` : ''}
                                 </div>
@@ -223,8 +232,8 @@
 
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 num-tabular">
                         <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
-                            <div class="text-[11px] text-white/85">Tugas Tuntas (ACC)</div>
-                            <div class="text-lg font-extrabold">${stats.accCount}/${stats.eligibleCount}</div>
+                            <div class="text-[11px] text-white/85">📊 Project Update</div>
+                            <div class="text-lg font-extrabold">${ckDone}/${ckCols.length} <span class="text-xs font-bold text-white/80">(${ckPct}%)</span></div>
                         </div>
                         <div class="bg-white/15 rounded-xl px-3.5 py-2.5">
                             <div class="text-[11px] text-white/85">🌟 Lencana Emas</div>
@@ -335,6 +344,7 @@
                                 <div class="py-2.5 flex items-center justify-between gap-3">
                                     <div class="min-w-0">
                                         <div class="font-bold text-[#1E293B] truncate">${esc(dt.task_title || 'Aktivitas Harian')}</div>
+                                        ${dt.student_notes ? `<div class="text-[11px] text-slate-600 line-clamp-1 mt-0.5">${esc(dt.student_notes)}</div>` : ''}
                                         <div class="text-[10.5px] text-slate-400">${esc(A.formatDateTime(dt.created_at))}</div>
                                     </div>
                                     <div class="flex items-center gap-2 shrink-0">
