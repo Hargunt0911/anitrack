@@ -125,16 +125,25 @@ async function fetchSupabase(endpoint) {
   return res.json();
 }
 
-async function fetchWaGatewayConfig() {
+let cachedWaCfg = null;
+let cachedWaCfgAt = 0;
+
+async function fetchWaGatewayConfig(forceFresh = false) {
+  const now = Date.now();
+  if (!forceFresh && cachedWaCfg && (now - cachedWaCfgAt) < 15000) {
+    return cachedWaCfg;
+  }
   try {
     const rows = await fetchSupabase('app_settings?select=value&key=eq.wa_gateway_config');
     if (rows && rows.length && rows[0].value) {
-      return JSON.parse(rows[0].value) || {};
+      cachedWaCfg = JSON.parse(rows[0].value) || {};
+      cachedWaCfgAt = now;
+      return cachedWaCfg;
     }
   } catch (err) {
     addLog(`Gagal baca wa_gateway_config: ${err.message}`, 'error');
   }
-  return {};
+  return cachedWaCfg || {};
 }
 
 async function insertWaLog(entry) {
@@ -511,7 +520,15 @@ function extractIncomingText(msg) {
   return '';
 }
 
-function buildAutoReplyMenuText() {
+function buildAutoReplyMenuText(waCfg = {}) {
+  const baseUrl = (waCfg.appUrl || APP_URL || 'https://anitrack.republikanimasi.my.id').trim().replace(/\/+$/, '');
+  const pantauUrl = `${baseUrl}/pantau.html`;
+  const customTpl = String(waCfg.autoReplyMenuTemplate || '').trim();
+  if (customTpl) {
+    return customTpl
+      .replace(/\{link_anitrack\}/gi, baseUrl)
+      .replace(/\{link_pantau\}/gi, pantauUrl);
+  }
   return [
     '🤖 *AniTrack — SMKN 4 Malang (Balas Otomatis)*',
     '',
@@ -521,12 +538,12 @@ function buildAutoReplyMenuText() {
     '• *tugas* — Lihat daftar tugas & deadline terdekat kamu',
     '• *menu* — Tampilkan daftar perintah ini',
     '',
-    `🌐 Portal Siswa: ${APP_URL}`,
-    `👨‍👩‍👧 Portal Pantau Ortu: ${APP_URL.replace(/\/+$/, '')}/pantau.html`
+    `🌐 Portal Siswa: ${baseUrl}`,
+    `👨‍👩‍👧 Portal Pantau Ortu: ${pantauUrl}`
   ].join('\n');
 }
 
-async function buildStudentProgressReply(student, allProfiles, tasks, subs, colsMap, rowMap, mode = 'all') {
+async function buildStudentProgressReply(student, allProfiles, tasks, subs, colsMap, rowMap, mode = 'all', waCfg = {}) {
   const todayStr = getTodayJakartaYmd();
   const todayMs = parseYmdToUtcMs(todayStr);
   const mentor = student.mentor_id ? allProfiles.find((p) => p.id === student.mentor_id) : null;
@@ -605,8 +622,14 @@ async function buildStudentProgressReply(student, allProfiles, tasks, subs, cols
     lines.push('🎉 *Luar biasa!* Semua tugas project sudah tuntas (ACC).');
   }
 
+  const customFooter = String(waCfg.autoReplyCekFooter || '').trim();
+  if (customFooter) {
+    lines.push('');
+    lines.push(customFooter);
+  }
+
   lines.push('');
-  lines.push(`🔗 Portal AniTrack: ${APP_URL}`);
+  lines.push(`🔗 Portal AniTrack: ${(waCfg.appUrl || APP_URL || '').trim()}`);
   return lines.join('\n');
 }
 
@@ -641,18 +664,19 @@ async function handleIncomingAutoReply(msg) {
   const senderPhone = normalizeWaPhone(phoneSource);
 
   try {
+    const waCfg = await fetchWaGatewayConfig();
+    if (waCfg.autoReplyEnabled === false) return;
+
     if (isMenuCmd) {
-      await sendToJidWithTyping(remoteJid, buildAutoReplyMenuText(), true);
+      await sendToJidWithTyping(remoteJid, buildAutoReplyMenuText(waCfg), true);
       addLog(`[AUTO-REPLY] "${rawText}" -> kirim menu ke ${senderPhone ? formatWaLocal(senderPhone) : remoteJid}`);
       return;
     }
 
     if (isSiapCmd) {
-      await sendToJidWithTyping(
-        remoteJid,
-        '✅ Terima kasih! Nomor kamu sudah terhubung dengan *AniTrack SMKN 4 Malang*.\n\nKapan saja ingin melihat progres project & deadline, cukup ketik *cek* atau *menu*.',
-        true
-      );
+      const siapReply = String(waCfg.autoReplySiapTemplate || '').trim() ||
+        '✅ Terima kasih! Nomor kamu sudah terhubung dengan *AniTrack SMKN 4 Malang*.\n\nKapan saja ingin melihat progres project & deadline, cukup ketik *cek* atau *menu*.';
+      await sendToJidWithTyping(remoteJid, siapReply, true);
       addLog(`[AUTO-REPLY] "${rawText}" -> konfirmasi siap ke ${senderPhone ? formatWaLocal(senderPhone) : remoteJid}`);
       return;
     }
@@ -735,7 +759,7 @@ async function handleIncomingAutoReply(msg) {
       matchedStudent = matches[0];
     }
 
-    const replyText = await buildStudentProgressReply(matchedStudent, profiles, tasks, subs, colsMap, rowMap, mode);
+    const replyText = await buildStudentProgressReply(matchedStudent, profiles, tasks, subs, colsMap, rowMap, mode, waCfg);
     await sendToJidWithTyping(remoteJid, replyText, true);
     addLog(`[AUTO-REPLY] "${rawText}" -> kirim progres ${matchedStudent.full_name} ke ${senderPhone ? formatWaLocal(senderPhone) : remoteJid}`);
   } catch (err) {
