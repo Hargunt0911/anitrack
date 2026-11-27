@@ -32,8 +32,21 @@ const APP_URL = (process.env.APP_URL || 'https://anitrack.republikanimasi.my.id'
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://izgcmhsobexicceqklqm.supabase.co').trim();
 const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || 'sb_publishable_T9eODcUv7nRBYgN-F24aRg_w-QOzKVu').trim();
 const CRON_SCHEDULE = (process.env.CRON_SCHEDULE || '0 7 * * *').trim();
-const SEND_DELAY_MS = Math.max(1500, Number(process.env.SEND_DELAY_MS || 3000));
+// Mode Ekstra Aman (Anti-Ban Ketat):
+// - Simulasi mengetik 2-4 detik sebelum kirim
+// - Jeda acak 25-45 detik antar siswa
+// - Istirahat (cooldown) 3 menit setiap 10 pesan
+const TYPING_MIN_MS = Math.max(1000, Number(process.env.TYPING_MIN_MS || 2000));
+const TYPING_MAX_MS = Math.max(TYPING_MIN_MS, Number(process.env.TYPING_MAX_MS || 4000));
+const SEND_DELAY_MIN_MS = Math.max(5000, Number(process.env.SEND_DELAY_MIN_MS || 25000));
+const SEND_DELAY_MAX_MS = Math.max(SEND_DELAY_MIN_MS, Number(process.env.SEND_DELAY_MAX_MS || 45000));
+const COOLDOWN_EVERY = Math.max(1, Number(process.env.COOLDOWN_EVERY || 10));
+const COOLDOWN_MS = Math.max(15000, Number(process.env.COOLDOWN_MS || 180000));
 const AUTH_DIR = path.join(__dirname, 'auth_info');
+
+function randBetween(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
 
 let sock = null;
 let waStatus = 'starting'; // starting | qr | open | close | logged_out
@@ -133,13 +146,21 @@ async function insertWaLog(entry) {
   }
 }
 
-async function sendWhatsAppMessage(rawPhone, text) {
+async function sendWhatsAppMessage(rawPhone, text, withTyping = true) {
   if (!sock || waStatus !== 'open') {
     throw new Error(`WhatsApp belum terhubung (status: ${waStatus}). Scan QR di http://127.0.0.1:${PORT} terlebih dahulu.`);
   }
   const phone = normalizeWaPhone(rawPhone);
   if (!phone) throw new Error(`Nomor WA tidak valid: ${rawPhone}`);
   const jid = `${phone}@s.whatsapp.net`;
+  if (withTyping) {
+    try {
+      await sock.presenceSubscribe(jid).catch(() => {});
+      await sock.sendPresenceUpdate('composing', jid).catch(() => {});
+      await sleep(randBetween(TYPING_MIN_MS, TYPING_MAX_MS));
+      await sock.sendPresenceUpdate('paused', jid).catch(() => {});
+    } catch { /* ignore presence errors */ }
+  }
   await sock.sendMessage(jid, { text: String(text || '') });
   return phone;
 }
@@ -375,6 +396,10 @@ async function runDeadlineReminderJob(source = 'cron', options = {}) {
 
       if (isDummyMode) {
         messageText = `🧪 *[MODE PERCOBAAN DUMMY — Contoh untuk ${s.full_name}]*\n_(Mode Dummy aktif di Admin AniTrack sehingga siswa asli belum dikirimi pesan)_\n\n${messageText}`;
+      } else {
+        // Variasi ringan unik per siswa agar payload tidak identik 100%
+        const refCode = `${todayStr.replace(/-/g, '')}-${String(sentCount + 1).padStart(3, '0')}`;
+        messageText = `${messageText}\n\n_Ref: #${refCode}_`;
       }
 
       const reminderType = isDummyMode
@@ -418,8 +443,16 @@ async function runDeadlineReminderJob(source = 'cron', options = {}) {
       }
 
       if (!isDummyMode) {
-        // Jeda aman + jitter acak 0-1.5 detik agar lebih natural
-        await sleep(SEND_DELAY_MS + Math.floor(Math.random() * 1500));
+        // Mode Ekstra Aman: cooldown 3 menit tiap 10 pesan + jeda acak 25-45 detik antar siswa
+        if (sentCount > 0 && sentCount % COOLDOWN_EVERY === 0) {
+          const coolSec = Math.round(COOLDOWN_MS / 1000);
+          addLog(`☕ Istirahat Anti-Ban ${Math.round(coolSec / 60)} menit (${coolSec} dtk) setelah ${sentCount} pesan terkirim...`);
+          await sleep(COOLDOWN_MS);
+        } else {
+          const waitMs = randBetween(SEND_DELAY_MIN_MS, SEND_DELAY_MAX_MS);
+          addLog(`⏳ Jeda ekstra aman ${Math.round(waitMs / 1000)} detik sebelum siswa berikutnya...`);
+          await sleep(waitMs);
+        }
       }
     }
 
@@ -560,6 +593,7 @@ function renderDashboardHtml() {
       <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
         <span class="pill" id="phonePill">Nomor WA: -</span>
         <span class="pill" id="cronPill">Jadwal: ${CRON_SCHEDULE} WIB</span>
+        <span class="pill" style="background:#fef3c7;color:#92400e;">🛡️ Mode Ekstra Aman: ${Math.round(SEND_DELAY_MIN_MS / 1000)}–${Math.round(SEND_DELAY_MAX_MS / 1000)} dtk + Istirahat ${Math.round(COOLDOWN_MS / 60000)} mnt / ${COOLDOWN_EVERY} pesan</span>
         <span class="pill" id="dummyPill">Mode Dummy: memuat...</span>
       </div>
     </div>
