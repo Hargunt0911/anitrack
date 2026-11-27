@@ -469,6 +469,9 @@
                     <!-- Ringkasan Project Update per Sub-Konsentrasi Langsung di Dashboard Siswa -->
                     <div id="dashboardProjectUpdateCard" class="hidden"></div>
 
+                    <!-- Kalender Mini Interaktif & Deadline Project Siswa -->
+                    <div id="studentDashCalendarCard"></div>
+
                     <!-- ROW 2: 3-Column Bento Grid -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
                         <div class="lg:col-span-4 space-y-3.5">
@@ -1114,7 +1117,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261126s"></script>
+    <script src="./anitrack-core.js?v=20261126t"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -1150,6 +1153,7 @@
                     updateGateVisuals();
                     paintTabs();
                     renderStudentProjectDriveCard();
+                renderStudentDashCalendar();
                 },
                 () => { loadDailyTaskFeed(); loadStudentProjects(); }
             );
@@ -2066,6 +2070,7 @@
             window.toggleEditProjectDrive = function (editMode) {
                 editingProjectDrive = Boolean(editMode);
                 renderStudentProjectDriveCard();
+                renderStudentDashCalendar();
                 if (editingProjectDrive) {
                     setTimeout(() => document.getElementById('studentProjectDriveInput')?.focus(), 50);
                 }
@@ -2106,6 +2111,7 @@
                 editingProjectDrive = false;
                 paintProfile();
                 renderStudentProjectDriveCard();
+                renderStudentDashCalendar();
                 A.showToast('Link Folder Google Drive Project berhasil disimpan ✓');
             };
 
@@ -2124,6 +2130,47 @@
             window.openMyFlowchart = function () {
                 A.openStudentFlowchartModal(currentUser, studentProjectCache.tasks, studentProjectCache.subMapComposite, null, studentFeedbackLogsCache);
             };
+            let studentDashCalState = { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: '' };
+            function renderStudentDashCalendar() {
+                const el = document.getElementById('studentDashCalendarCard');
+                if (!el || typeof A.buildDashboardCalendarWidgetHtml !== 'function') return;
+                const tasks = studentProjectCache.tasks || [];
+                const subMap = studentProjectCache.subMap || {};
+                el.innerHTML = A.buildDashboardCalendarWidgetHtml(tasks, studentDashCalState, {
+                    title: 'Kalender & Deadline Project Saya',
+                    prevFn: 'shiftStuDashCalMonth(-1)',
+                    todayFn: 'resetStuDashCalMonth()',
+                    nextFn: 'shiftStuDashCalMonth(1)',
+                    selectDateFn: 'selectStuDashCalDate',
+                    fullCalFn: 'openMyCalendar()',
+                    onTaskClickAttrFn: () => `onclick="switchTab('projects')"`,
+                    getTaskMetaFn: (t) => {
+                        const st = subMap[t.id]?.status || 'belum_mulai';
+                        if (st === 'selesai') return { badge: '✓ ACC Selesai', allDone: true };
+                        if (st === 'revisi') return { badge: '⚠️ Perlu Revisi', allDone: false };
+                        if (st === 'menunggu_review') return { badge: '⏳ Menunggu Review', allDone: false };
+                        return { badge: 'Belum selesai', allDone: false };
+                    }
+                });
+            }
+            window.shiftStuDashCalMonth = function (delta) {
+                const dt = new Date(studentDashCalState.year, studentDashCalState.month + delta, 1);
+                studentDashCalState.year = dt.getFullYear();
+                studentDashCalState.month = dt.getMonth();
+                renderStudentDashCalendar();
+            };
+            window.resetStuDashCalMonth = function () {
+                const n = new Date();
+                studentDashCalState.year = n.getFullYear();
+                studentDashCalState.month = n.getMonth();
+                studentDashCalState.selectedDate = '';
+                renderStudentDashCalendar();
+            };
+            window.selectStuDashCalDate = function (ymd) {
+                studentDashCalState.selectedDate = studentDashCalState.selectedDate === ymd ? '' : (ymd || '');
+                renderStudentDashCalendar();
+            };
+
             window.openMyCalendar = function () {
                 A.openStudentCalendarModal(studentProjectCache.tasks, studentProjectCache.subMap);
             };
@@ -2488,6 +2535,7 @@
                 })();
 
                 renderStudentProjectDriveCard();
+                renderStudentDashCalendar();
 
                 const stages = [
                     { val: '', label: 'Semua Tahap' },
@@ -2793,6 +2841,7 @@
                 updateGateVisuals();
                 paintTabs();
                 renderStudentProjectDriveCard();
+                renderStudentDashCalendar();
             });
 
             (async () => {

@@ -2045,6 +2045,202 @@
     };
 
     // ==================== 7. KALENDER DEADLINE & TIMELINE GANTT PRODUKSI ====================
+    function buildDashboardCalendarWidgetHtml(tasks = [], state = {}, opts = {}) {
+        const now = new Date();
+        const year = typeof state.year === 'number' ? state.year : now.getFullYear();
+        const month = typeof state.month === 'number' ? state.month : now.getMonth();
+        const selectedDate = state.selectedDate || '';
+        const {
+            title = 'Kalender & Deadline Produksi',
+            prevFn = 'shiftDashCalendarMonth(-1)',
+            todayFn = 'resetDashCalendarMonth()',
+            nextFn = 'shiftDashCalendarMonth(1)',
+            selectDateFn = 'selectDashCalendarDate',
+            fullCalFn = 'openFullProjectCalendar()',
+            onTaskClickAttrFn = null,
+            getTaskMetaFn = null
+        } = opts;
+
+        const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const dayNames = ['Sn', 'Sl', 'Rb', 'Km', 'Jm', 'Sb', 'Mg'];
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startOffset = (firstDay.getDay() + 6) % 7;
+        const todayYmd = getJakartaYmd(now);
+        const todayMs = Date.parse(`${todayYmd}T00:00:00Z`);
+
+        const stageColorDot = (st) => st === 'Pre-Production' ? '#F59E0B' : (st === 'Production' ? '#0095FF' : '#F13B6E');
+        const stageAccentCls = (st) => st === 'Pre-Production' ? 'bg-[#F59E0B]' : (st === 'Production' ? 'bg-[#0095FF]' : 'bg-[#F13B6E]');
+        const stagePillCls = (st) => st === 'Pre-Production'
+            ? 'bg-[#FFF6D6] text-[#9A6F00]'
+            : (st === 'Production' ? 'bg-[#EAF4FF] text-[#0082E6]' : 'bg-[#FFF0F4] text-[#E11D48]');
+
+        const tasksByDate = {};
+        const datedTasks = [];
+        (tasks || []).forEach((t) => {
+            if (!t?.due_date) return;
+            const ymd = String(t.due_date).slice(0, 10);
+            if (!tasksByDate[ymd]) tasksByDate[ymd] = [];
+            tasksByDate[ymd].push(t);
+            datedTasks.push({ ...t, _ymd: ymd });
+        });
+        datedTasks.sort((a, b) => a._ymd.localeCompare(b._ymd));
+
+        const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+        const monthTaskCount = datedTasks.filter((t) => t._ymd.startsWith(monthPrefix)).length;
+
+        const dayCells = [];
+        for (let i = 0; i < startOffset; i++) {
+            dayCells.push(`<div class="h-10"></div>`);
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const ymd = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const colIdx = (startOffset + d - 1) % 7;
+            const isWeekend = colIdx >= 5;
+            const isToday = ymd === todayYmd;
+            const isSelected = ymd === selectedDate;
+            const dayTasks = tasksByDate[ymd] || [];
+            const hasTasks = dayTasks.length > 0;
+
+            let btnCls = 'text-slate-600 hover:bg-[#F3F6FB]';
+            if (isSelected) btnCls = 'bg-[#1E293B] text-white font-extrabold shadow-sm';
+            else if (isToday) btnCls = 'bg-[#0095FF] text-white font-extrabold shadow-xs';
+            else if (hasTasks) btnCls = 'bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#1E293B] font-extrabold ring-1 ring-inset ring-[#DCEBFF]';
+            else if (isWeekend) btnCls = 'text-slate-400 hover:bg-[#F3F6FB]';
+
+            const uniqueStages = [...new Set(dayTasks.map((t) => t.pipeline_stage))].slice(0, 3);
+            const dotsHtml = hasTasks
+                ? `<span class="flex items-center justify-center gap-0.5 mt-0.5">${uniqueStages.map((st) =>
+                    `<span class="w-1.5 h-1.5 rounded-full" style="background:${(isSelected || isToday) ? '#FFFFFF' : stageColorDot(st)}"></span>`
+                ).join('')}</span>`
+                : `<span class="h-1.5 mt-0.5"></span>`;
+
+            dayCells.push(`
+                <button type="button" onclick="${selectDateFn}('${ymd}')" title="${hasTasks ? `${dayTasks.length} deadline pada ${formatDateOnly(ymd)}` : formatDateOnly(ymd)}"
+                    class="h-10 w-full rounded-xl flex flex-col items-center justify-center leading-none transition cursor-pointer ${btnCls}">
+                    <span class="text-xs">${d}</span>
+                    ${dotsHtml}
+                </button>`);
+        }
+
+        const formatCountdown = (ymd, allDone) => {
+            if (allDone) return { label: 'Tuntas', cls: 'bg-[#E7F9EE] text-[#15803D]' };
+            const dueMs = Date.parse(`${ymd}T00:00:00Z`);
+            const diffDays = Math.round((dueMs - todayMs) / 86400000);
+            if (diffDays < 0) return { label: `Lewat ${Math.abs(diffDays)} hr`, cls: 'bg-[#FFF0F4] text-[#E11D48]' };
+            if (diffDays === 0) return { label: 'Hari Ini', cls: 'bg-[#FFF6D6] text-[#B45309]' };
+            if (diffDays === 1) return { label: 'Besok', cls: 'bg-[#FFF6D6] text-[#B45309]' };
+            if (diffDays <= 5) return { label: `H-${diffDays}`, cls: 'bg-[#EAF4FF] text-[#0082E6]' };
+            return { label: formatDateOnly(ymd), cls: 'bg-[#F3F6FB] text-slate-600' };
+        };
+
+        const agendaTasks = selectedDate
+            ? (tasksByDate[selectedDate] || []).map((t) => ({ ...t, _ymd: selectedDate }))
+            : (() => {
+                const upcoming = datedTasks.filter((t) => {
+                    const meta = getTaskMetaFn ? getTaskMetaFn(t) : null;
+                    if (meta?.allDone && t._ymd < todayYmd) return false;
+                    return true;
+                });
+                return (upcoming.length ? upcoming : datedTasks).slice(0, 5);
+            })();
+
+        const selectedDatePretty = selectedDate
+            ? new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${selectedDate}T00:00:00`))
+            : '';
+
+        const agendaHtml = agendaTasks.length
+            ? `<div class="space-y-2">${agendaTasks.map((t) => {
+                const meta = getTaskMetaFn ? getTaskMetaFn(t) : { badge: '', allDone: false };
+                const cd = formatCountdown(t._ymd, Boolean(meta?.allDone));
+                const clickAttr = onTaskClickAttrFn ? onTaskClickAttrFn(t) : '';
+                return `
+                    <button type="button" ${clickAttr}
+                        class="w-full text-left rounded-xl bg-white hover:bg-[#F8FBFF] border border-[#EDF1F7] hover:border-[#BAE6FD] px-3.5 py-2.5 flex items-center justify-between gap-3 transition cursor-pointer group">
+                        <div class="flex items-stretch gap-3 min-w-0">
+                            <span class="w-1 rounded-full shrink-0 ${stageAccentCls(t.pipeline_stage)}"></span>
+                            <div class="min-w-0 space-y-0.5">
+                                <div class="text-xs sm:text-[13px] font-bold text-[#1E293B] group-hover:text-[#0082E6] truncate transition">${esc(t.title)}</div>
+                                <div class="flex flex-wrap items-center gap-1.5 text-[10.5px] text-slate-500">
+                                    <span class="px-1.5 py-0.5 rounded font-bold text-[10px] ${stagePillCls(t.pipeline_stage)}">${esc(t.pipeline_stage)}</span>
+                                    <span>${esc(t.sub_concentration || 'Semua Subkon')}</span>
+                                    <span class="text-slate-300">•</span>
+                                    <span class="font-mono">${esc(formatDateOnly(t._ymd))}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-1 shrink-0 num-tabular">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${cd.cls}">${esc(cd.label)}</span>
+                            ${meta?.badge ? `<span class="text-[10.5px] font-semibold text-slate-500">${esc(meta.badge)}</span>` : ''}
+                        </div>
+                    </button>`;
+            }).join('')}</div>`
+            : `<div class="rounded-xl bg-white border border-dashed border-[#DCE5F2] px-4 py-7 text-center space-y-1.5">
+                <div class="text-xl">🗓️</div>
+                <div class="text-xs font-bold text-[#1E293B]">${selectedDate ? 'Tidak ada deadline pada tanggal ini' : 'Belum ada deadline tugas project'}</div>
+                <p class="text-[11px] text-slate-400">${selectedDate ? 'Klik tanggal yang memiliki titik warna untuk melihat tugasnya.' : 'Deadline yang ditambahkan di Project Tracker otomatis tampil di sini.'}</p>
+                ${selectedDate ? `<button type="button" onclick="${selectDateFn}('')" class="mt-1 px-3 py-1 rounded-lg bg-[#EAF4FF] text-[#0082E6] text-[11px] font-bold hover:bg-[#0095FF] hover:text-white transition cursor-pointer">Lihat Deadline Terdekat</button>` : ''}
+            </div>`;
+
+        return `
+            <div class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-[#EDF1F7] flex flex-wrap items-center justify-between gap-2.5">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <h2 class="text-[15px] font-extrabold text-[#1E293B]">📅 ${esc(title)}</h2>
+                        <div class="hidden sm:flex items-center gap-2.5 text-[10.5px] font-semibold text-slate-500">
+                            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#F59E0B]"></span>Pre-Prod</span>
+                            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#0095FF]"></span>Production</span>
+                            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#F13B6E]"></span>Post-Prod</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="${fullCalFn}"
+                        class="px-3 py-1.5 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer">
+                        🗓️ Kalender Penuh &amp; Gantt →
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-12">
+                    <div class="lg:col-span-5 p-4 sm:p-5 border-b lg:border-b-0 lg:border-r border-[#EDF1F7] space-y-3 num-tabular">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <div class="text-sm font-extrabold text-[#1E293B]">${monthNames[month]} ${year}</div>
+                                <div class="text-[10.5px] text-slate-400">${monthTaskCount} deadline bulan ini</div>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="${prevFn}" title="Bulan sebelumnya"
+                                    class="w-7 h-7 rounded-lg bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] font-bold text-xs flex items-center justify-center transition cursor-pointer">◀</button>
+                                <button type="button" onclick="${todayFn}"
+                                    class="px-2.5 h-7 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white font-bold text-[11px] transition cursor-pointer">Hari Ini</button>
+                                <button type="button" onclick="${nextFn}" title="Bulan berikutnya"
+                                    class="w-7 h-7 rounded-lg bg-[#F3F6FB] hover:bg-[#EAF4FF] text-slate-600 hover:text-[#0095FF] font-bold text-xs flex items-center justify-center transition cursor-pointer">▶</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 text-center text-[10.5px] font-extrabold">
+                            ${dayNames.map((dn, idx) => `<div class="py-1 ${idx >= 5 ? 'text-rose-400/80' : 'text-slate-400'}">${dn}</div>`).join('')}
+                        </div>
+                        <div class="grid grid-cols-7 gap-1">${dayCells.join('')}</div>
+                    </div>
+                    <div class="lg:col-span-7 p-4 sm:p-5 bg-[#FAFBFD]/60 flex flex-col justify-between gap-3">
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="text-xs font-extrabold text-[#1E293B]">
+                                    ${selectedDate ? `📌 Agenda • ${esc(selectedDatePretty)}` : `📌 Deadline Terdekat`}
+                                </div>
+                                ${selectedDate
+                                    ? `<button type="button" onclick="${selectDateFn}('')" class="text-[11px] font-bold text-[#0095FF] hover:underline cursor-pointer">✕ Semua Mendatang</button>`
+                                    : `<span class="text-[11px] font-semibold text-slate-400 num-tabular">${datedTasks.length} tugas terjadwal</span>`}
+                            </div>
+                            ${agendaHtml}
+                        </div>
+                        ${!selectedDate && datedTasks.length > agendaTasks.length ? `
+                        <div class="pt-2 border-t border-[#EDF1F7] flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Menampilkan ${agendaTasks.length} dari ${datedTasks.length} tugas terjadwal</span>
+                            <button type="button" onclick="${fullCalFn}" class="font-bold text-[#0095FF] hover:underline cursor-pointer">Lihat timeline lengkap →</button>
+                        </div>` : ''}
+                    </div>
+                </div>
+            </div>`;
+    }
+
     function buildCalendarAndGanttHtml(tasks = [], year, month, opts = {}) {
         const { getProgressFn = null, onTaskClickAttrFn = null, prevFn = 'shiftProjectCalendarMonth(-1)', todayFn = 'resetProjectCalendarMonth()', nextFn = 'shiftProjectCalendarMonth(1)' } = opts;
         const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -2068,22 +2264,24 @@
         const stageBarColor = (stage) => stage === 'Pre-Production' ? '#F59E0B' : (stage === 'Production' ? '#0095FF' : '#F13B6E');
 
         const cells = [];
-        for (let i = 0; i < startOffset; i++) cells.push(`<div class="min-h-[82px] bg-[#FAFBFD] border-r border-b border-[#EDF1F7]"></div>`);
+        for (let i = 0; i < startOffset; i++) cells.push(`<div class="min-h-[86px] bg-[#FAFBFD]/70 border-r border-b border-[#EDF1F7]"></div>`);
         for (let d = 1; d <= daysInMonth; d++) {
             const ymd = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const colIdx = (startOffset + d - 1) % 7;
+            const isWeekend = colIdx >= 5;
             const isToday = ymd === todayYmd;
             const dayTasks = tasksByDate[ymd] || [];
             cells.push(`
-                <div class="min-h-[82px] p-1.5 border-r border-b border-[#EDF1F7] ${isToday ? 'bg-[#EFF6FF] ring-1 ring-inset ring-[#0095FF]' : 'bg-white'} space-y-1">
+                <div class="min-h-[86px] p-1.5 border-r border-b border-[#EDF1F7] ${isToday ? 'bg-[#EFF6FF]/90 ring-1 ring-inset ring-[#0095FF]' : (isWeekend ? 'bg-[#FAFBFD]/60' : 'bg-white')} space-y-1 transition hover:bg-[#F8FBFF]">
                     <div class="flex items-center justify-between">
-                        <span class="text-[11px] font-extrabold ${isToday ? 'px-1.5 py-0.5 rounded-md bg-[#0095FF] text-white' : 'text-slate-600'}">${d}</span>
-                        ${dayTasks.length ? `<span class="text-[9.5px] font-bold text-slate-400">${dayTasks.length} DL</span>` : ''}
+                        <span class="text-[11px] font-extrabold ${isToday ? 'w-6 h-6 rounded-full bg-[#0095FF] text-white inline-flex items-center justify-center shadow-xs' : (isWeekend ? 'text-rose-400/90 pl-1' : 'text-slate-600 pl-1')}">${d}</span>
+                        ${dayTasks.length ? `<span class="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#F3F6FB] text-slate-500">${dayTasks.length} DL</span>` : ''}
                     </div>
                     <div class="space-y-1">
                         ${dayTasks.map((t) => {
                             const clickAttr = onTaskClickAttrFn ? onTaskClickAttrFn(t) : '';
                             return `<button type="button" ${clickAttr} title="${esc(t.title)} (${esc(t.pipeline_stage)})"
-                                class="w-full text-left px-1.5 py-0.5 rounded border ${stageBadge(t.pipeline_stage)} text-[10px] font-bold truncate block cursor-pointer hover:opacity-80 transition">
+                                class="w-full text-left px-2 py-0.5 rounded-md border ${stageBadge(t.pipeline_stage)} text-[10px] font-bold truncate block cursor-pointer hover:shadow-xs transition">
                                 ${esc(t.title)}
                             </button>`;
                         }).join('')}
@@ -3523,6 +3721,63 @@
         let dashboardQueueTabManual = false;
         let dashboardDailyCache = { filledCount: 0, scopeTotal: 0, missingStudents: [], todayEntries: 0 };
         let dashboardProjectCache = { reviewItems: [], revisionCount: 0, overdueCount: 0, earlyWarningCount: 0 };
+        let dashCalState = { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: '' };
+
+        global.shiftDashCalendarMonth = function (delta) {
+            const dt = new Date(dashCalState.year, dashCalState.month + delta, 1);
+            dashCalState.year = dt.getFullYear();
+            dashCalState.month = dt.getMonth();
+            renderDashboardCalendarWidget();
+        };
+
+        global.resetDashCalendarMonth = function () {
+            const n = new Date();
+            dashCalState.year = n.getFullYear();
+            dashCalState.month = n.getMonth();
+            dashCalState.selectedDate = '';
+            renderDashboardCalendarWidget();
+        };
+
+        global.selectDashCalendarDate = function (ymd) {
+            dashCalState.selectedDate = dashCalState.selectedDate === ymd ? '' : (ymd || '');
+            renderDashboardCalendarWidget();
+        };
+
+        global.openFullProjectCalendar = function () {
+            projectCalendarState.year = dashCalState.year;
+            projectCalendarState.month = dashCalState.month;
+            projectViewMode = 'calendar';
+            global.switchTab('projects');
+            renderProjectTrackerBody();
+        };
+
+        global.openDashCalendarTask = function (taskId) {
+            global.switchTab('projects');
+            if (typeof global.jumpToCalendarTask === 'function') global.jumpToCalendarTask(taskId);
+        };
+
+        function renderDashboardCalendarWidget() {
+            const el = document.getElementById('dashCalendarCard');
+            if (!el) return;
+            const { allTasks = [], subMap = {}, studentList = [] } = projectDataCache;
+            el.innerHTML = buildDashboardCalendarWidgetHtml(allTasks, dashCalState, {
+                title: 'Kalender & Deadline Produksi',
+                prevFn: 'shiftDashCalendarMonth(-1)',
+                todayFn: 'resetDashCalendarMonth()',
+                nextFn: 'shiftDashCalendarMonth(1)',
+                selectDateFn: 'selectDashCalendarDate',
+                fullCalFn: 'openFullProjectCalendar()',
+                onTaskClickAttrFn: (t) => `onclick="openDashCalendarTask('${esc(t.id)}')"`,
+                getTaskMetaFn: (t) => {
+                    const elig = studentList.filter((s) => !t.sub_concentration || s.sub_concentration === t.sub_concentration);
+                    const done = elig.filter((s) => subMap[`${t.id}__${s.id}`]?.status === 'selesai').length;
+                    return {
+                        badge: elig.length ? `${done}/${elig.length} ACC` : '',
+                        allDone: elig.length > 0 && done === elig.length
+                    };
+                }
+            });
+        }
 
         global.setDashboardQueueTab = function (tab) {
             dashboardQueueTab = tab === 'review' ? 'review' : 'daily';
@@ -3901,6 +4156,7 @@
             }
 
             renderDashboardActionQueue();
+            renderDashboardCalendarWidget();
         }
 
         global.handlePdfFilePick = function (inp) {
@@ -8222,6 +8478,7 @@
         openLeaderboardModal,
         printStudentCertificatePdf,
         openShowcaseGalleryModal,
+        buildDashboardCalendarWidgetHtml,
         buildCalendarAndGanttHtml,
         openStudentCalendarModal,
         openFeedbackHistoryModal,
