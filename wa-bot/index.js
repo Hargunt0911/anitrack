@@ -42,7 +42,11 @@ const SEND_DELAY_MIN_MS = Math.max(5000, Number(process.env.SEND_DELAY_MIN_MS ||
 const SEND_DELAY_MAX_MS = Math.max(SEND_DELAY_MIN_MS, Number(process.env.SEND_DELAY_MAX_MS || 45000));
 const COOLDOWN_EVERY = Math.max(1, Number(process.env.COOLDOWN_EVERY || 10));
 const COOLDOWN_MS = Math.max(15000, Number(process.env.COOLDOWN_MS || 180000));
+const AUTO_REPLY_ENABLED = String(process.env.AUTO_REPLY_ENABLED ?? 'true').toLowerCase() !== 'false';
+const AUTO_REPLY_COOLDOWN_MS = Math.max(3000, Number(process.env.AUTO_REPLY_COOLDOWN_MS || 6000));
 const AUTH_DIR = path.join(__dirname, 'auth_info');
+
+const lastAutoReplyAt = new Map(); // senderKey -> timestamp ms
 
 function randBetween(min, max) {
   return min + Math.floor(Math.random() * (max - min + 1));
@@ -476,6 +480,265 @@ async function runDeadlineReminderJob(source = 'cron', options = {}) {
   }
 }
 
+async function sendToJidWithTyping(jid, text, withTyping = true) {
+  if (!sock || waStatus !== 'open') {
+    throw new Error(`WhatsApp belum terhubung (status: ${waStatus}).`);
+  }
+  if (withTyping) {
+    try {
+      await sock.presenceSubscribe(jid).catch(() => {});
+      await sock.sendPresenceUpdate('composing', jid).catch(() => {});
+      await sleep(randBetween(TYPING_MIN_MS, TYPING_MAX_MS));
+      await sock.sendPresenceUpdate('paused', jid).catch(() => {});
+    } catch { /* ignore presence errors */ }
+  }
+  await sock.sendMessage(jid, { text: String(text || '') });
+}
+
+function extractIncomingText(msg) {
+  const m = msg?.message;
+  if (!m) return '';
+  if (typeof m.conversation === 'string') return m.conversation;
+  if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
+  if (m.imageMessage?.caption) return m.imageMessage.caption;
+  if (m.videoMessage?.caption) return m.videoMessage.caption;
+  if (m.ephemeralMessage?.message) return extractIncomingText({ message: m.ephemeralMessage.message });
+  if (m.viewOnceMessage?.message) return extractIncomingText({ message: m.viewOnceMessage.message });
+  return '';
+}
+
+function buildAutoReplyMenuText() {
+  return [
+    '🤖 *AniTrack — SMKN 4 Malang (Balas Otomatis)*',
+    '',
+    'Ketik salah satu kata kunci berikut:',
+    '• *cek* — Cek progres & deadline akun kamu (otomatis dari nomor WA terdaftar)',
+    '• *cek <nama/username>* — Cek progres siswa tertentu *(cocok untuk Orang Tua/Wali, contoh: `cek zahira`)*',
+    '• *tugas* — Lihat daftar tugas & deadline terdekat kamu',
+    '• *menu* — Tampilkan daftar perintah ini',
+    '',
+    `🌐 Portal Siswa: ${APP_URL}`,
+    `👨‍👩‍👧 Portal Pantau Ortu: ${APP_URL.replace(/\/+$/, '')}/pantau.html`
+  ].join('\n');
+}
+
+async function buildStudentProgressReply(student, allProfiles, tasks, subs, colsMap, rowMap, mode = 'all') {
+  const todayStr = getTodayJakartaYmd();
+  const todayMs = parseYmdToUtcMs(todayStr);
+  const mentor = student.mentor_id ? allProfiles.find((p) => p.id === student.mentor_id) : null;
+  const subMap = {};
+  subs.forEach((ps) => {
+    if (ps.student_id === student.id) subMap[ps.project_task_id] = ps;
+  });
+
+  const eligibleTasks = tasks.filter((t) => !t.sub_concentration || t.sub_concentration === student.sub_concentration);
+  let accCount = 0;
+  let reviewCount = 0;
+  let revisiCount = 0;
+  const overdueItems = [];
+  const upcomingItems = [];
+
+  eligibleTasks.forEach((t) => {
+    const ps = subMap[t.id];
+    const st = ps ? ps.status : 'belum_mulai';
+    if (st === 'selesai') { accCount++; return; }
+    if (st === 'menunggu_review') { reviewCount++; return; }
+    if (st === 'revisi') revisiCount++;
+    if (!t.due_date) return;
+    const dueMs = parseYmdToUtcMs(t.due_date);
+    if (dueMs === null) return;
+    const diffDays = Math.round((dueMs - todayMs) / 86400000);
+    if (diffDays < 0) {
+      overdueItems.push({ title: t.title, dueDate: String(t.due_date).slice(0, 10), lateDays: Math.abs(diffDays), status: st });
+    } else {
+      upcomingItems.push({ title: t.title, dueDate: String(t.due_date).slice(0, 10), diffDays, status: st });
+    }
+  });
+
+  overdueItems.sort((a, b) => b.lateDays - a.lateDays);
+  upcomingItems.sort((a, b) => a.diffDays - b.diffDays);
+
+  const lines = [
+    `📌 *UPDATE PROGRES ANITRACK*`,
+    `👤 *${student.full_name}* (@${student.username})`,
+    `🏫 ${student.class_name || '-'} • ${student.sub_concentration || 'Belum pilih subkon'}`,
+    mentor ? `👨‍🏫 Pembimbing: *${mentor.full_name}*${formatWaLocal(mentor.whatsapp_number) !== '-' ? ` (${formatWaLocal(mentor.whatsapp_number)})` : ''}` : '',
+    ''
+  ].filter((x) => x !== '');
+
+  if (mode !== 'tasks_only') {
+    lines.push(formatProjectUpdateBlock(student, colsMap, rowMap));
+    lines.push('');
+  }
+
+  lines.push(`📋 *RINGKASAN PROJECT TRACKER:*`);
+  lines.push(`• Tuntas (ACC): *${accCount}/${eligibleTasks.length}* tugas`);
+  if (reviewCount) lines.push(`• Menunggu Review Guru: *${reviewCount}*`);
+  if (revisiCount) lines.push(`• Perlu Revisi: *${revisiCount}*`);
+
+  if (overdueItems.length) {
+    lines.push('');
+    lines.push('🔴 *MELEBIHI DEADLINE:*');
+    overdueItems.slice(0, 5).forEach((item, i) => {
+      const rev = item.status === 'revisi' ? ' [Revisi]' : '';
+      lines.push(`${i + 1}. ${item.title}${rev} — *Telat ${item.lateDays} hari* (${item.dueDate})`);
+    });
+    if (overdueItems.length > 5) lines.push(`_...dan ${overdueItems.length - 5} tugas terlambat lainnya._`);
+  }
+
+  if (upcomingItems.length) {
+    lines.push('');
+    lines.push('🟡 *DEADLINE TERDEKAT:*');
+    upcomingItems.slice(0, 4).forEach((item, i) => {
+      const when = item.diffDays === 0 ? 'HARI INI' : (item.diffDays === 1 ? 'Besok' : `H-${item.diffDays}`);
+      const rev = item.status === 'revisi' ? ' [Revisi]' : '';
+      lines.push(`${i + 1}. ${item.title}${rev} — *${when}* (${item.dueDate})`);
+    });
+  }
+
+  if (!overdueItems.length && !upcomingItems.length && eligibleTasks.length > 0 && accCount === eligibleTasks.length) {
+    lines.push('');
+    lines.push('🎉 *Luar biasa!* Semua tugas project sudah tuntas (ACC).');
+  }
+
+  lines.push('');
+  lines.push(`🔗 Portal AniTrack: ${APP_URL}`);
+  return lines.join('\n');
+}
+
+async function handleIncomingAutoReply(msg) {
+  if (!AUTO_REPLY_ENABLED) return;
+  if (!msg || !msg.key || msg.key.fromMe) return;
+
+  const remoteJid = String(msg.key.remoteJid || '');
+  // HANYA balas chat pribadi (jangan pernah balas di grup @g.us atau status@broadcast)
+  if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast' || remoteJid.endsWith('@newsletter')) return;
+
+  const rawText = extractIncomingText(msg).trim();
+  if (!rawText || rawText.length > 120) return;
+
+  const lower = rawText.toLowerCase().replace(/\s+/g, ' ');
+  const isMenuCmd = /^(menu|bantu|help|info|halo|hai|hi|mulai|start)$/i.test(lower);
+  const isSiapCmd = /^(siap|oke|ok|hadir|tersimpan)$/i.test(lower);
+  const cekMatch = lower.match(/^(cek|progres|progress|status|pantau|tugas|deadline)(?:\s+(.+))?$/i);
+  if (!isMenuCmd && !isSiapCmd && !cekMatch) return;
+
+  // Anti-spam rate limit per pengirim
+  const now = Date.now();
+  const prevAt = lastAutoReplyAt.get(remoteJid) || 0;
+  if (now - prevAt < AUTO_REPLY_COOLDOWN_MS) return;
+  lastAutoReplyAt.set(remoteJid, now);
+
+  // Ambil nomor pengirim dari remoteJid atau remoteJidAlt (untuk dukungan LID Baileys)
+  const altJid = String(msg.key.remoteJidAlt || '');
+  const phoneSource = remoteJid.endsWith('@s.whatsapp.net')
+    ? remoteJid.split('@')[0]
+    : (altJid.endsWith('@s.whatsapp.net') ? altJid.split('@')[0] : '');
+  const senderPhone = normalizeWaPhone(phoneSource);
+
+  try {
+    if (isMenuCmd) {
+      await sendToJidWithTyping(remoteJid, buildAutoReplyMenuText(), true);
+      addLog(`[AUTO-REPLY] "${rawText}" -> kirim menu ke ${senderPhone ? formatWaLocal(senderPhone) : remoteJid}`);
+      return;
+    }
+
+    if (isSiapCmd) {
+      await sendToJidWithTyping(
+        remoteJid,
+        '✅ Terima kasih! Nomor kamu sudah terhubung dengan *AniTrack SMKN 4 Malang*.\n\nKapan saja ingin melihat progres project & deadline, cukup ketik *cek* atau *menu*.',
+        true
+      );
+      addLog(`[AUTO-REPLY] "${rawText}" -> konfirmasi siap ke ${senderPhone ? formatWaLocal(senderPhone) : remoteJid}`);
+      return;
+    }
+
+    const cmd = cekMatch[1].toLowerCase();
+    const queryRaw = (cekMatch[2] || '').trim();
+    const mode = (cmd === 'tugas' || cmd === 'deadline') ? 'tasks_only' : 'all';
+
+    const [profiles, tasks, subs, colsRows, ckRows] = await Promise.all([
+      fetchSupabase('profiles?select=id,full_name,username,class_name,sub_concentration,role,mentor_id,whatsapp_number'),
+      fetchSupabase('project_tasks?select=id,title,pipeline_stage,sub_concentration,due_date'),
+      fetchSupabase('project_submissions?select=project_task_id,student_id,status'),
+      fetchSupabase('app_settings?select=value&key=eq.proj_checklist_cols').catch(() => []),
+      fetchSupabase('app_settings?select=key,value&key=like.proj_checklist_row::*').catch(() => [])
+    ]);
+
+    const students = profiles.filter((p) => p.role === 'student');
+    let colsMap = {};
+    if (colsRows && colsRows.length && colsRows[0].value) {
+      try { colsMap = JSON.parse(colsRows[0].value) || {}; } catch { /* ignore */ }
+    }
+    const rowMap = {};
+    (ckRows || []).forEach((r) => {
+      try {
+        const p = JSON.parse(r.value || '{}');
+        const sid = p.student_id || String(r.key || '').replace('proj_checklist_row::', '');
+        if (sid) rowMap[sid] = p;
+      } catch { /* ignore */ }
+    });
+
+    let matchedStudent = null;
+    if (!queryRaw) {
+      // Cari otomatis berdasarkan nomor WA pengirim
+      if (senderPhone) {
+        matchedStudent = students.find((s) => normalizeWaPhone(s.whatsapp_number) === senderPhone) || null;
+      }
+      if (!matchedStudent) {
+        await sendToJidWithTyping(
+          remoteJid,
+          'ℹ️ Nomor WhatsApp ini belum terdaftar pada profil siswa di AniTrack.\n\nJika Anda *Orang Tua/Wali* atau menggunakan nomor lain, ketik:\n*cek <nama atau username siswa>*\nContoh: `cek zahira`',
+          true
+        );
+        addLog(`[AUTO-REPLY] "${rawText}" -> nomor belum terdaftar (${senderPhone ? formatWaLocal(senderPhone) : remoteJid})`);
+        return;
+      }
+    } else {
+      const q = queryRaw.replace(/^@+/, '').toLowerCase();
+      const exact = students.filter((s) =>
+        String(s.username || '').toLowerCase() === q ||
+        String(s.full_name || '').toLowerCase() === q
+      );
+      const matches = exact.length
+        ? exact
+        : students.filter((s) =>
+            String(s.full_name || '').toLowerCase().includes(q) ||
+            String(s.username || '').toLowerCase().includes(q)
+          );
+
+      if (!matches.length) {
+        await sendToJidWithTyping(
+          remoteJid,
+          `❌ Siswa dengan kata kunci *"${queryRaw}"* tidak ditemukan.\nCoba ketik sebagian nama depan atau username siswa (contoh: *cek zahira*).`,
+          true
+        );
+        addLog(`[AUTO-REPLY] "${rawText}" -> tidak ditemukan`);
+        return;
+      }
+      if (matches.length > 1) {
+        const listText = matches.slice(0, 8).map((s, i) =>
+          `${i + 1}. *${s.full_name}* (${s.class_name || '-'}) → ketik: *cek ${s.username}*`
+        ).join('\n');
+        await sendToJidWithTyping(
+          remoteJid,
+          `🔎 Ditemukan ${matches.length} siswa cocok dengan *"${queryRaw}"*:\n\n${listText}\n\nSilakan ketik perintah di sebelah kanan nama yang dimaksud.`,
+          true
+        );
+        addLog(`[AUTO-REPLY] "${rawText}" -> ${matches.length} kandidat dikirim`);
+        return;
+      }
+      matchedStudent = matches[0];
+    }
+
+    const replyText = await buildStudentProgressReply(matchedStudent, profiles, tasks, subs, colsMap, rowMap, mode);
+    await sendToJidWithTyping(remoteJid, replyText, true);
+    addLog(`[AUTO-REPLY] "${rawText}" -> kirim progres ${matchedStudent.full_name} ke ${senderPhone ? formatWaLocal(senderPhone) : remoteJid}`);
+  } catch (err) {
+    addLog(`[AUTO-REPLY ERROR] ${err.message}`, 'error');
+  }
+}
+
 async function startWhatsAppSocket() {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -495,6 +758,13 @@ async function startWhatsAppSocket() {
   });
 
   sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('messages.upsert', async (event) => {
+    if (event.type !== 'notify') return;
+    for (const msg of event.messages || []) {
+      handleIncomingAutoReply(msg);
+    }
+  });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -594,6 +864,7 @@ function renderDashboardHtml() {
         <span class="pill" id="phonePill">Nomor WA: -</span>
         <span class="pill" id="cronPill">Jadwal: ${CRON_SCHEDULE} WIB</span>
         <span class="pill" style="background:#fef3c7;color:#92400e;">🛡️ Mode Ekstra Aman: ${Math.round(SEND_DELAY_MIN_MS / 1000)}–${Math.round(SEND_DELAY_MAX_MS / 1000)} dtk + Istirahat ${Math.round(COOLDOWN_MS / 60000)} mnt / ${COOLDOWN_EVERY} pesan</span>
+        <span class="pill" style="background:#dcfce7;color:#15803d;">💬 Auto-Reply Kata Kunci: ${AUTO_REPLY_ENABLED ? 'AKTIF (menu, cek, cek &lt;nama&gt;, tugas)' : 'NONAKTIF'}</span>
         <span class="pill" id="dummyPill">Mode Dummy: memuat...</span>
       </div>
     </div>
