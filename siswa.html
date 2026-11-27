@@ -8,6 +8,12 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./logo-anitrack.png?v=20261124b" />
     <link rel="shortcut icon" type="image/png" href="./logo-anitrack.png?v=20261124b" />
     <link rel="apple-touch-icon" href="./logo-anitrack.png?v=20261124b" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="AniTrack" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -906,6 +912,17 @@
                             <div id="accountFeedback" class="text-xs font-semibold"></div>
                         </div>
                     </div>
+
+                    <div data-pwa-install-wrap class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-sm font-extrabold text-[#1E293B]">📱 Pasang AniTrack di HP (Android &amp; iPhone)</div>
+                            <p class="text-xs text-slate-500 mt-0.5">Tambahkan ke Layar Utama agar tampil layar penuh seperti aplikasi asli tanpa address bar browser.</p>
+                        </div>
+                        <button type="button" onclick="promptPwaInstall()"
+                            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-xs font-bold transition shrink-0 cursor-pointer">
+                            📲 <span data-pwa-install-label>Pasang Aplikasi</span>
+                        </button>
+                    </div>
                 </section>
             </main>
         </div>
@@ -956,7 +973,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261127a"></script>
+    <script src="./anitrack-core.js?v=20261127c"></script>
     <script>
         (function () {
             const A = window.AniTrack;

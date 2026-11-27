@@ -8,6 +8,12 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./logo-anitrack.png?v=20261124b" />
     <link rel="shortcut icon" type="image/png" href="./logo-anitrack.png?v=20261124b" />
     <link rel="apple-touch-icon" href="./logo-anitrack.png?v=20261124b" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="AniTrack" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,13 +41,14 @@
 </head>
 
 <body class="bg-[#F3F6FB] text-[#1E293B] min-h-screen antialiased selection:bg-[#EAF4FF] selection:text-[#0095FF]">
-    <section class="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-[#F3F6FB]">
+    <section class="relative min-h-[100dvh] flex items-center justify-center p-4 overflow-hidden bg-[#F3F6FB]" style="padding-top: max(1rem, env(safe-area-inset-top)); padding-bottom: max(1rem, env(safe-area-inset-bottom));">
         <div class="pointer-events-none absolute -top-28 -left-28 w-80 h-80 rounded-full bg-[#F7C200]/25 blur-2xl"></div>
         <div class="pointer-events-none absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-[#4CB6A7]/25 blur-2xl"></div>
         <div class="pointer-events-none absolute top-1/3 right-12 w-36 h-36 rounded-full bg-[#0095FF]/12 blur-xl"></div>
 
         <button type="button" data-dark-toggle onclick="toggleDarkMode()" title="Ganti Mode Gelap / Terang"
-            class="fixed top-4 right-4 z-20 w-10 h-10 rounded-xl bg-white border border-[#E8EEF6] shadow-cardHover flex items-center justify-center text-base cursor-pointer">
+            style="top: max(1rem, env(safe-area-inset-top));"
+            class="fixed right-4 z-20 w-10 h-10 rounded-xl bg-white border border-[#E8EEF6] shadow-cardHover flex items-center justify-center text-base cursor-pointer">
             <span data-dark-icon>🌙</span>
         </button>
 
@@ -108,15 +115,24 @@
                     class="hidden text-xs font-medium text-[#E11D48] bg-[#FFF1F5] border border-[#FECDD6] rounded-xl px-3.5 py-2.5 text-center">
                 </div>
 
-                <div class="pt-2.5 border-t border-[#F1F5F9] text-center space-y-1">
-                    <div class="text-[11px] text-slate-500">Lupa username atau password? Hubungi <strong>Admin / Guru Pembimbing</strong>.</div>
-                    <div class="text-[10.5px] text-slate-400">Sistem Monitoring Project &amp; Daily Task • Jurusan Animasi</div>
+                <div class="pt-2.5 border-t border-[#F1F5F9] text-center space-y-2.5">
+                    <div data-pwa-install-wrap class="pt-0.5">
+                        <button type="button" onclick="promptPwaInstall()"
+                            class="w-full py-2.5 px-3.5 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] border border-[#DCEBFF] text-[#0082E6] text-xs font-bold inline-flex items-center justify-center gap-2 transition cursor-pointer">
+                            <span>📲</span>
+                            <span data-pwa-install-label>Pasang Aplikasi di HP (Android / iPhone)</span>
+                        </button>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-[11px] text-slate-500">Lupa username atau password? Hubungi <strong>Admin / Guru Pembimbing</strong>.</div>
+                        <div class="text-[10.5px] text-slate-400">Sistem Monitoring Project &amp; Daily Task • Jurusan Animasi</div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <script src="./anitrack-core.js?v=20261127a"></script>
+    <script src="./anitrack-core.js?v=20261127c"></script>
     <script>
         (function () {
             const { supabase, getUser, setUser, redirectToRole, loadAdminRoleIds } = window.AniTrack;

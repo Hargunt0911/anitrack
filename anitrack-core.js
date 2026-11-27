@@ -1221,8 +1221,78 @@
             html.dark td.sticky, html.dark th.sticky { background-color: #111827 !important; }
             html.dark .shadow-card { box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35) !important; }
             html.dark #anitrackNotifPopover { background-color: #111827 !important; border-color: #253349 !important; }
+
+            /* ==================== MOBILE ANDROID, IPHONE & PWA POLISH ==================== */
+            html, body { overscroll-behavior-y: contain; -webkit-text-size-adjust: 100%; }
+            button, a, [role="button"], label { touch-action: manipulation; }
+            #appToast { top: calc(1rem + env(safe-area-inset-top)) !important; }
+            header.sticky { padding-top: env(safe-area-inset-top); }
+            .mob-link { min-height: 48px; transition: background-color 150ms ease, color 150ms ease, transform 120ms ease; }
+            .mob-link:active { transform: scale(0.95); }
+            .mob-link.text-\\[\\#0095FF\\] { background-color: rgba(0, 149, 255, 0.1); }
+            html.dark .mob-link.text-\\[\\#0095FF\\] { background-color: rgba(56, 189, 248, 0.16); }
+
+            @media (max-width: 1023px) {
+                #sidebar {
+                    height: 100dvh !important;
+                    max-height: 100dvh;
+                    width: min(82vw, 272px) !important;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                    -webkit-overflow-scrolling: touch;
+                    padding-top: max(1rem, env(safe-area-inset-top)) !important;
+                    padding-bottom: max(1.25rem, env(safe-area-inset-bottom)) !important;
+                }
+                #sidebar .sidebar-label {
+                    max-width: 175px !important;
+                    opacity: 1 !important;
+                    margin-left: 12px !important;
+                    transform: translateX(0) !important;
+                    pointer-events: auto !important;
+                }
+                #sidebar .nav-item {
+                    min-height: 44px;
+                    padding-right: 12px !important;
+                }
+                #sidebar .nav-tooltip { display: none !important; }
+            }
+
+            @media (max-width: 639px) {
+                /* Cegah auto-zoom paksa di iPhone Safari saat mengetik input/select */
+                input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+                select, textarea {
+                    font-size: 16px !important;
+                }
+                /* Pastikan kolom nama siswa sticky di Project Update tidak memakan seluruh layar HP */
+                .ck-sticky-col {
+                    min-width: 136px !important;
+                    max-width: 158px !important;
+                    padding-left: 0.65rem !important;
+                    padding-right: 0.65rem !important;
+                }
+                /* Pastikan modal tetap bisa di-scroll nyaman di HP layar kecil */
+                [id$="Modal"] > div, #anitrackPwaModal > div {
+                    max-height: calc(100dvh - 2rem);
+                    overflow-y: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+            }
+
+            @media (display-mode: standalone) {
+                header, nav, aside { -webkit-user-select: none; user-select: none; }
+            }
         `;
         document.head.appendChild(st);
+    }
+
+    function updateThemeColorMeta(isDark) {
+        let meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'theme-color';
+            document.head.appendChild(meta);
+        }
+        meta.content = isDark ? '#111827' : '#FFFFFF';
     }
 
     function updateDarkModeButtons(isDark) {
@@ -1236,6 +1306,7 @@
     function applyDarkMode(isDark) {
         injectDarkModeStyles();
         document.documentElement.classList.toggle('dark', Boolean(isDark));
+        updateThemeColorMeta(Boolean(isDark));
         try { localStorage.setItem(DARK_THEME_STORAGE_KEY, isDark ? 'dark' : 'light'); } catch { /* ignore */ }
         updateDarkModeButtons(Boolean(isDark));
     }
@@ -1256,6 +1327,191 @@
         document.addEventListener('DOMContentLoaded', initDarkMode);
     } else {
         initDarkMode();
+    }
+
+    // ==================== 1B. PWA & SMARTPHONE APP INSTALLER (ANDROID & IPHONE) ====================
+    let deferredPwaPrompt = null;
+
+    function isPwaStandalone() {
+        try {
+            return Boolean(
+                (global.matchMedia && global.matchMedia('(display-mode: standalone)').matches)
+                || global.navigator.standalone === true
+            );
+        } catch {
+            return false;
+        }
+    }
+
+    function detectMobileOs() {
+        const ua = (global.navigator?.userAgent || '').toLowerCase();
+        const isIos = /iphone|ipad|ipod/.test(ua)
+            || (global.navigator?.platform === 'MacIntel' && (global.navigator?.maxTouchPoints || 0) > 1);
+        const isAndroid = /android/.test(ua);
+        return { isIos, isAndroid };
+    }
+
+    function updatePwaInstallButtons() {
+        const standalone = isPwaStandalone();
+        const { isIos, isAndroid } = detectMobileOs();
+        document.querySelectorAll('[data-pwa-install-wrap]').forEach((wrap) => {
+            wrap.classList.toggle('hidden', standalone);
+        });
+        document.querySelectorAll('[data-pwa-install-label]').forEach((el) => {
+            if (deferredPwaPrompt) {
+                el.textContent = 'Install Aplikasi AniTrack (Android)';
+            } else if (isIos) {
+                el.textContent = 'Pasang AniTrack di iPhone / iPad';
+            } else if (isAndroid) {
+                el.textContent = 'Pasang AniTrack di HP Android';
+            } else {
+                el.textContent = 'Pasang Aplikasi di HP / Desktop';
+            }
+        });
+    }
+
+    function openPwaGuideModal() {
+        const { isIos, isAndroid } = detectMobileOs();
+        let modal = document.getElementById('anitrackPwaModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'anitrackPwaModal';
+            modal.className = 'fixed inset-0 z-[95] hidden bg-slate-900/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-3 sm:p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+            document.body.appendChild(modal);
+        }
+
+        const title = isIos
+            ? 'Pasang AniTrack di iPhone / iPad'
+            : (isAndroid ? 'Pasang AniTrack di HP Android' : 'Pasang Aplikasi AniTrack');
+
+        const stepsHtml = isIos
+            ? `
+                <div class="rounded-xl bg-[#F0F9FF] border border-[#BAE6FD] p-3 text-xs text-[#0369A1] font-medium">
+                    Pastikan membuka link ini menggunakan browser <strong>Safari</strong> di iPhone/iPad.
+                </div>
+                <ol class="space-y-2.5 text-xs sm:text-sm text-slate-600">
+                    <li class="flex items-start gap-2.5">
+                        <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <span>Ketuk tombol <strong>Bagikan (Share)</strong> ikon kotak berpanah ke atas <strong>⬆️</strong> di bar bawah Safari.</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <span>Geser ke bawah, lalu ketuk <strong>"Tambahkan ke Layar Utama"</strong> (<em>Add to Home Screen</em>).</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <span>Ketuk <strong>"Tambah"</strong> di pojok kanan atas. Ikon <strong>AniTrack</strong> siap dibuka layar penuh seperti aplikasi!</span>
+                    </li>
+                </ol>
+            `
+            : (isAndroid
+                ? `
+                    <ol class="space-y-2.5 text-xs sm:text-sm text-slate-600">
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                            <span>Buka halaman ini di <strong>Google Chrome</strong> Android, lalu ketuk ikon <strong>titik tiga (⋮)</strong> di pojok kanan atas.</span>
+                        </li>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                            <span>Pilih menu <strong>"Tambahkan ke layar utama"</strong> atau <strong>"Instal aplikasi"</strong> (<em>Install app</em>).</span>
+                        </li>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                            <span>Ketuk <strong>"Instal"</strong> — aplikasi <strong>AniTrack</strong> akan tampil layar penuh tanpa address bar browser!</span>
+                        </li>
+                    </ol>
+                `
+                : `
+                    <ol class="space-y-2.5 text-xs sm:text-sm text-slate-600">
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                            <span>Untuk <strong>Android</strong>: buka di Chrome → ketuk menu <strong>⋮</strong> → pilih <strong>"Instal aplikasi"</strong>.</span>
+                        </li>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                            <span>Untuk <strong>iPhone</strong>: buka di Safari → ketuk tombol <strong>Share (⬆️)</strong> → pilih <strong>"Tambahkan ke Layar Utama"</strong>.</span>
+                        </li>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-6 h-6 rounded-full bg-[#EAF4FF] text-[#0095FF] font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                            <span>Untuk <strong>PC/Laptop</strong>: klik ikon <strong>Install (⊕)</strong> di ujung kanan address bar Chrome/Edge.</span>
+                        </li>
+                    </ol>
+                `);
+
+        modal.innerHTML = `
+            <div class="w-full max-w-md bg-white border border-[#EDF1F7] rounded-2xl shadow-2xl overflow-hidden">
+                <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <img src="./logo-anitrack.png" alt="AniTrack" class="w-10 h-10 rounded-xl object-contain shrink-0 bg-white p-1 border border-[#E8EEF6]" />
+                        <div class="min-w-0">
+                            <div class="text-sm font-extrabold text-[#1E293B] truncate">${title}</div>
+                            <div class="text-[11px] text-slate-500">Buka cepat dari Layar Utama HP (tanpa Play Store)</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="document.getElementById('anitrackPwaModal').classList.add('hidden')"
+                        class="w-8 h-8 rounded-xl bg-white border border-[#E2E8F0] text-slate-500 hover:text-slate-800 text-sm font-bold flex items-center justify-center shrink-0 cursor-pointer">✕</button>
+                </div>
+                <div class="p-5 space-y-4">
+                    ${stepsHtml}
+                    <button type="button" onclick="document.getElementById('anitrackPwaModal').classList.add('hidden')"
+                        class="w-full py-2.5 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-sm font-bold shadow-blueGlow transition cursor-pointer">
+                        Mengerti
+                    </button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+    }
+
+    async function promptPwaInstall() {
+        if (isPwaStandalone()) {
+            showToast('AniTrack sudah terpasang & berjalan dalam mode aplikasi ✅');
+            return;
+        }
+        if (deferredPwaPrompt) {
+            try {
+                deferredPwaPrompt.prompt();
+                const choice = await deferredPwaPrompt.userChoice;
+                deferredPwaPrompt = null;
+                updatePwaInstallButtons();
+                if (choice?.outcome === 'accepted') {
+                    showToast('AniTrack sedang dipasang ke Layar Utama HP... 📲');
+                }
+                return;
+            } catch {
+                deferredPwaPrompt = null;
+            }
+        }
+        openPwaGuideModal();
+    }
+
+    function initPwaSupport() {
+        updatePwaInstallButtons();
+        global.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPwaPrompt = e;
+            updatePwaInstallButtons();
+        });
+        global.addEventListener('appinstalled', () => {
+            deferredPwaPrompt = null;
+            updatePwaInstallButtons();
+            showToast('Aplikasi AniTrack berhasil dipasang di HP! 🎉');
+        });
+        if ('serviceWorker' in global.navigator) {
+            const proto = global.location?.protocol || '';
+            const host = global.location?.hostname || '';
+            if (proto === 'https:' || host === 'localhost' || host === '127.0.0.1') {
+                global.navigator.serviceWorker.register('./sw.js').catch(() => {});
+            }
+        }
+    }
+
+    global.promptPwaInstall = promptPwaInstall;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPwaSupport);
+    } else {
+        initPwaSupport();
     }
 
     // ==================== 2. IN-APP DRAW-OVER IMAGE ANNOTATOR ====================
@@ -2937,9 +3193,11 @@
                 sb.classList.add('sidebar-expanded');
                 sb.classList.remove('-translate-x-full');
                 bd.classList.remove('hidden');
+                if (global.innerWidth < 1024) document.body.style.overflow = 'hidden';
             } else {
                 sb.classList.add('-translate-x-full');
                 bd.classList.add('hidden');
+                document.body.style.overflow = '';
                 if (global.innerWidth >= 1024) applyDesktopSidebarState();
             }
         };
@@ -8350,6 +8608,8 @@
         printStudentsReportPdf,
         initDarkMode,
         toggleDarkMode,
+        isPwaStandalone,
+        promptPwaInstall,
         openImageAnnotatorModal,
         PARENT_WATCH_PREFIX,
         PARENT_TOKEN_PREFIX,
