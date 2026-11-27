@@ -4934,7 +4934,7 @@
         let projectReviewState = { status: 'active', className: '', search: '', page: 1 };
         let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
-        let projectChecklistState = { subconc: '', className: '', statusFilter: 'all', search: '', compactCols: true };
+        let projectChecklistState = { subconc: null, className: '', statusFilter: 'all', search: '', compactCols: true };
         let projectChecklistScrollPos = { left: 0, top: 0 };
         let projectClassesState = { search: '', mentorId: '', openClasses: new Set() };
         let projectCalendarState = { year: new Date().getFullYear(), month: new Date().getMonth() };
@@ -5812,10 +5812,12 @@
             const isAdminStaff = isAnyAdmin(currentUser);
             const poolStudents = (expectedRole === 'superadmin' || isAdminStaff) ? allStudentsList : studentList;
 
-            // Tentukan default tab aktif
+            // Tentukan default tab aktif hanya pada pemuatan awal (agar klik "Semua Bimbingan" = '' tidak tertimpa)
             let activeSc = projectChecklistState.subconc;
-            if (!activeSc && (expectedRole === 'superadmin' || myPjSubconcs.length > 0)) {
-                activeSc = myPjSubconcs[0] || SUBCONCS[0];
+            if (activeSc === null || activeSc === undefined) {
+                activeSc = (expectedRole === 'superadmin' || myPjSubconcs.length > 0)
+                    ? (myPjSubconcs[0] || SUBCONCS[0])
+                    : '';
                 projectChecklistState.subconc = activeSc;
             }
 
