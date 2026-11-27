@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="./logo-anitrack.png?v=20261124b" />
     <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#FFFFFF" />
+    <meta name="color-scheme" content="light" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -48,7 +49,7 @@
 
         <button type="button" data-dark-toggle onclick="toggleDarkMode()" title="Ganti Mode Gelap / Terang"
             style="top: max(1rem, env(safe-area-inset-top));"
-            class="fixed right-4 z-20 w-10 h-10 rounded-xl bg-white border border-[#E8EEF6] shadow-cardHover flex items-center justify-center text-base cursor-pointer">
+            class="fixed right-4 z-50 w-10 h-10 rounded-xl bg-white border border-[#E8EEF6] shadow-cardHover flex items-center justify-center text-base cursor-pointer">
             <span data-dark-icon>🌙</span>
         </button>
 
@@ -132,7 +133,7 @@
         </div>
     </section>
 
-    <script src="./anitrack-core.js?v=20261127d"></script>
+    <script src="./anitrack-core.js?v=20261127e"></script>
     <script>
         (function () {
             const { supabase, getUser, setUser, redirectToRole, loadAdminRoleIds } = window.AniTrack;

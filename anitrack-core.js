@@ -1174,10 +1174,17 @@
     const DARK_THEME_STORAGE_KEY = 'anitrack_theme';
 
     function injectDarkModeStyles() {
-        if (document.getElementById('anitrackDarkStyle')) return;
-        const st = document.createElement('style');
+        let st = document.getElementById('anitrackDarkStyle');
+        if (st) {
+            // Pastikan stylesheet dark mode selalu berada di paling bawah <head> (di bawah style Tailwind CDN)
+            document.head.appendChild(st);
+            return;
+        }
+        st = document.createElement('style');
         st.id = 'anitrackDarkStyle';
         st.textContent = `
+            :root { color-scheme: light; }
+            html.dark { color-scheme: dark; }
             .anitrack-xscroll { scrollbar-width: thin; scrollbar-color: #94A3B8 #EEF2F7; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
             .anitrack-xscroll::-webkit-scrollbar { height: 11px; width: 11px; }
             .anitrack-xscroll::-webkit-scrollbar-track { background: #EEF2F7; border-radius: 999px; }
@@ -1392,22 +1399,45 @@
             document.head.appendChild(meta);
         }
         meta.content = isDark ? '#111827' : '#FFFFFF';
+
+        let cs = document.querySelector('meta[name="color-scheme"]');
+        if (!cs) {
+            cs = document.createElement('meta');
+            cs.name = 'color-scheme';
+            document.head.appendChild(cs);
+        }
+        cs.content = isDark ? 'dark' : 'light';
     }
 
     function updateDarkModeButtons(isDark) {
         document.querySelectorAll('[data-dark-toggle]').forEach((btn) => {
             btn.title = isDark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap';
+            btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
             const icon = btn.querySelector('[data-dark-icon]');
             if (icon) icon.textContent = isDark ? '☀️' : '🌙';
         });
     }
 
     function applyDarkMode(isDark) {
+        const dark = Boolean(isDark);
         injectDarkModeStyles();
-        document.documentElement.classList.toggle('dark', Boolean(isDark));
-        updateThemeColorMeta(Boolean(isDark));
-        try { localStorage.setItem(DARK_THEME_STORAGE_KEY, isDark ? 'dark' : 'light'); } catch { /* ignore */ }
-        updateDarkModeButtons(Boolean(isDark));
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        document.documentElement.style.backgroundColor = dark ? '#0B1120' : '#F3F6FB';
+        if (document.body) {
+            document.body.classList.toggle('dark', dark);
+            document.body.style.backgroundColor = dark ? '#0B1120' : '#F3F6FB';
+            document.body.style.color = dark ? '#E2E8F0' : '#1E293B';
+        }
+        updateThemeColorMeta(dark);
+        try { localStorage.setItem(DARK_THEME_STORAGE_KEY, dark ? 'dark' : 'light'); } catch { /* ignore */ }
+        updateDarkModeButtons(dark);
+        try {
+            if (global.AniTrackNative && typeof global.AniTrackNative.setTheme === 'function') {
+                global.AniTrackNative.setTheme(dark);
+            }
+        } catch { /* ignore */ }
     }
 
     function initDarkMode() {

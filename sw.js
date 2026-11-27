@@ -1,5 +1,5 @@
 // AniTrack PWA Service Worker — Network-First App Shell (Safe for Supabase & Live Updates)
-const CACHE_NAME = 'anitrack-shell-v20261127d';
+const CACHE_NAME = 'anitrack-shell-v20261127e';
 const APP_SHELL = [
     './',
     './index.html',
