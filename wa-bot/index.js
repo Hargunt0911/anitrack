@@ -44,7 +44,11 @@ const COOLDOWN_EVERY = Math.max(1, Number(process.env.COOLDOWN_EVERY || 10));
 const COOLDOWN_MS = Math.max(15000, Number(process.env.COOLDOWN_MS || 180000));
 const AUTO_REPLY_ENABLED = String(process.env.AUTO_REPLY_ENABLED ?? 'true').toLowerCase() !== 'false';
 const AUTO_REPLY_COOLDOWN_MS = Math.max(3000, Number(process.env.AUTO_REPLY_COOLDOWN_MS || 6000));
+const PANEL_ENABLED = String(process.env.PANEL_ENABLED ?? 'true').toLowerCase() !== 'false';
+const PANEL_USER = (process.env.PANEL_USER || 'hargunt').trim();
+const PANEL_PASSWORD = (process.env.PANEL_PASSWORD || 'anitrack2026').trim();
 const AUTH_DIR = path.join(__dirname, 'auth_info');
+const PID_FILE = path.join(__dirname, '.bot.pid');
 
 const lastAutoReplyAt = new Map(); // senderKey -> timestamp ms
 
@@ -812,6 +816,27 @@ function verifySecret(req, res, next) {
   return res.status(401).json({ ok: false, status: false, error: 'Unauthorized: API Token tidak sesuai.' });
 }
 
+function requirePanelAuth(req, res, next) {
+  if (!PANEL_ENABLED) {
+    return res.status(404).send('Panel web dinonaktifkan (PANEL_ENABLED=false). Bot tetap aktif di background.');
+  }
+  if (!PANEL_PASSWORD) return next();
+  const header = String(req.headers.authorization || '');
+  if (header.startsWith('Basic ')) {
+    try {
+      const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+      const sepIdx = decoded.indexOf(':');
+      if (sepIdx !== -1) {
+        const u = decoded.slice(0, sepIdx);
+        const p = decoded.slice(sepIdx + 1);
+        if (u === PANEL_USER && p === PANEL_PASSWORD) return next();
+      }
+    } catch { /* invalid base64 */ }
+  }
+  res.setHeader('WWW-Authenticate', 'Basic realm="AniTrack WA Bot Admin"');
+  return res.status(401).send('Akses dibatasi. Masukkan Username & Password Admin AniTrack WA Bot.');
+}
+
 function renderDashboardHtml() {
   return `<!DOCTYPE html>
 <html lang="id">
@@ -865,6 +890,7 @@ function renderDashboardHtml() {
         <span class="pill" id="cronPill">Jadwal: ${CRON_SCHEDULE} WIB</span>
         <span class="pill" style="background:#fef3c7;color:#92400e;">🛡️ Mode Ekstra Aman: ${Math.round(SEND_DELAY_MIN_MS / 1000)}–${Math.round(SEND_DELAY_MAX_MS / 1000)} dtk + Istirahat ${Math.round(COOLDOWN_MS / 60000)} mnt / ${COOLDOWN_EVERY} pesan</span>
         <span class="pill" style="background:#dcfce7;color:#15803d;">💬 Auto-Reply Kata Kunci: ${AUTO_REPLY_ENABLED ? 'AKTIF (menu, cek, cek &lt;nama&gt;, tugas)' : 'NONAKTIF'}</span>
+        <span class="pill" style="background:#f1f5f9;color:#334155;">🔒 Panel Terkunci Password</span>
         <span class="pill" id="dummyPill">Mode Dummy: memuat...</span>
       </div>
     </div>
@@ -1004,12 +1030,12 @@ function renderDashboardHtml() {
 </html>`;
 }
 
-app.get('/', (_req, res) => {
+app.get('/', requirePanelAuth, (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(renderDashboardHtml());
 });
 
-app.get('/api/status', async (_req, res) => {
+app.get('/api/status', requirePanelAuth, async (_req, res) => {
   const cfg = await fetchWaGatewayConfig();
   res.json({
     ok: true,
@@ -1025,7 +1051,7 @@ app.get('/api/status', async (_req, res) => {
   });
 });
 
-app.post('/api/test-send', async (req, res) => {
+app.post('/api/test-send', requirePanelAuth, async (req, res) => {
   try {
     const cfg = await fetchWaGatewayConfig();
     const targetPhone = req.body?.phone || cfg.waTestPhone || '081259699623';
@@ -1064,12 +1090,12 @@ app.post('/api/test-send', async (req, res) => {
   }
 });
 
-app.post('/api/run-now', async (_req, res) => {
+app.post('/api/run-now', requirePanelAuth, async (_req, res) => {
   const result = await runDeadlineReminderJob('local_ui_manual');
   res.status(result.ok ? 200 : 500).json(result);
 });
 
-app.post('/api/logout', async (_req, res) => {
+app.post('/api/logout', requirePanelAuth, async (_req, res) => {
   try {
     if (sock) {
       try { await sock.logout(); } catch { /* ignore */ }
@@ -1086,7 +1112,7 @@ app.post('/api/logout', async (_req, res) => {
   }
 });
 
-app.get('/health', (_req, res) => {
+app.get('/health', requirePanelAuth, (_req, res) => {
   res.json({
     ok: true,
     service: 'anitrack-wa-bot',
@@ -1126,8 +1152,24 @@ cron.schedule(
   { timezone: 'Asia/Jakarta' }
 );
 
+function cleanupPidFile() {
+  try {
+    if (fs.existsSync(PID_FILE) && String(fs.readFileSync(PID_FILE, 'utf8')).trim() === String(process.pid)) {
+      fs.unlinkSync(PID_FILE);
+    }
+  } catch { /* ignore */ }
+}
+process.on('exit', cleanupPidFile);
+process.on('SIGINT', () => { cleanupPidFile(); process.exit(0); });
+process.on('SIGTERM', () => { cleanupPidFile(); process.exit(0); });
+
 app.listen(PORT, '127.0.0.1', () => {
-  addLog(`AniTrack WA Bot aktif di http://127.0.0.1:${PORT} (buka di browser untuk Scan QR & Tes)`);
+  try { fs.writeFileSync(PID_FILE, String(process.pid), 'utf8'); } catch { /* ignore */ }
+  addLog(
+    PANEL_ENABLED
+      ? `AniTrack WA Bot aktif di http://127.0.0.1:${PORT} (terkunci password untuk user "${PANEL_USER}")`
+      : 'AniTrack WA Bot aktif dalam MODE SENYAP PENUH (panel web dinonaktifkan).'
+  );
   addLog(`Jadwal otomatis aktif: "${CRON_SCHEDULE}" (Asia/Jakarta / WIB)`);
   startWhatsAppSocket();
 });

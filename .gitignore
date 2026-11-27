@@ -3,6 +3,7 @@
 wa-bot/.env
 wa-bot/auth_info/
 wa-bot/node_modules/
+wa-bot/.bot.pid
 *.key
 *.pem
 *.log
