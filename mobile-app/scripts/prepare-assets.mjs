@@ -30,16 +30,10 @@ const densities = [
     { name: 'xxxhdpi', size: 192 }
 ];
 for (const d of densities) {
-    const inner = Math.max(32, Math.round(d.size * 0.94));
-    const resized = await sharp(sourceLogo)
-        .trim()
-        .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-        .png()
-        .toBuffer();
-    await sharp({
-        create: { width: d.size, height: d.size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
-    })
-        .composite([{ input: resized, gravity: 'center' }])
+    // Isi penuh 100% kanvas (tanpa padding sisa) agar ukuran visual logo setara ikon aplikasi lain di layar utama HP
+    await sharp(sourceLogo)
+        .trim({ threshold: 25 })
+        .resize(d.size, d.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toFile(path.join(transparentIconsDir, `${d.name}.png`));
 }
@@ -65,9 +59,10 @@ await sharp({
     .png()
     .toFile(path.join(assetsDir, 'icon-background.png'));
 
-// 4. Splash Logo Terpusat 1:1 (512x512 transparan, logo 300x300 di safe-zone Android 12+ — anti-gepeng & anti-terpotong)
+// 4. Splash Logo Terpusat 1:1 (512x512 transparan, logo 340x340 di safe-zone Android 12+ — lebih tegas & anti-gepeng)
 const logoForSplashCenter = await sharp(sourceLogo)
-    .resize(300, 300, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .trim({ threshold: 25 })
+    .resize(340, 340, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
 

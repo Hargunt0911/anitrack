@@ -92,7 +92,7 @@ fs.writeFileSync(
     `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/anitrack_splash_bg" />
-    <item android:width="220dp" android:height="220dp" android:gravity="center">
+    <item android:width="248dp" android:height="248dp" android:gravity="center">
         <bitmap
             android:gravity="fill"
             android:src="@drawable/anitrack_splash_logo" />
