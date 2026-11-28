@@ -893,6 +893,17 @@
                         </div>
                     </div>
 
+                    <div data-native-notif-wrap class="hidden bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-sm font-extrabold text-[#1E293B]">🔔 Notifikasi HP Android Aktif</div>
+                            <p class="text-xs text-slate-500 mt-0.5">Otomatis memberi tahu saat ada siswa bimbingan setor tugas baru atau pengumuman — walau aplikasi ditutup.</p>
+                        </div>
+                        <button type="button" onclick="testNativeNotification()"
+                            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white text-xs font-bold transition shrink-0 cursor-pointer">
+                            🔔 Tes Notifikasi HP
+                        </button>
+                    </div>
+
                     <div data-pwa-install-wrap class="bg-white border border-[#EDF1F7] rounded-2xl shadow-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div class="min-w-0">
                             <div class="text-sm font-extrabold text-[#1E293B]">📱 Pasang AniTrack di HP (Android &amp; iPhone)</div>
@@ -934,7 +945,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261128c"></script>
+    <script src="./anitrack-core.js?v=20261128d"></script>
     <script>
         window.AniTrack.initStaffPortal({
             role: 'mentor',

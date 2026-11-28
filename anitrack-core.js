@@ -57,22 +57,58 @@
 
     let toastTimer = null;
 
-    // ==================== AUTH & SESSION ====================
+    // ==================== AUTH & SESSION (LOGIN SEKALI SAJA — PERSISTENT LOCALSTORAGE + ANDROID BRIDGE) ====================
+    function syncNativeAndroidSession(user) {
+        try {
+            if (!global.AniTrackNative) return;
+            if (user && user.id) {
+                if (typeof global.AniTrackNative.setSession === 'function') {
+                    global.AniTrackNative.setSession(JSON.stringify({
+                        id: user.id,
+                        role: user.role || 'student',
+                        isAdmin: isAnyAdmin(user),
+                        full_name: user.full_name || '',
+                        class_name: user.class_name || '',
+                        sub_concentration: user.sub_concentration || ''
+                    }));
+                }
+            } else if (typeof global.AniTrackNative.clearSession === 'function') {
+                global.AniTrackNative.clearSession();
+            }
+        } catch { /* ignore */ }
+    }
+
     function getUser() {
         try {
-            return JSON.parse(sessionStorage.getItem('anitrack_user') || 'null');
+            let raw = localStorage.getItem('anitrack_user');
+            if (!raw) {
+                raw = sessionStorage.getItem('anitrack_user');
+                if (raw) {
+                    localStorage.setItem('anitrack_user', raw);
+                    sessionStorage.removeItem('anitrack_user');
+                }
+            }
+            return JSON.parse(raw || 'null');
         } catch {
-            return null;
+            try { return JSON.parse(sessionStorage.getItem('anitrack_user') || 'null'); } catch { return null; }
         }
     }
 
     function setUser(user) {
-        if (user) sessionStorage.setItem('anitrack_user', JSON.stringify(user));
-        else sessionStorage.removeItem('anitrack_user');
+        if (user) {
+            const str = JSON.stringify(user);
+            try { localStorage.setItem('anitrack_user', str); } catch { /* ignore */ }
+            try { sessionStorage.removeItem('anitrack_user'); } catch { /* ignore */ }
+            syncNativeAndroidSession(user);
+        } else {
+            clearUser();
+        }
     }
 
     function clearUser() {
-        sessionStorage.removeItem('anitrack_user');
+        try { localStorage.removeItem('anitrack_user'); } catch { /* ignore */ }
+        try { sessionStorage.removeItem('anitrack_user'); } catch { /* ignore */ }
+        syncNativeAndroidSession(null);
     }
 
     const ADMIN_ROLE_IDS_KEY = 'admin_role_ids';
@@ -1491,9 +1527,13 @@
 
     function updatePwaInstallButtons() {
         const standalone = isPwaStandalone();
+        const isNativeApk = Boolean(global.AniTrackNative);
         const { isIos, isAndroid } = detectMobileOs();
         document.querySelectorAll('[data-pwa-install-wrap]').forEach((wrap) => {
             wrap.classList.toggle('hidden', standalone);
+        });
+        document.querySelectorAll('[data-native-notif-wrap]').forEach((wrap) => {
+            wrap.classList.toggle('hidden', !isNativeApk);
         });
         document.querySelectorAll('[data-pwa-install-label]').forEach((el) => {
             if (deferredPwaPrompt) {
@@ -1507,6 +1547,17 @@
             }
         });
     }
+
+    global.testNativeNotification = function () {
+        try {
+            if (global.AniTrackNative && typeof global.AniTrackNative.testNotification === 'function') {
+                global.AniTrackNative.testNotification();
+                showToast('Notifikasi tes dikirim ke bar atas HP Android 🔔');
+                return;
+            }
+        } catch { /* ignore */ }
+        showToast('Fitur tes notifikasi bar HP tersedia di aplikasi AniTrack Android (.apk).');
+    };
 
     function openPwaGuideModal() {
         const { isIos, isAndroid } = detectMobileOs();
@@ -1637,6 +1688,9 @@
 
     function initPwaSupport() {
         updatePwaInstallButtons();
+        // Sinkronkan sesi login tersimpan ke Android APK agar notifikasi latar belakang tetap aktif
+        const curU = getUser();
+        if (curU && curU.id) syncNativeAndroidSession(curU);
         global.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPwaPrompt = e;
@@ -2019,6 +2073,26 @@
         if (dot) dot.classList.toggle('hidden', unread === 0);
         const pop = document.getElementById('anitrackNotifPopover');
         if (pop && !pop.classList.contains('hidden')) renderNotificationPopoverBody();
+
+        // Jika berjalan di APK Android, munculkan notifikasi HP otomatis saat ada item baru masuk
+        try {
+            if (global.AniTrackNative && typeof global.AniTrackNative.showNotification === 'function') {
+                const storeKey = `anitrack_native_pushed_${roleKey}`;
+                const prevPushed = Number(localStorage.getItem(storeKey) || 0);
+                const maxTs = notifCenterState.items.reduce((m, it) => Math.max(m, Number(it.ts || 0)), 0);
+                if (!prevPushed) {
+                    localStorage.setItem(storeKey, String(Math.max(Date.now(), maxTs)));
+                } else {
+                    const freshItems = notifCenterState.items.filter((it) => Number(it.ts || 0) > prevPushed);
+                    if (freshItems.length) {
+                        const top = freshItems[0];
+                        const title = freshItems.length > 1 ? `${top.title} (+${freshItems.length - 1} lainnya)` : top.title;
+                        global.AniTrackNative.showNotification(String(title || 'Update AniTrack'), String(top.desc || 'Ada pembaruan baru di AniTrack.'));
+                        localStorage.setItem(storeKey, String(Math.max(prevPushed, maxTs)));
+                    }
+                }
+            }
+        } catch { /* ignore */ }
     }
 
     function renderNotificationPopoverBody() {
