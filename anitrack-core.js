@@ -805,9 +805,16 @@
                 const rawItems = (parsed.items && typeof parsed.items === 'object') ? parsed.items : {};
                 const normItems = {};
                 Object.keys(rawItems).forEach((k) => { normItems[k] = normalizeChecklistStatus(rawItems[k]); });
+                const rawItemNotes = (parsed.item_notes && typeof parsed.item_notes === 'object') ? parsed.item_notes : {};
+                const cleanItemNotes = {};
+                Object.keys(rawItemNotes).forEach((k) => {
+                    const txt = String(rawItemNotes[k] || '').trim();
+                    if (txt) cleanItemNotes[k] = txt;
+                });
                 map[sid] = {
                     student_id: sid,
                     items: normItems,
+                    item_notes: cleanItemNotes,
                     notes: parsed.notes || '',
                     updated_by: parsed.updated_by || '',
                     updated_at: parsed.updated_at || r.updated_at || null
@@ -1080,7 +1087,8 @@
         const ckSummaryHtml = ckCols.map((c) => {
             const st = statusTextMap[normalizeChecklistStatus(ckRow.items?.[c])] || 'None';
             const bg = st === 'Done' ? '#dcfce7' : (st === 'Revisi' ? '#ffe4e6' : (st === 'WIP' ? '#fef3c7' : '#f1f5f9'));
-            return `<span style="display:inline-block;padding:3px 8px;border-radius:6px;background:${bg};border:1px solid #cbd5e1;font-size:10px;font-weight:700;margin:2px 4px 2px 0;">${esc(c)}: ${esc(st)}</span>`;
+            const sn = String(ckRow.item_notes?.[c] || '').trim();
+            return `<span style="display:inline-block;padding:3px 8px;border-radius:6px;background:${bg};border:1px solid #cbd5e1;font-size:10px;font-weight:700;margin:2px 4px 2px 0;">${esc(c)}: ${esc(st)}${sn ? ` — <em style="font-weight:500;">${esc(sn)}</em>` : ''}</span>`;
         }).join('');
 
         return `
@@ -2835,7 +2843,8 @@
             const stVal = normalizeChecklistStatus(rd.items?.[c]);
             const lbl = statusLabelMap[stVal] || 'None';
             const icon = stVal === 'done' ? '✅' : (stVal === 'revisi' ? '🔴' : (stVal === 'wip' ? '🟡' : '⚪'));
-            lines.push(`${icon} ${c}: *${lbl}*`);
+            const sn = String(rd.item_notes?.[c] || '').trim();
+            lines.push(`${icon} ${c}: *${lbl}*${sn ? `\n   ↳ _Revisi: ${sn}_` : ''}`);
         });
         if (rd.notes && String(rd.notes).trim()) {
             lines.push(`📝 Notes PJ Subkon: _${String(rd.notes).trim()}_`);
@@ -6614,8 +6623,10 @@
                                             ${stuCols.map((col, idx) => {
                                                 const stVal = normalizeChecklistStatus(rowData.items?.[col]);
                                                 const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
+                                                const stageNote = String(rowData.item_notes?.[col] || '').trim();
+                                                const showStageNoteBox = stVal === 'revisi' || Boolean(stageNote);
                                                 return `
-                                                    <div class="rounded-xl bg-white border border-[#E8EEF6] p-3 space-y-2">
+                                                    <div class="rounded-xl bg-white border ${stVal === 'revisi' ? 'border-[#FECDD6] ring-1 ring-[#FFF0F4]' : 'border-[#E8EEF6]'} p-3 space-y-2.5">
                                                         <div class="flex items-center justify-between gap-2">
                                                             <div class="font-bold text-sm text-[#1E293B] leading-snug">${idx + 1}. ${esc(col)}</div>
                                                             <span class="px-2 py-0.5 rounded-lg border text-xs font-extrabold shrink-0 ${stOpt.cls}">${stOpt.label}</span>
@@ -6630,6 +6641,21 @@
                                                                         ${o.label}
                                                                     </button>`;
                                                             }).join('')}
+                                                        </div>` : ''}
+                                                        ${showStageNoteBox ? `
+                                                        <div class="rounded-xl bg-[#FFF5F7] border border-[#FECDD6] p-2.5 space-y-2">
+                                                            <label for="ckStageNoteMob_${s.id}_${idx}" class="block text-xs font-extrabold text-[#BE123C]">
+                                                                🔴 Catatan Revisi — ${esc(col)}
+                                                            </label>
+                                                            ${stuCanEdit ? `
+                                                                <textarea id="ckStageNoteMob_${s.id}_${idx}" rows="2"
+                                                                    placeholder="Tulis bagian yang perlu direvisi pada tahapan ${esc(col)}..."
+                                                                    class="w-full px-3 py-2 bg-white border border-[#FECDD6] rounded-xl text-sm text-[#1E293B] focus:outline-none focus:border-[#E11D48]">${esc(stageNote)}</textarea>
+                                                                <button type="button" onclick="saveChecklistStageNote('${s.id}', '${encodeURIComponent(col)}', 'ckStageNoteMob_${s.id}_${idx}', this)"
+                                                                    class="w-full py-2 px-3 rounded-xl bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold transition cursor-pointer">
+                                                                    💾 Simpan Catatan Revisi
+                                                                </button>` : `
+                                                                <div class="text-xs font-semibold text-[#9F1239] leading-relaxed">${esc(stageNote || 'Perlu revisi (belum ada detail catatan)')}</div>`}
                                                         </div>` : ''}
                                                     </div>`;
                                             }).join('')}
@@ -6760,18 +6786,27 @@
                                             if (!stuColsSet.has(col)) return `<td class="py-3 px-2 text-center text-slate-300 text-sm border-r border-[#F1F5F9]">·</td>`;
                                             const stVal = normalizeChecklistStatus(rowData.items?.[col]);
                                             const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
+                                            const stageNote = String(rowData.item_notes?.[col] || '').trim();
+                                            const shortNote = stageNote.length > 24 ? `${stageNote.slice(0, 24)}…` : stageNote;
                                             if (stuCanEdit) {
                                                 return `
-                                                    <td class="py-3 px-2.5 text-center border-r border-[#F1F5F9]">
+                                                    <td class="py-2.5 px-2.5 text-center border-r border-[#F1F5F9] space-y-1">
                                                         <select onchange="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', this.value, this)"
                                                             class="w-full max-w-[126px] mx-auto block px-2.5 py-2 rounded-xl border text-xs font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}">
                                                             ${CHECKLIST_STATUS_OPTIONS.map((o) => `<option value="${o.value}" ${stVal === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
                                                         </select>
+                                                        ${(stVal === 'revisi' || stageNote) ? `
+                                                        <button type="button" onclick="openChecklistStageNoteModal('${s.id}', '${encodeURIComponent(col)}')"
+                                                            title="${esc(stageNote || 'Klik untuk tulis catatan revisi tahapan ini')}"
+                                                            class="max-w-[132px] mx-auto block truncate px-2 py-0.5 rounded-lg border text-[10.5px] font-bold transition cursor-pointer ${stageNote ? 'bg-[#FFF0F4] border-[#FECDD6] text-[#BE123C] hover:bg-[#FFE4EC]' : 'bg-white border-dashed border-[#FDA4AF] text-[#E11D48] hover:bg-[#FFF5F7]'}">
+                                                            ${stageNote ? `📝 ${esc(shortNote)}` : '+ Catatan Revisi'}
+                                                        </button>` : ''}
                                                     </td>`;
                                             }
                                             return `
-                                                <td class="py-3 px-2.5 text-center border-r border-[#F1F5F9]">
+                                                <td class="py-2.5 px-2.5 text-center border-r border-[#F1F5F9] space-y-1">
                                                     <span class="inline-block min-w-[82px] px-3 py-1.5 rounded-xl border text-xs font-extrabold ${stOpt.cls}">${stOpt.label}</span>
+                                                    ${stageNote ? `<div title="${esc(stageNote)}" class="max-w-[132px] mx-auto truncate text-[10.5px] font-semibold text-[#BE123C] bg-[#FFF5F7] rounded-md px-1.5 py-0.5">📝 ${esc(shortNote)}</div>` : ''}
                                                 </td>`;
                                         }).join('')}
                                         <td class="py-3 px-3.5">
@@ -7783,16 +7818,23 @@
             const { error } = await saveChecklistColsMap(colsMap);
             if (error) { showToast(`Gagal mengubah nama tahapan: ${error.message}`); return; }
 
-            // Pindahkan status siswa dari nama kolom lama ke nama baru agar progres tidak hilang
+            // Pindahkan status & catatan revisi siswa dari nama kolom lama ke nama baru agar progres tidak hilang
             const rowMap = projectDataCache.checklistRowMap || {};
             const nowIso = new Date().toISOString();
-            const affectedStudents = (projectDataCache.allStudentsList || []).filter((s) => s.sub_concentration === subconc && rowMap[s.id]?.items && rowMap[s.id].items[oldName] !== undefined);
+            const affectedStudents = (projectDataCache.allStudentsList || []).filter((s) => s.sub_concentration === subconc && (rowMap[s.id]?.items?.[oldName] !== undefined || rowMap[s.id]?.item_notes?.[oldName] !== undefined));
             for (const s of affectedStudents) {
                 const existing = rowMap[s.id];
                 const nextItems = { ...(existing.items || {}) };
-                nextItems[newName] = nextItems[oldName];
-                delete nextItems[oldName];
-                const nextRow = { ...existing, items: nextItems, updated_at: nowIso };
+                if (nextItems[oldName] !== undefined) {
+                    nextItems[newName] = nextItems[oldName];
+                    delete nextItems[oldName];
+                }
+                const nextItemNotes = { ...(existing.item_notes || {}) };
+                if (nextItemNotes[oldName] !== undefined) {
+                    nextItemNotes[newName] = nextItemNotes[oldName];
+                    delete nextItemNotes[oldName];
+                }
+                const nextRow = { ...existing, items: nextItems, item_notes: nextItemNotes, updated_at: nowIso };
                 rowMap[s.id] = nextRow;
                 await supabase.from('app_settings').upsert({
                     key: `${CHECKLIST_ROW_PREFIX}${s.id}`,
@@ -7880,19 +7922,21 @@
             const normVal = normalizeChecklistStatus(newVal);
             const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === normVal) || CHECKLIST_STATUS_OPTIONS[0];
             const rowMap = projectDataCache.checklistRowMap || {};
-            const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, item_notes: {}, notes: '' };
             const nextItems = { ...(existing.items || {}), [colName]: normVal };
+            const nextItemNotes = { ...(existing.item_notes || {}) };
             const nowIso = new Date().toISOString();
             const nextRow = {
                 student_id: studentId,
                 items: nextItems,
+                item_notes: nextItemNotes,
                 notes: existing.notes || '',
                 updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
                 updated_at: nowIso
             };
 
             if (selectEl) {
-                selectEl.className = `w-full px-2 py-1.5 rounded-lg border text-[11px] font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}`;
+                selectEl.className = `w-full max-w-[126px] mx-auto block px-2.5 py-2 rounded-xl border text-xs font-extrabold text-center cursor-pointer focus:outline-none ${stOpt.cls}`;
             }
 
             const { error } = await supabase.from('app_settings').upsert({
@@ -7908,9 +7952,122 @@
             const sy = global.scrollY || 0;
             rowMap[studentId] = nextRow;
             projectDataCache.checklistRowMap = rowMap;
-            showToast(`Project Update "${colName}" → ${stOpt.label} ✓`);
+            showToast(normVal === 'revisi'
+                ? `Status "${colName}" → Revisi. Silakan tulis detail revisinya ↓`
+                : `Project Update "${colName}" → ${stOpt.label} ✓`);
+            renderProjectUpdateView();
+            global.requestAnimationFrame?.(() => {
+                global.scrollTo(0, sy);
+                if (normVal === 'revisi') {
+                    const isMobileCards = global.innerWidth < 768 && projectChecklistState.mobileViewMode !== 'table';
+                    if (isMobileCards) {
+                        const stu = (projectDataCache.allStudentsList || []).find((s) => s.id === studentId);
+                        const colsMap = projectDataCache.checklistColsMap || {};
+                        const stuCols = (stu?.sub_concentration && Array.isArray(colsMap[stu.sub_concentration]) && colsMap[stu.sub_concentration].length)
+                            ? colsMap[stu.sub_concentration]
+                            : DEFAULT_CHECKLIST_COLS;
+                        const colIdx = stuCols.indexOf(colName);
+                        const ta = colIdx >= 0 ? document.getElementById(`ckStageNoteMob_${studentId}_${colIdx}`) : null;
+                        if (ta) {
+                            ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            ta.focus();
+                        }
+                    } else if (selectEl) {
+                        global.openChecklistStageNoteModal(studentId, encodedCol);
+                    }
+                }
+            });
+        };
+
+        global.saveChecklistStageNote = async function (studentId, encodedCol, inputId, btn) {
+            const colName = decodeURIComponent(encodedCol || '');
+            const inp = document.getElementById(inputId);
+            if (!studentId || !colName || !inp) return;
+            const noteText = inp.value.trim();
+            const rowMap = projectDataCache.checklistRowMap || {};
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, item_notes: {}, notes: '' };
+            const nextItemNotes = { ...(existing.item_notes || {}) };
+            if (noteText) nextItemNotes[colName] = noteText;
+            else delete nextItemNotes[colName];
+
+            const nowIso = new Date().toISOString();
+            const nextRow = {
+                student_id: studentId,
+                items: { ...(existing.items || {}) },
+                item_notes: nextItemNotes,
+                notes: existing.notes || '',
+                updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
+                updated_at: nowIso
+            };
+
+            const prevLabel = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+            const { error } = await supabase.from('app_settings').upsert({
+                key: `${CHECKLIST_ROW_PREFIX}${studentId}`,
+                value: JSON.stringify(nextRow),
+                updated_at: nowIso
+            }, { onConflict: 'key' });
+            if (btn) { btn.disabled = false; btn.textContent = prevLabel; }
+            if (error) { showToast(`Gagal menyimpan catatan revisi: ${error.message}`); return; }
+
+            const sy = global.scrollY || 0;
+            rowMap[studentId] = nextRow;
+            projectDataCache.checklistRowMap = rowMap;
+            document.getElementById('anitrackStageNoteModal')?.classList.add('hidden');
+            showToast(noteText ? `Catatan revisi "${colName}" tersimpan ✓` : `Catatan revisi "${colName}" dihapus.`);
             renderProjectUpdateView();
             global.requestAnimationFrame?.(() => global.scrollTo(0, sy));
+        };
+
+        global.openChecklistStageNoteModal = function (studentId, encodedCol) {
+            const colName = decodeURIComponent(encodedCol || '');
+            if (!studentId || !colName) return;
+            const stu = (projectDataCache.allStudentsList || []).find((s) => s.id === studentId);
+            const rowData = (projectDataCache.checklistRowMap || {})[studentId] || { items: {}, item_notes: {}, notes: '' };
+            const curNote = String(rowData.item_notes?.[colName] || '').trim();
+
+            let modal = document.getElementById('anitrackStageNoteModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'anitrackStageNoteModal';
+                modal.className = 'fixed inset-0 z-[86] hidden bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4';
+                modal.onclick = (e) => { if (e.target === modal) modal.classList.add('hidden'); };
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = `
+                <div class="w-full max-w-md bg-white border border-[#EDF1F7] rounded-2xl shadow-2xl overflow-hidden">
+                    <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#FFF5F7] flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#BE123C]">🔴 Catatan Revisi Khusus Tahapan</div>
+                            <div class="text-sm font-extrabold text-[#1E293B] truncate mt-0.5">${esc(colName)}</div>
+                            <div class="text-xs text-slate-500 truncate">${esc(stu?.full_name || 'Siswa')} ${stu?.class_name ? `(${esc(stu.class_name)})` : ''}</div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('anitrackStageNoteModal').classList.add('hidden')"
+                            class="w-8 h-8 rounded-xl bg-white border border-[#E2E8F0] text-slate-500 hover:text-slate-800 font-bold text-sm cursor-pointer shrink-0">✕</button>
+                    </div>
+                    <div class="p-5 space-y-3.5">
+                        <div>
+                            <label for="desktopStageNoteTextarea" class="block text-xs font-bold text-slate-600 mb-1.5">Detail yang perlu diperbaiki siswa:</label>
+                            <textarea id="desktopStageNoteTextarea" rows="4"
+                                placeholder="Contoh: Perbaiki timing gerakan tangan di detik 0:08 dan tambahkan audio ambience..."
+                                class="w-full px-3.5 py-2.5 bg-[#FAFBFD] focus:bg-white border border-[#FECDD6] rounded-xl text-sm text-[#1E293B] focus:outline-none focus:border-[#E11D48]">${esc(curNote)}</textarea>
+                            <p class="text-[11px] text-slate-400 mt-1">Catatan ini akan muncul tepat di bawah tahapan <strong>${esc(colName)}</strong> di HP siswa, Portal Orang Tua, &amp; pesan WA.</p>
+                        </div>
+                        <div class="flex items-center justify-end gap-2">
+                            <button type="button" onclick="document.getElementById('anitrackStageNoteModal').classList.add('hidden')"
+                                class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#E2E8F0] text-slate-600 text-xs font-bold cursor-pointer">
+                                Tutup
+                            </button>
+                            <button type="button" onclick="saveChecklistStageNote('${studentId}', '${encodeURIComponent(colName)}', 'desktopStageNoteTextarea', this)"
+                                class="px-4 py-2 rounded-xl bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold shadow-sm transition cursor-pointer">
+                                💾 Simpan Catatan Revisi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('desktopStageNoteTextarea')?.focus(), 50);
         };
 
         global.markAllChecklistDone = async function (studentId) {
@@ -7923,13 +8080,14 @@
             if (!confirm(`Tandai semua ${stuCols.length} tahapan milik ${stu?.full_name || 'siswa ini'} menjadi DONE?`)) return;
 
             const rowMap = projectDataCache.checklistRowMap || {};
-            const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, item_notes: {}, notes: '' };
             const nextItems = { ...(existing.items || {}) };
             stuCols.forEach((c) => { nextItems[c] = 'done'; });
             const nowIso = new Date().toISOString();
             const nextRow = {
                 student_id: studentId,
                 items: nextItems,
+                item_notes: { ...(existing.item_notes || {}) },
                 notes: existing.notes || '',
                 updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
                 updated_at: nowIso
@@ -7955,11 +8113,12 @@
             if (!inp) return;
             const noteText = inp.value.trim();
             const rowMap = projectDataCache.checklistRowMap || {};
-            const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, item_notes: {}, notes: '' };
             const nowIso = new Date().toISOString();
             const nextRow = {
                 student_id: studentId,
                 items: { ...(existing.items || {}) },
+                item_notes: { ...(existing.item_notes || {}) },
                 notes: noteText,
                 updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
                 updated_at: nowIso

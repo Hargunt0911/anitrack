@@ -218,7 +218,8 @@ function formatProjectUpdateBlock(student, colsMap, rowMap) {
   cols.forEach((c) => {
     const st = normalizeChecklistStatus(rd.items && rd.items[c]);
     const icon = st === 'done' ? '✅' : (st === 'revisi' ? '🔴' : (st === 'wip' ? '🟡' : '⚪'));
-    lines.push(`${icon} ${c}: *${labelMap[st] || 'None'}*`);
+    const sn = rd.item_notes && rd.item_notes[c] ? String(rd.item_notes[c]).trim() : '';
+    lines.push(`${icon} ${c}: *${labelMap[st] || 'None'}*${sn ? `\n   ↳ _Revisi: ${sn}_` : ''}`);
   });
   if (rd.notes && String(rd.notes).trim()) {
     lines.push(`📝 Notes PJ Subkon: _${String(rd.notes).trim()}_`);

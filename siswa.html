@@ -936,7 +936,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261128b"></script>
+    <script src="./anitrack-core.js?v=20261128c"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -2118,10 +2118,11 @@
                 ]);
                 const taskFilesMap = A.parseTaskFilesMap(taskFilesRaw || []);
 
-                let myChecklistData = { items: {}, notes: '', updated_by: '', updated_at: null };
+                let myChecklistData = { items: {}, item_notes: {}, notes: '', updated_by: '', updated_at: null };
                 if (myChecklistRow?.value) {
                     try { myChecklistData = { ...myChecklistData, ...JSON.parse(myChecklistRow.value) }; } catch { /* ignore */ }
                 }
+                if (!myChecklistData.item_notes || typeof myChecklistData.item_notes !== 'object') myChecklistData.item_notes = {};
                 const myChecklistCols = currentUser.sub_concentration
                     ? (checklistColsMap[currentUser.sub_concentration] || A.DEFAULT_CHECKLIST_COLS)
                     : A.DEFAULT_CHECKLIST_COLS;
@@ -2310,7 +2311,16 @@
                     // Di Dashboard tampilkan hanya jika ada catatan penting PJ Subkon atau revisi (detail lengkap ada di menu Project Update agar tidak dobel)
                     const dashCkEl = document.getElementById('dashboardProjectUpdateCard');
                     if (dashCkEl) {
-                        if (myChecklistData.notes || revCk > 0) {
+                        const revStagesWithNotes = myChecklistCols
+                            .filter((c) => A.normalizeChecklistStatus(myChecklistData.items?.[c]) === 'revisi' || String(myChecklistData.item_notes?.[c] || '').trim())
+                            .map((c) => {
+                                const sn = String(myChecklistData.item_notes?.[c] || '').trim();
+                                return sn ? `${c}: ${sn}` : c;
+                            });
+                        if (myChecklistData.notes || revCk > 0 || revStagesWithNotes.length > 0) {
+                            const previewDesc = revStagesWithNotes.length
+                                ? revStagesWithNotes.slice(0, 2).join(' • ')
+                                : (myChecklistData.notes || 'Segera buka menu Project Update untuk melihat rincian tahapan yang perlu diperbaiki.');
                             dashCkEl.classList.remove('hidden');
                             dashCkEl.innerHTML = `
                                 <div onclick="switchTab('project-update')" class="rounded-2xl ${revCk > 0 ? 'bg-[#FFF5F7] border-[#FECDD6] border-l-[#E11D48]' : 'bg-[#FFFDF5] border-[#FDE68A] border-l-[#D97706]'} border border-l-4 shadow-card px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:opacity-95 transition">
@@ -2318,7 +2328,7 @@
                                         <div class="text-xs font-extrabold ${revCk > 0 ? 'text-[#BE123C]' : 'text-[#92400E]'}">
                                             ${revCk > 0 ? `🔴 ${revCk} Tahapan Project Update Perlu Revisi` : '📝 Catatan Terbaru dari Guru PJ Sub-Konsentrasi'}
                                         </div>
-                                        ${myChecklistData.notes ? `<p class="text-xs text-slate-700 line-clamp-2">${A.esc(myChecklistData.notes)}</p>` : `<p class="text-xs text-slate-600">Segera buka menu Project Update untuk melihat rincian tahapan yang perlu diperbaiki.</p>`}
+                                        <p class="text-xs text-slate-700 line-clamp-2">${A.esc(previewDesc)}</p>
                                     </div>
                                     <span class="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white border border-black/10 text-xs font-bold text-[#1E293B] shrink-0">Lihat Detail →</span>
                                 </div>`;
@@ -2402,23 +2412,31 @@
                                     ${myChecklistCols.map((col, idx) => {
                                         const stVal = A.normalizeChecklistStatus(myChecklistData.items?.[col]);
                                         const stOpt = A.CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || A.CHECKLIST_STATUS_OPTIONS[0];
+                                        const stageNote = String(myChecklistData.item_notes?.[col] || '').trim();
                                         const stHint = stVal === 'done'
                                             ? 'Tahapan sudah tuntas & dinyatakan selesai oleh PJ Subkon.'
                                             : (stVal === 'wip'
                                                 ? 'Sedang dalam pengerjaan — lanjutkan dan simpan progres terbaru di Folder Google Drive.'
                                                 : (stVal === 'revisi'
-                                                    ? 'Perlu perbaikan — cek Notes PJ Subkon di atas atau konsultasikan dengan Pembimbing.'
+                                                    ? (stageNote ? 'Perlu perbaikan sesuai catatan revisi di bawah ini.' : 'Perlu perbaikan — cek Notes PJ Subkon di atas atau konsultasikan dengan Pembimbing.')
                                                     : 'Belum dimulai / belum dinilai oleh Guru PJ Subkon.'));
                                         return `
-                                            <div class="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-[#F8FBFF] transition">
-                                                <div class="flex items-start gap-3 min-w-0">
-                                                    <span class="w-7 h-7 rounded-lg bg-[#EAF4FF] text-[#0082E6] font-mono text-xs font-extrabold flex items-center justify-center shrink-0 mt-0.5">${idx + 1}</span>
-                                                    <div class="min-w-0">
-                                                        <div class="font-bold text-sm text-[#1E293B]">${A.esc(col)}</div>
-                                                        <div class="text-[11.5px] text-slate-500 mt-0.5">${stHint}</div>
+                                            <div class="px-4 sm:px-5 py-3.5 space-y-2.5 ${stVal === 'revisi' ? 'bg-[#FFF5F7]/60' : 'hover:bg-[#F8FBFF]'} transition">
+                                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                                    <div class="flex items-start gap-3 min-w-0">
+                                                        <span class="w-7 h-7 rounded-lg ${stVal === 'revisi' ? 'bg-[#FFE4EC] text-[#E11D48]' : 'bg-[#EAF4FF] text-[#0082E6]'} font-mono text-xs font-extrabold flex items-center justify-center shrink-0 mt-0.5">${idx + 1}</span>
+                                                        <div class="min-w-0">
+                                                            <div class="font-bold text-sm text-[#1E293B]">${A.esc(col)}</div>
+                                                            <div class="text-[11.5px] text-slate-500 mt-0.5">${stHint}</div>
+                                                        </div>
                                                     </div>
+                                                    <span class="self-start sm:self-center inline-flex items-center justify-center min-w-[82px] px-3 py-1.5 rounded-xl border text-xs font-extrabold shrink-0 ${stOpt.cls}">${stOpt.label}</span>
                                                 </div>
-                                                <span class="self-start sm:self-center inline-flex items-center justify-center min-w-[82px] px-3 py-1.5 rounded-xl border text-xs font-extrabold shrink-0 ${stOpt.cls}">${stOpt.label}</span>
+                                                ${stageNote ? `
+                                                <div class="sm:ml-10 rounded-xl bg-[#FFF0F4] border border-[#FECDD6] px-3.5 py-2.5 space-y-0.5">
+                                                    <div class="text-[11px] font-extrabold uppercase tracking-wider text-[#BE123C]">🔴 Catatan Revisi (${A.esc(col)})</div>
+                                                    <p class="text-xs sm:text-sm font-semibold text-[#9F1239] leading-relaxed whitespace-pre-line">${A.esc(stageNote)}</p>
+                                                </div>` : ''}
                                             </div>`;
                                     }).join('')}
                                 </div>
