@@ -19,6 +19,31 @@ await sharp(sourceLogo)
     .png()
     .toFile(path.join(assetsDir, 'icon-only.png'));
 
+// 1B. Ikon PNG Transparan Murni untuk semua kepadatan layar Android (mdpi..xxxhdpi) — tanpa kotak background sama sekali!
+const transparentIconsDir = path.join(assetsDir, 'transparent-icons');
+fs.mkdirSync(transparentIconsDir, { recursive: true });
+const densities = [
+    { name: 'mdpi', size: 48 },
+    { name: 'hdpi', size: 72 },
+    { name: 'xhdpi', size: 96 },
+    { name: 'xxhdpi', size: 144 },
+    { name: 'xxxhdpi', size: 192 }
+];
+for (const d of densities) {
+    const inner = Math.max(32, Math.round(d.size * 0.94));
+    const resized = await sharp(sourceLogo)
+        .trim()
+        .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .png()
+        .toBuffer();
+    await sharp({
+        create: { width: d.size, height: d.size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+    })
+        .composite([{ input: resized, gravity: 'center' }])
+        .png()
+        .toFile(path.join(transparentIconsDir, `${d.name}.png`));
+}
+
 // 2. Adaptive Icon Foreground (1024x1024, logo 740x740 mengisi penuh area tampak 72% ikon Android tanpa pinggiran putih)
 const logoForAdaptive = await sharp(sourceLogo)
     .trim()

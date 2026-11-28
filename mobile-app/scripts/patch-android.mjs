@@ -9,6 +9,28 @@ const javaPkgDir = path.join(androidAppDir, 'src', 'main', 'java', 'id', 'sch', 
 const splashCenterSrc = path.join(process.cwd(), 'assets', 'splash-logo-center.png');
 const notifLargeSrc = path.join(process.cwd(), 'assets', 'notif-large-icon.png');
 const notifSmallSrc = path.join(process.cwd(), 'assets', 'notif-small-icon.png');
+const transparentIconsDir = path.join(process.cwd(), 'assets', 'transparent-icons');
+
+// ==================== 0. IKON APLIKASI PNG TRANSPARAN MURNI (HAPUS ADAPTIVE ICON BOX) ====================
+const anydpiDir = path.join(resDir, 'mipmap-anydpi-v26');
+if (fs.existsSync(anydpiDir)) {
+    fs.rmSync(anydpiDir, { recursive: true, force: true });
+    console.log('Removed adaptive icon XML dir (mipmap-anydpi-v26) untuk ikon PNG transparan murni');
+}
+for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+    const srcPng = path.join(transparentIconsDir, `${density}.png`);
+    const targetDir = path.join(resDir, `mipmap-${density}`);
+    if (fs.existsSync(srcPng)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+        fs.copyFileSync(srcPng, path.join(targetDir, 'ic_launcher.png'));
+        fs.copyFileSync(srcPng, path.join(targetDir, 'ic_launcher_round.png'));
+        for (const extra of ['ic_launcher_foreground.png', 'ic_launcher_background.png']) {
+            const extraPath = path.join(targetDir, extra);
+            if (fs.existsSync(extraPath)) fs.unlinkSync(extraPath);
+        }
+    }
+}
+console.log('OK: Ikon aplikasi PNG transparan murni terpasang di semua mipmap-*');
 
 // ==================== 1. FIX SPLASH SCREEN ANTI-GEPENG (ANDROID <12 & ANDROID 12–15) ====================
 if (fs.existsSync(resDir)) {
