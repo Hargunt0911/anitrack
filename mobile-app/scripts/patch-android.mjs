@@ -7,6 +7,8 @@ const manifestPath = path.join(androidAppDir, 'src', 'main', 'AndroidManifest.xm
 const buildGradlePath = path.join(androidAppDir, 'build.gradle');
 const javaPkgDir = path.join(androidAppDir, 'src', 'main', 'java', 'id', 'sch', 'smkn4malang', 'anitrack');
 const splashCenterSrc = path.join(process.cwd(), 'assets', 'splash-logo-center.png');
+const notifLargeSrc = path.join(process.cwd(), 'assets', 'notif-large-icon.png');
+const notifSmallSrc = path.join(process.cwd(), 'assets', 'notif-small-icon.png');
 
 // ==================== 1. FIX SPLASH SCREEN ANTI-GEPENG (ANDROID <12 & ANDROID 12–15) ====================
 if (fs.existsSync(resDir)) {
@@ -25,6 +27,12 @@ const drawableNodpiDir = path.join(resDir, 'drawable-nodpi');
 fs.mkdirSync(drawableNodpiDir, { recursive: true });
 if (fs.existsSync(splashCenterSrc)) {
     fs.copyFileSync(splashCenterSrc, path.join(drawableNodpiDir, 'anitrack_splash_logo.png'));
+}
+if (fs.existsSync(notifLargeSrc)) {
+    fs.copyFileSync(notifLargeSrc, path.join(drawableNodpiDir, 'anitrack_notif_large.png'));
+}
+if (fs.existsSync(notifSmallSrc)) {
+    fs.copyFileSync(notifSmallSrc, path.join(drawableNodpiDir, 'ic_stat_anitrack.png'));
 }
 
 const valuesDir = path.join(resDir, 'values');
@@ -156,6 +164,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -214,8 +225,11 @@ public class AniTrackNotifWorker extends Worker {
             }
             PendingIntent pi = PendingIntent.getActivity(ctx, notifId, intent, flags);
 
+            Bitmap largeLogo = BitmapFactory.decodeResource(ctx.getResources(), R.drawable.anitrack_notif_large);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_stat_anitrack)
+                .setLargeIcon(largeLogo)
+                .setColor(Color.parseColor("#0095FF"))
                 .setContentTitle(title != null && !title.isEmpty() ? title : "AniTrack SMKN 4 Malang")
                 .setContentText(body != null ? body : "")
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body != null ? body : ""))
