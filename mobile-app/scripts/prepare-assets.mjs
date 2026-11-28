@@ -12,22 +12,17 @@ if (!fs.existsSync(sourceLogo)) {
 
 fs.mkdirSync(assetsDir, { recursive: true });
 
-// 1. Icon Only (1024x1024, latar putih bersih dengan logo 1:1 proporsional)
-const logoForIcon = await sharp(sourceLogo)
-    .resize(820, 820, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
-    .png()
-    .toBuffer();
-
-await sharp({
-    create: { width: 1024, height: 1024, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
-})
-    .composite([{ input: logoForIcon, gravity: 'center' }])
+// 1. Icon Only (1024x1024, TANPA frame putih — langsung full logo AniTrack transparan)
+await sharp(sourceLogo)
+    .trim()
+    .resize(1024, 1024, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toFile(path.join(assetsDir, 'icon-only.png'));
 
-// 2. Adaptive Icon Foreground (1024x1024, logo di safe-zone 66% agar tidak terpotong ikon bulat Android)
+// 2. Adaptive Icon Foreground (1024x1024, logo 740x740 mengisi penuh area tampak 72% ikon Android tanpa pinggiran putih)
 const logoForAdaptive = await sharp(sourceLogo)
-    .resize(670, 670, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .trim()
+    .resize(740, 740, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
 
@@ -38,9 +33,9 @@ await sharp({
     .png()
     .toFile(path.join(assetsDir, 'icon-foreground.png'));
 
-// 3. Adaptive Icon Background (1024x1024 solid putih)
+// 3. Adaptive Icon Background (1024x1024 warna gelap #141519 menyatu dengan outline logo — nol frame putih!)
 await sharp({
-    create: { width: 1024, height: 1024, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
+    create: { width: 1024, height: 1024, channels: 4, background: { r: 20, g: 21, b: 25, alpha: 1 } }
 })
     .png()
     .toFile(path.join(assetsDir, 'icon-background.png'));

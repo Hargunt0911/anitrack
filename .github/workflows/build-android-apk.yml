@@ -49,8 +49,8 @@ jobs:
         working-directory: mobile-app
         run: >
           npx capacitor-assets generate --android
-          --iconBackgroundColor "#FFFFFF"
-          --iconBackgroundColorDark "#111827"
+          --iconBackgroundColor "#141519"
+          --iconBackgroundColorDark "#141519"
           --splashBackgroundColor "#F3F6FB"
           --splashBackgroundColorDark "#0B1120"
 
