@@ -1368,14 +1368,15 @@
                     padding: 0.375rem 0.65rem !important;
                     font-size: 0.8rem !important;
                 }
-                /* Header topbar HP lebih lega disentuh & rapi di layar sempit 360px */
+                /* Header topbar HP tetap ringkas agar judul AniTrack & nama menu tampil penuh tanpa terpotong */
                 header button.w-9.h-9 {
-                    width: 40px !important;
-                    height: 40px !important;
+                    width: 36px !important;
+                    height: 36px !important;
                 }
                 header > div {
                     padding-left: 0.75rem !important;
                     padding-right: 0.75rem !important;
+                    gap: 0.5rem !important;
                 }
 
                 /* 3. Input, Select, Textarea & Checkbox anti auto-zoom iOS Safari dan nyaman disentuh */

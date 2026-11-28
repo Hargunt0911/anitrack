@@ -267,10 +267,10 @@
         <!-- Main Column -->
         <div class="flex-1 min-w-0 flex flex-col min-h-screen">
             <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[#EDF1F7]">
-                <div class="px-4 sm:px-6 h-16 sm:h-[68px] flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 max-w-md">
+                <div class="px-3 sm:px-6 h-16 sm:h-[68px] flex items-center justify-between gap-2 sm:gap-3">
+                    <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 max-w-md">
                         <button onclick="handleSidebarToggle()" title="Toggle menu"
-                            class="w-10 h-10 rounded-xl bg-[#EAF4FF] hover:bg-[#D9ECFF] text-[#0095FF] flex items-center justify-center shrink-0 transition cursor-pointer">
+                            class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#EAF4FF] hover:bg-[#D9ECFF] text-[#0095FF] flex items-center justify-center shrink-0 transition cursor-pointer">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h12M4 18h16" />
                             </svg>
@@ -282,29 +282,31 @@
                                 class="w-full h-10 pl-3.5 pr-9 rounded-xl bg-[#F7F9FC] border border-[#EDF1F7] text-sm text-[#1E293B] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#0095FF] transition" />
                             <svg class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                                <circle cx="11" cy="11" r="7" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 20l-3.5-3.5" />
                             </svg>
                         </div>
 
                         <div class="sm:hidden flex items-center gap-2 min-w-0">
-                            <img src="./logo-anitrack.png?v=20261124" alt="AniTrack" class="w-8 h-8 object-contain shrink-0" />
+                            <img src="./logo-anitrack.png?v=20261124" alt="AniTrack" class="w-7 h-7 object-contain shrink-0" />
                             <div class="min-w-0">
-                                <div class="text-sm font-extrabold text-[#1E293B] leading-tight truncate">AniTrack</div>
+                                <div class="text-sm font-extrabold text-[#1E293B] leading-tight whitespace-nowrap">AniTrack</div>
                                 <div id="mobileTabLabel" class="text-[11px] text-slate-400 leading-tight truncate">Dashboard</div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                    <div class="flex items-center gap-1 sm:gap-2.5 shrink-0">
                         <button onclick="toggleMobileSearch()" aria-label="Cari"
                             class="sm:hidden w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#0095FF] flex items-center justify-center transition cursor-pointer">
-                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                                <circle cx="11" cy="11" r="7" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 20l-3.5-3.5" />
                             </svg>
                         </button>
 
                         <button type="button" onclick="if(window.openGlobalAnnouncementModal){openGlobalAnnouncementModal();}else{var m=document.getElementById('adminBroadcastModal');if(m){m.classList.remove('hidden');document.getElementById('globalAnnouncementInput')?.focus();}}" title="Papan Pengumuman Global (Broadcast)"
-                            class="relative w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#4F46E5] flex items-center justify-center transition cursor-pointer">
+                            class="hidden sm:flex relative w-9 h-9 rounded-xl bg-[#F4F8FF] hover:bg-[#EAF4FF] text-[#4F46E5] items-center justify-center transition cursor-pointer">
                             <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
                             </svg>
@@ -352,7 +354,8 @@
                             class="w-full h-10 pl-3.5 pr-9 rounded-xl bg-[#F7F9FC] border border-[#E2E8F0] text-base text-[#1E293B] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#0095FF] transition" />
                         <svg class="w-4 h-4 text-slate-400 absolute right-3 pointer-events-none"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                            <circle cx="11" cy="11" r="7" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 20l-3.5-3.5" />
                         </svg>
                     </div>
                 </div>
@@ -369,7 +372,7 @@
                                 <span id="dashTodayBadge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F3F6FB] text-slate-500 text-[11px] font-semibold">Hari ini</span>
                                 <div id="dashContextPills" class="flex flex-wrap items-center gap-1.5"></div>
                             </div>
-                            <h1 id="dashGreetingTitle" class="text-lg sm:text-xl font-extrabold tracking-tight text-[#1E293B] truncate">
+                            <h1 id="dashGreetingTitle" class="text-lg sm:text-xl font-extrabold tracking-tight text-[#1E293B] leading-snug sm:truncate">
                                 Pusat Kendali Animasi SMKN 4 Malang
                             </h1>
                             <p id="dashGreetingSubtitle" class="text-xs text-slate-500">
@@ -388,6 +391,10 @@
                             <button type="button" onclick="switchTab('autoreply')"
                                 class="px-3.5 py-2 rounded-xl bg-white hover:bg-[#F7FAFF] border border-[#E2E8F0] text-slate-600 hover:text-[#0095FF] text-xs font-bold transition cursor-pointer">
                                 💬 Balas Otomatis WA
+                            </button>
+                            <button type="button" onclick="if(window.openGlobalAnnouncementModal){openGlobalAnnouncementModal();}else{var m=document.getElementById('adminBroadcastModal');if(m){m.classList.remove('hidden');document.getElementById('globalAnnouncementInput')?.focus();}}"
+                                class="sm:hidden px-3.5 py-2 rounded-xl bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE] text-xs font-bold transition cursor-pointer">
+                                📢 Pengumuman
                             </button>
                         </div>
                     </div>
@@ -1686,7 +1693,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261128d"></script>
+    <script src="./anitrack-core.js?v=20261128e"></script>
     <script>
         (function () {
             const A = window.AniTrack;
