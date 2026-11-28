@@ -133,10 +133,10 @@
         </div>
     </section>
 
-    <script src="./anitrack-core.js?v=20261128e"></script>
+    <script src="./anitrack-core.js?v=20261128f"></script>
     <script>
         (function () {
-            const { supabase, getUser, setUser, redirectToRole, loadAdminRoleIds } = window.AniTrack;
+            const { supabase, getUser, setUser, setSessionToken, redirectToRole, loadAdminRoleIds } = window.AniTrack;
 
             // Jika sudah login di sesi ini, langsung arahkan ke portal sesuai role
             const existing = getUser();
@@ -162,6 +162,35 @@
                 btn.disabled = true;
                 btn.textContent = 'Memeriksa akun...';
 
+                // 1. Login aman via RPC Server (Bcrypt + Token Sesi 90 hari) jika SQL keamanan sudah dijalankan
+                const { data: rpcRes, error: rpcErr } = await supabase.rpc('anitrack_login', {
+                    p_username: username,
+                    p_password: password
+                });
+
+                const rpcMissing = Boolean(
+                    rpcErr && (
+                        rpcErr.code === 'PGRST202'
+                        || rpcErr.code === '42883'
+                        || /Could not find the function|anitrack_login/i.test(rpcErr.message || '')
+                    )
+                );
+
+                if (!rpcMissing) {
+                    if (rpcErr || !rpcRes?.ok || !rpcRes?.user) {
+                        btn.disabled = false;
+                        btn.textContent = 'Masuk ke Dashboard →';
+                        errEl.textContent = rpcErr ? `Kendala koneksi: ${rpcErr.message}` : (rpcRes?.error || 'Username atau password tidak sesuai.');
+                        errEl.classList.remove('hidden');
+                        return;
+                    }
+                    if (rpcRes.token) setSessionToken(rpcRes.token);
+                    setUser(rpcRes.user);
+                    redirectToRole(rpcRes.user);
+                    return;
+                }
+
+                // 2. Fallback kompatibilitas sebelum supabase-security-hardening.sql dijalankan
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('id, full_name, username, class_name, sub_concentration, role, mentor_id, avatar_url, whatsapp_number, project_drive_url')

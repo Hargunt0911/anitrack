@@ -51,13 +51,42 @@
 
     const STAGE_ORDER = { 'Pre-Production': 1, 'Production': 2, 'Post-Production': 3 };
 
+    const SESSION_TOKEN_KEY = 'anitrack_session_token';
+
+    function getSessionToken() {
+        try { return localStorage.getItem(SESSION_TOKEN_KEY) || ''; } catch { return ''; }
+    }
+
+    function setSessionToken(token) {
+        try {
+            if (token) localStorage.setItem(SESSION_TOKEN_KEY, String(token));
+            else localStorage.removeItem(SESSION_TOKEN_KEY);
+        } catch { /* ignore */ }
+    }
+
+    function clearSessionToken() {
+        try { localStorage.removeItem(SESSION_TOKEN_KEY); } catch { /* ignore */ }
+    }
+
+    const anitrackFetch = (url, options = {}) => {
+        const tok = getSessionToken();
+        if (tok) {
+            const headers = new Headers(options.headers || {});
+            headers.set('x-anitrack-session', tok);
+            options = { ...options, headers };
+        }
+        return fetch(url, options);
+    };
+
     const supabase = global.supabase
-        ? global.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        ? global.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global: { fetch: anitrackFetch }
+        })
         : null;
 
     let toastTimer = null;
 
-    // ==================== AUTH & SESSION (LOGIN SEKALI SAJA — PERSISTENT LOCALSTORAGE + ANDROID BRIDGE) ====================
+    // ==================== AUTH & SESSION (LOGIN SEKALI SAJA — PERSISTENT LOCALSTORAGE + SERVER TOKEN + ANDROID BRIDGE) ====================
     function syncNativeAndroidSession(user) {
         try {
             if (!global.AniTrackNative) return;
@@ -67,6 +96,7 @@
                         id: user.id,
                         role: user.role || 'student',
                         isAdmin: isAnyAdmin(user),
+                        sessionToken: getSessionToken(),
                         full_name: user.full_name || '',
                         class_name: user.class_name || '',
                         sub_concentration: user.sub_concentration || ''
@@ -108,6 +138,7 @@
     function clearUser() {
         try { localStorage.removeItem('anitrack_user'); } catch { /* ignore */ }
         try { sessionStorage.removeItem('anitrack_user'); } catch { /* ignore */ }
+        clearSessionToken();
         syncNativeAndroidSession(null);
     }
 
@@ -188,12 +219,44 @@
     }
 
     function logout() {
+        try {
+            if (supabase && getSessionToken()) {
+                supabase.rpc('anitrack_logout').then(() => {}).catch(() => {});
+            }
+        } catch { /* ignore */ }
         clearUser();
         global.location.replace('./index.html');
     }
 
     async function syncFreshProfile(userId, onFresh) {
         if (!supabase || !userId) return null;
+        // 1. Verifikasi sesi server asli (jika supabase-security-hardening.sql sudah aktif)
+        try {
+            const { data: verifyRes, error: verifyErr } = await supabase.rpc('anitrack_verify_session');
+            if (!verifyErr && verifyRes && typeof verifyRes === 'object') {
+                if (verifyRes.ok && verifyRes.user && verifyRes.user.id) {
+                    const verified = verifyRes.user;
+                    setUser(verified);
+                    // Pastikan halaman saat ini sesuai role asli dari server (anti-manipulasi localStorage)
+                    const path = (global.location?.pathname || '').toLowerCase();
+                    const expectedPage = getRolePage(verified).replace('./', '');
+                    if ((path.endsWith('admin.html') && expectedPage !== 'admin.html')
+                        || (path.endsWith('pembimbing.html') && expectedPage !== 'pembimbing.html')
+                        || (path.endsWith('siswa.html') && expectedPage !== 'siswa.html')) {
+                        redirectToRole(verified);
+                        return verified;
+                    }
+                    if (typeof onFresh === 'function') onFresh(verified);
+                    return verified;
+                }
+                // Sesi server tidak valid / belum punya token (sesi lama sebelum upgrade keamanan) -> minta login ulang 1x
+                clearUser();
+                global.location.replace('./index.html');
+                return null;
+            }
+        } catch { /* fallback jika RPC belum dipasang di Supabase */ }
+
+        // 2. Fallback kompatibilitas sebelum SQL hardening dijalankan
         const [{ data: fresh }, adminIds] = await Promise.all([
             supabase
                 .from('profiles')
@@ -9159,6 +9222,9 @@
         getUser,
         setUser,
         clearUser,
+        getSessionToken,
+        setSessionToken,
+        clearSessionToken,
         ADMIN_ROLE_IDS_KEY,
         loadAdminRoleIds,
         saveAdminRoleIds,

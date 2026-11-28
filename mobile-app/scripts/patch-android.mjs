@@ -264,7 +264,7 @@ public class AniTrackNotifWorker extends Worker {
         }
     }
 
-    private String fetchJson(String restPath) throws Exception {
+    private String fetchJson(String restPath, String sessionToken) throws Exception {
         URL url = new URL(SUPABASE_URL + "/rest/v1/" + restPath);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
@@ -272,6 +272,9 @@ public class AniTrackNotifWorker extends Worker {
         conn.setReadTimeout(10000);
         conn.setRequestProperty("apikey", SUPABASE_KEY);
         conn.setRequestProperty("Authorization", "Bearer " + SUPABASE_KEY);
+        if (sessionToken != null && !sessionToken.isEmpty()) {
+            conn.setRequestProperty("x-anitrack-session", sessionToken);
+        }
         conn.setRequestProperty("Accept", "application/json");
         int code = conn.getResponseCode();
         if (code < 200 || code >= 300) {
@@ -295,13 +298,14 @@ public class AniTrackNotifWorker extends Worker {
         String userId = prefs.getString("user_id", "");
         String role = prefs.getString("user_role", "");
         boolean isAdmin = prefs.getBoolean("is_admin", false);
+        String sessionToken = prefs.getString("session_token", "");
         if (userId == null || userId.isEmpty()) {
             return Result.success();
         }
 
         try {
             // 1. Cek Pengumuman Global terbaru (semua role)
-            String annRaw = fetchJson("app_settings?select=value,updated_at&key=eq.global_announcement&limit=1");
+            String annRaw = fetchJson("app_settings?select=value,updated_at&key=eq.global_announcement&limit=1", sessionToken);
             if (annRaw != null) {
                 JSONArray arr = new JSONArray(annRaw);
                 if (arr.length() > 0) {
@@ -330,7 +334,7 @@ public class AniTrackNotifWorker extends Worker {
             if ("student".equals(role)) {
                 // 2A. Khusus Siswa: Cek perubahan Project Update & Catatan Revisi per tahapan
                 String ckKey = URLEncoder.encode("proj_checklist_row::" + userId, "UTF-8");
-                String ckRaw = fetchJson("app_settings?select=value,updated_at&key=eq." + ckKey + "&limit=1");
+                String ckRaw = fetchJson("app_settings?select=value,updated_at&key=eq." + ckKey + "&limit=1", sessionToken);
                 if (ckRaw != null) {
                     JSONArray arr = new JSONArray(ckRaw);
                     if (arr.length() > 0) {
@@ -376,7 +380,7 @@ public class AniTrackNotifWorker extends Worker {
                 }
 
                 // 2B. Khusus Siswa: Cek perubahan status / feedback Project Tracker
-                String subRaw = fetchJson("project_submissions?select=id,status,mentor_feedback,updated_at&student_id=eq." + URLEncoder.encode(userId, "UTF-8") + "&order=updated_at.desc&limit=1");
+                String subRaw = fetchJson("project_submissions?select=id,status,mentor_feedback,updated_at&student_id=eq." + URLEncoder.encode(userId, "UTF-8") + "&order=updated_at.desc&limit=1", sessionToken);
                 if (subRaw != null) {
                     JSONArray arr = new JSONArray(subRaw);
                     if (arr.length() > 0) {
@@ -402,7 +406,7 @@ public class AniTrackNotifWorker extends Worker {
                 Set<String> allowedStudentIds = null;
                 if (!isAdmin) {
                     allowedStudentIds = new HashSet<>();
-                    String stuRaw = fetchJson("profiles?select=id&role=eq.student&mentor_id=eq." + URLEncoder.encode(userId, "UTF-8"));
+                    String stuRaw = fetchJson("profiles?select=id&role=eq.student&mentor_id=eq." + URLEncoder.encode(userId, "UTF-8"), sessionToken);
                     if (stuRaw != null) {
                         JSONArray sArr = new JSONArray(stuRaw);
                         for (int i = 0; i < sArr.length(); i++) {
@@ -410,7 +414,7 @@ public class AniTrackNotifWorker extends Worker {
                         }
                     }
                 }
-                String revRaw = fetchJson("project_submissions?select=id,student_id,updated_at&status=eq.menunggu_review&order=updated_at.desc&limit=25");
+                String revRaw = fetchJson("project_submissions?select=id,student_id,updated_at&status=eq.menunggu_review&order=updated_at.desc&limit=25", sessionToken);
                 if (revRaw != null) {
                     JSONArray arr = new JSONArray(revRaw);
                     int pendingCnt = 0;
@@ -527,6 +531,7 @@ public class MainActivity extends BridgeActivity {
                         ed.putString("user_id", uid);
                         ed.putString("user_role", obj.optString("role", "student"));
                         ed.putBoolean("is_admin", obj.optBoolean("isAdmin", false));
+                        ed.putString("session_token", obj.optString("sessionToken", ""));
                         ed.apply();
                         scheduleBackgroundNotifWorker();
                     } catch (Exception ignored) {

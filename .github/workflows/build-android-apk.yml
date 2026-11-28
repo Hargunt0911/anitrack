@@ -62,18 +62,32 @@ jobs:
         working-directory: mobile-app
         run: npm run patch:android
 
-      - name: Build Android APK (Gradle)
+      - name: Build Android APK (Release Keystore if configured, else Debug)
         working-directory: mobile-app/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - name: Prepare Output APK File
-        working-directory: mobile-app
-        run: |
-          mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/AniTrack-Android.apk
-          ls -lh dist/AniTrack-Android.apk
+          mkdir -p ../dist
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Building signed Release APK..."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/release-keystore.jks
+            ./gradlew assembleRelease \
+              -Pandroid.injected.signing.store.file="$PWD/app/release-keystore.jks" \
+              -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+            cp app/build/outputs/apk/release/app-release.apk ../dist/AniTrack-Android.apk
+            rm -f app/release-keystore.jks
+          else
+            echo "Release secrets not set; building standard Debug APK..."
+            ./gradlew assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk ../dist/AniTrack-Android.apk
+          fi
+          ls -lh ../dist/AniTrack-Android.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

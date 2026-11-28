@@ -30,7 +30,7 @@ const PORT = Number(process.env.PORT || 3001);
 const WA_API_SECRET = (process.env.WA_API_SECRET || '').trim();
 const APP_URL = (process.env.APP_URL || 'https://anitrack.republikanimasi.my.id').trim();
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://izgcmhsobexicceqklqm.supabase.co').trim();
-const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || 'sb_publishable_T9eODcUv7nRBYgN-F24aRg_w-QOzKVu').trim();
+const SUPABASE_ANON_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_T9eODcUv7nRBYgN-F24aRg_w-QOzKVu').trim();
 const CRON_SCHEDULE = (process.env.CRON_SCHEDULE || '0 7 * * *').trim();
 // Mode Ekstra Aman (Anti-Ban Ketat):
 // - Simulasi mengetik 2-4 detik sebelum kirim

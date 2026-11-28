@@ -89,7 +89,7 @@
         <div>AniTrack • Sistem Monitoring Project Animasi SMKN 4 Malang • Tautan Khusus Orang Tua / Wali (Read-Only)</div>
     </footer>
 
-    <script src="./anitrack-core.js?v=20261128e"></script>
+    <script src="./anitrack-core.js?v=20261128f"></script>
     <script>
         (async function () {
             const A = window.AniTrack;
@@ -118,66 +118,118 @@
                 return;
             }
 
-            await A.loadGlobalAnnouncement();
-
-            const { data: tokRow } = await supabase
-                .from('app_settings')
-                .select('value')
-                .eq('key', `${A.PARENT_TOKEN_PREFIX}${token}`)
-                .maybeSingle();
-
-            if (!tokRow?.value) {
-                renderError('Kode tautan tidak ditemukan atau sudah dicabut oleh Guru Pembimbing.');
-                return;
-            }
-
-            let tokData = {};
-            try { tokData = JSON.parse(tokRow.value); } catch { /* ignore */ }
-            if (!tokData.student_id || tokData.active === false) {
-                renderError('Tautan pantau ini sudah tidak aktif.');
-                return;
-            }
-
-            const studentId = tokData.student_id;
-            const [
-                { data: student },
-                { data: projTasks },
-                { data: projSubs },
-                { data: dailyProgRows },
-                { data: dailyTaskDefs },
-                { data: fbLogRow },
-                checklistColsMap,
-                { data: myChecklistRow }
-            ] = await Promise.all([
-                supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, avatar_url, mentor_id, project_drive_url').eq('id', studentId).maybeSingle(),
-                supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
-                supabase.from('project_submissions').select('*').eq('student_id', studentId),
-                supabase.from('student_progress').select('task_id, status, progress_percent, student_notes, updated_at').eq('student_id', studentId).order('updated_at', { ascending: false }).limit(14),
-                supabase.from('daily_tasks').select('id, title'),
-                supabase.from('app_settings').select('value').eq('key', `${A.PROJECT_FB_LOG_PREFIX}${studentId}`).maybeSingle(),
-                A.loadChecklistColsMap(),
-                supabase.from('app_settings').select('value').eq('key', `${A.CHECKLIST_ROW_PREFIX}${studentId}`).maybeSingle()
-            ]);
-
-            if (!student) {
-                renderError('Data siswa tidak ditemukan di sistem.');
-                return;
-            }
-
+            let student = null;
             let mentor = null;
-            if (student.mentor_id) {
-                const { data: mRow } = await supabase.from('profiles').select('id, full_name, whatsapp_number').eq('id', student.mentor_id).maybeSingle();
-                mentor = mRow || null;
-            }
-
+            let projTasks = [];
+            let projSubs = [];
+            let dailyProgRows = [];
+            let dailyTaskDefs = [];
             let fbLogs = [];
-            if (fbLogRow?.value) {
-                try { const p = JSON.parse(fbLogRow.value); if (Array.isArray(p)) fbLogs = p; } catch { /* ignore */ }
-            }
+            let checklistColsMap = {};
+            let myCk = { items: {}, item_notes: {}, notes: '', updated_by: '', updated_at: null };
 
-            let myCk = { items: {}, notes: '', updated_by: '', updated_at: null };
-            if (myChecklistRow?.value) {
-                try { myCk = { ...myCk, ...JSON.parse(myChecklistRow.value) }; } catch { /* ignore */ }
+            // 1. Coba muat aman via Server RPC (bekerja penuh saat RLS aktif tanpa membuka akses publik ke tabel)
+            const { data: rpcWatch, error: rpcWatchErr } = await supabase.rpc('anitrack_parent_watch', { p_token: token });
+            const watchRpcMissing = Boolean(
+                rpcWatchErr && (
+                    rpcWatchErr.code === 'PGRST202'
+                    || rpcWatchErr.code === '42883'
+                    || /Could not find the function|anitrack_parent_watch/i.test(rpcWatchErr.message || '')
+                )
+            );
+
+            if (!watchRpcMissing) {
+                if (rpcWatchErr || !rpcWatch?.ok || !rpcWatch?.student) {
+                    renderError(rpcWatch?.error || rpcWatchErr?.message || 'Kode tautan tidak ditemukan atau sudah dicabut oleh Guru Pembimbing.');
+                    return;
+                }
+                student = rpcWatch.student;
+                mentor = rpcWatch.mentor || null;
+                projTasks = Array.isArray(rpcWatch.proj_tasks) ? rpcWatch.proj_tasks : [];
+                projSubs = Array.isArray(rpcWatch.proj_subs) ? rpcWatch.proj_subs : [];
+                dailyProgRows = Array.isArray(rpcWatch.daily_prog) ? rpcWatch.daily_prog : [];
+                dailyTaskDefs = Array.isArray(rpcWatch.daily_defs) ? rpcWatch.daily_defs : [];
+                if (rpcWatch.fb_log_raw) {
+                    try { const p = JSON.parse(rpcWatch.fb_log_raw); if (Array.isArray(p)) fbLogs = p; } catch { /* ignore */ }
+                }
+                if (rpcWatch.checklist_cols_raw) {
+                    try { const p = JSON.parse(rpcWatch.checklist_cols_raw); if (p && typeof p === 'object') checklistColsMap = p; } catch { /* ignore */ }
+                }
+                if (rpcWatch.checklist_row_raw) {
+                    try { myCk = { ...myCk, ...JSON.parse(rpcWatch.checklist_row_raw) }; } catch { /* ignore */ }
+                }
+                if (rpcWatch.announcement_raw) {
+                    try {
+                        const ann = JSON.parse(rpcWatch.announcement_raw);
+                        if (ann && ann.active && ann.message && typeof A.renderGlobalAnnouncementBanner === 'function') {
+                            A.renderGlobalAnnouncementBanner(ann);
+                        }
+                    } catch { /* ignore */ }
+                }
+            } else {
+                // 2. Fallback kompatibilitas sebelum supabase-security-hardening.sql dijalankan
+                await A.loadGlobalAnnouncement();
+
+                const { data: tokRow } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', `${A.PARENT_TOKEN_PREFIX}${token}`)
+                    .maybeSingle();
+
+                if (!tokRow?.value) {
+                    renderError('Kode tautan tidak ditemukan atau sudah dicabut oleh Guru Pembimbing.');
+                    return;
+                }
+
+                let tokData = {};
+                try { tokData = JSON.parse(tokRow.value); } catch { /* ignore */ }
+                if (!tokData.student_id || tokData.active === false) {
+                    renderError('Tautan pantau ini sudah tidak aktif.');
+                    return;
+                }
+
+                const studentId = tokData.student_id;
+                const [
+                    { data: stuRow },
+                    { data: tasksRaw },
+                    { data: subsRaw },
+                    { data: dailyProgRaw },
+                    { data: dailyDefsRaw },
+                    { data: fbLogRow },
+                    colsMapLoaded,
+                    { data: myChecklistRow }
+                ] = await Promise.all([
+                    supabase.from('profiles').select('id, full_name, username, class_name, sub_concentration, avatar_url, mentor_id, project_drive_url').eq('id', studentId).maybeSingle(),
+                    supabase.from('project_tasks').select('*').order('due_date', { ascending: true }),
+                    supabase.from('project_submissions').select('*').eq('student_id', studentId),
+                    supabase.from('student_progress').select('task_id, status, progress_percent, student_notes, updated_at').eq('student_id', studentId).order('updated_at', { ascending: false }).limit(14),
+                    supabase.from('daily_tasks').select('id, title'),
+                    supabase.from('app_settings').select('value').eq('key', `${A.PROJECT_FB_LOG_PREFIX}${studentId}`).maybeSingle(),
+                    A.loadChecklistColsMap(),
+                    supabase.from('app_settings').select('value').eq('key', `${A.CHECKLIST_ROW_PREFIX}${studentId}`).maybeSingle()
+                ]);
+
+                if (!stuRow) {
+                    renderError('Data siswa tidak ditemukan di sistem.');
+                    return;
+                }
+                student = stuRow;
+                projTasks = tasksRaw || [];
+                projSubs = subsRaw || [];
+                dailyProgRows = dailyProgRaw || [];
+                dailyTaskDefs = dailyDefsRaw || [];
+                checklistColsMap = colsMapLoaded || {};
+
+                if (student.mentor_id) {
+                    const { data: mRow } = await supabase.from('profiles').select('id, full_name, whatsapp_number').eq('id', student.mentor_id).maybeSingle();
+                    mentor = mRow || null;
+                }
+                if (fbLogRow?.value) {
+                    try { const p = JSON.parse(fbLogRow.value); if (Array.isArray(p)) fbLogs = p; } catch { /* ignore */ }
+                }
+                if (myChecklistRow?.value) {
+                    try { myCk = { ...myCk, ...JSON.parse(myChecklistRow.value) }; } catch { /* ignore */ }
+                }
             }
             const ckCols = (student.sub_concentration && checklistColsMap[student.sub_concentration]) || A.DEFAULT_CHECKLIST_COLS;
             const ckDone = ckCols.filter((c) => A.normalizeChecklistStatus(myCk.items?.[c]) === 'done').length;
