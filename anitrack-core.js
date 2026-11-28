@@ -5333,7 +5333,7 @@
         let projectReviewState = { status: 'active', className: '', search: '', page: 1 };
         let projectMatrixState = { className: '', search: '', onlyIssues: false, page: 1 };
         let projectWeeklyState = { weekKey: getWeekKey(), status: 'all', className: '', taskId: '', mentorId: '', search: '', page: 1 };
-        let projectChecklistState = { subconc: null, className: '', statusFilter: 'all', search: '', compactCols: true };
+        let projectChecklistState = { subconc: null, className: '', statusFilter: 'all', search: '', compactCols: true, openMobileStudentId: null, mobileViewMode: 'cards', mobileColsOpen: false };
         let projectChecklistScrollPos = { left: 0, top: 0 };
         let projectClassesState = { search: '', mentorId: '', openClasses: new Set() };
         let projectCalendarState = { year: new Date().getFullYear(), month: new Date().getMonth() };
@@ -6342,7 +6342,7 @@
                                     Siswa otomatis masuk ke tabel sesuai Sub-Konsentrasinya. Ubah status tahapan (<strong>None / WIP / Revisi / Done</strong>) untuk langsung menggerakkan <strong>Progress Bar hijau</strong> &amp; menyimpan <strong>Notes</strong> secara real-time.
                                 </p>
                             </div>
-                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                            <div class="hidden md:flex flex-wrap items-center gap-2 shrink-0">
                                 ${(isAdminStaff || myPjSubconcs.length > 0) ? `
                                 <button type="button" onclick="downloadChecklistTemplateXlsx()"
                                     class="px-3.5 py-2 rounded-xl bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-xs font-bold transition cursor-pointer">
@@ -6360,8 +6360,31 @@
                             </div>
                         </div>
 
+                        <!-- Opsi Excel Ringkas khusus Layar HP -->
+                        <details class="md:hidden rounded-xl bg-white border border-[#DCEBFF] px-3.5 py-2.5">
+                            <summary class="text-xs font-extrabold text-[#0082E6] cursor-pointer select-none flex items-center justify-between">
+                                <span>📂 Opsi Excel (Download / Import / Export)</span>
+                                <span class="text-slate-400 text-[11px]">Ketuk ▾</span>
+                            </summary>
+                            <div class="pt-3 flex flex-col gap-2">
+                                ${(isAdminStaff || myPjSubconcs.length > 0) ? `
+                                <button type="button" onclick="downloadChecklistTemplateXlsx()"
+                                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#EAF4FF] text-[#0082E6] text-xs font-bold transition cursor-pointer text-center">
+                                    📄 Download Format (.xlsx)
+                                </button>
+                                <label for="importChecklistXlsxInput"
+                                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#FFF6D6] text-[#9A6F00] text-xs font-bold transition cursor-pointer text-center block">
+                                    📤 Import Spreadsheet (.xlsx)
+                                </label>` : ''}
+                                <button type="button" onclick="exportChecklistXlsx()"
+                                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#E2F5F2] text-[#1D5E55] text-xs font-bold transition cursor-pointer text-center">
+                                    📥 Export Project Update (.xlsx)
+                                </button>
+                            </div>
+                        </details>
+
                         ${(isAdminStaff || myPjSubconcs.length > 0) ? `
-                        <div class="rounded-xl bg-white/90 border border-[#DCEBFF] px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+                        <div class="hidden md:flex rounded-xl bg-white/90 border border-[#DCEBFF] px-3.5 py-2.5 flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <span class="font-extrabold text-[#0082E6]">📋 Format Kolom Excel:</span>
                                 <code class="px-1.5 py-0.5 rounded bg-[#F3F6FB] font-mono text-[10.5px]">Nama Siswa</code>
@@ -6374,8 +6397,8 @@
                             <span class="text-[10.5px] text-slate-400">Klik <strong>📄 Download Format (.xlsx)</strong> untuk mengunduh template siap isi dengan daftar siswa.</span>
                         </div>` : ''}
 
-                        <!-- Tab Otomatis per Sub-Konsentrasi + Grup 2D / 3D -->
-                        <div class="flex flex-wrap items-center gap-1.5">
+                        <!-- Tab Otomatis per Sub-Konsentrasi + Grup 2D / 3D (Swipe Horizontal Mulus di HP) -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0 anitrack-xscroll">
                             ${subconcTabs.map((tab) => {
                                 const active = activeSc === tab.val;
                                 const pillCls = active
@@ -6387,7 +6410,7 @@
                                             : 'bg-white text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'));
                                 return `
                                     <button type="button" onclick="setChecklistSubconc('${esc(tab.val)}')"
-                                        class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer inline-flex items-center gap-1.5 ${pillCls}">
+                                        class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap ${pillCls}">
                                         <span>${esc(tab.label)}</span>
                                         <span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold num-tabular ${active ? 'bg-white/20 text-white' : 'bg-black/5'}">${tab.count}</span>
                                     </button>`;
@@ -6398,33 +6421,39 @@
                         ${canEditActiveSc && isSpecificSc ? `
                         <div class="rounded-xl bg-white border border-[#DCEBFF] p-3.5 space-y-2.5">
                             <div class="flex flex-wrap items-center justify-between gap-2">
-                                <div>
+                                <button type="button" onclick="toggleChecklistMobileCols()" class="md:hidden w-full flex items-center justify-between text-left cursor-pointer">
+                                    <span class="text-xs font-extrabold text-[#0082E6]">⚙️ Kelola Kolom Tahapan (${activeCols.length} kolom)</span>
+                                    <span class="text-xs font-bold text-slate-500">${projectChecklistState.mobileColsOpen ? 'Tutup ▲' : 'Atur ▾'}</span>
+                                </button>
+                                <div class="hidden md:block">
                                     <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#0082E6]">✏️ Kelola Kolom Tahapan STATUS — ${esc(activeSc)}</span>
                                     <p class="text-[10.5px] text-slate-400">Guru PJ Subkon bebas menambah, mengubah nama (✎), mengurutkan (◀/▶), atau menghapus tahapan sesuai pipeline subkon ini.</p>
                                 </div>
                                 <button type="button" onclick="syncChecklistColsFromTasks('${esc(activeSc)}')"
-                                    class="px-2.5 py-1 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
+                                    class="${projectChecklistState.mobileColsOpen ? 'inline-flex' : 'hidden md:inline-flex'} px-2.5 py-1.5 rounded-lg bg-[#EAF4FF] hover:bg-[#0095FF] text-[#0082E6] hover:text-white text-[11px] font-bold transition cursor-pointer shrink-0">
                                     ↻ Tarik dari Daftar Tugas Project
                                 </button>
                             </div>
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                ${activeCols.map((col, ci) => `
-                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F7FAFF] border border-[#DCEBFF] text-xs font-bold text-[#1E293B]">
-                                        ${ci > 0 ? `<button type="button" onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, -1)" title="Geser ke kiri" class="text-slate-400 hover:text-[#0082E6] text-[10px] px-0.5 cursor-pointer">◀</button>` : ''}
-                                        <span>${ci + 1}. ${esc(col)}</span>
-                                        <button type="button" onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-slate-400 hover:text-[#0082E6] text-[11px] px-0.5 cursor-pointer">✎</button>
-                                        ${ci < activeCols.length - 1 ? `<button type="button" onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, 1)" title="Geser ke kanan" class="text-slate-400 hover:text-[#0082E6] text-[10px] px-0.5 cursor-pointer">▶</button>` : ''}
-                                        ${activeCols.length > 1 ? `<button type="button" onclick="removeChecklistColumn('${esc(activeSc)}', ${ci})" title="Hapus kolom tahapan ini" class="text-slate-400 hover:text-[#E11D48] font-extrabold px-0.5 cursor-pointer">✕</button>` : ''}
-                                    </span>`).join('')}
-                            </div>
-                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Storyline, Storyboard, Modeling, Rigging, Grading, Final Film)"
-                                    onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistColumn('${esc(activeSc)}');}"
-                                    class="flex-1 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
-                                <button type="button" onclick="addChecklistColumn('${esc(activeSc)}')"
-                                    class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
-                                    + Tambah Kolom
-                                </button>
+                            <div class="${projectChecklistState.mobileColsOpen ? 'block' : 'hidden md:block'} space-y-2.5">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    ${activeCols.map((col, ci) => `
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#F7FAFF] border border-[#DCEBFF] text-xs font-bold text-[#1E293B]">
+                                            ${ci > 0 ? `<button type="button" data-compact-btn onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, -1)" title="Geser ke kiri" class="text-slate-500 hover:text-[#0082E6] text-xs px-1 py-0.5 cursor-pointer">◀</button>` : ''}
+                                            <span>${ci + 1}. ${esc(col)}</span>
+                                            <button type="button" data-compact-btn onclick="renameChecklistColumn('${esc(activeSc)}', ${ci})" title="Ubah nama tahapan ini" class="text-slate-500 hover:text-[#0082E6] text-xs px-1 py-0.5 cursor-pointer">✎</button>
+                                            ${ci < activeCols.length - 1 ? `<button type="button" data-compact-btn onclick="moveChecklistColumn('${esc(activeSc)}', ${ci}, 1)" title="Geser ke kanan" class="text-slate-500 hover:text-[#0082E6] text-xs px-1 py-0.5 cursor-pointer">▶</button>` : ''}
+                                            ${activeCols.length > 1 ? `<button type="button" data-compact-btn onclick="removeChecklistColumn('${esc(activeSc)}', ${ci})" title="Hapus kolom tahapan ini" class="text-slate-500 hover:text-[#E11D48] font-extrabold px-1 py-0.5 cursor-pointer">✕</button>` : ''}
+                                        </span>`).join('')}
+                                </div>
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                    <input id="newChecklistColInput" type="text" placeholder="Tambah kolom tahapan baru... (mis: Storyline, Modeling, Grading)"
+                                        onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistColumn('${esc(activeSc)}');}"
+                                        class="flex-1 px-3 py-2 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#0095FF]" />
+                                    <button type="button" onclick="addChecklistColumn('${esc(activeSc)}')"
+                                        class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-xs font-bold transition cursor-pointer shrink-0">
+                                        + Tambah Kolom
+                                    </button>
+                                </div>
                             </div>
                         </div>` : ''}
 
@@ -6453,42 +6482,210 @@
                             </div>
                         </div>
 
-                        <!-- Toolbar Filter -->
-                        <div class="flex flex-wrap items-center gap-2">
-                            <select onchange="setChecklistClass(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                        <!-- Toolbar Filter (Rapi 2-Kolom + Full-Width Search di HP) -->
+                        <div class="grid grid-cols-2 md:flex md:flex-wrap items-center gap-2">
+                            <select onchange="setChecklistClass(this.value)" class="w-full md:w-auto px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
                                 <option value="">Semua Kelas</option>
                                 ${ckClasses.map((c) => `<option value="${esc(c)}" ${ckCls === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
                             </select>
-                            <select onchange="setChecklistStatusFilter(this.value)" class="px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
-                                <option value="all" ${ckStFilter === 'all' ? 'selected' : ''}>Semua Status (${baseStudents.length})</option>
+                            <select onchange="setChecklistStatusFilter(this.value)" class="w-full md:w-auto px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0095FF]">
+                                <option value="all" ${ckStFilter === 'all' ? 'selected' : ''}>Semua (${baseStudents.length})</option>
                                 <option value="not_done" ${ckStFilter === 'not_done' ? 'selected' : ''}>Belum Tuntas (${totalNotDoneAll})</option>
-                                <option value="wip" ${ckStFilter === 'wip' ? 'selected' : ''}>Sedang WIP (${totalWipAll})</option>
-                                <option value="revisi" ${ckStFilter === 'revisi' ? 'selected' : ''}>Ada Revisi (${totalRevisiAll})</option>
-                                <option value="all_done" ${ckStFilter === 'all_done' ? 'selected' : ''}>Semua Done (${totalDoneAll})</option>
+                                <option value="wip" ${ckStFilter === 'wip' ? 'selected' : ''}>WIP (${totalWipAll})</option>
+                                <option value="revisi" ${ckStFilter === 'revisi' ? 'selected' : ''}>Revisi (${totalRevisiAll})</option>
+                                <option value="all_done" ${ckStFilter === 'all_done' ? 'selected' : ''}>Done (${totalDoneAll})</option>
                             </select>
                             <input id="checklistSearchInp" type="text" value="${esc(projectChecklistState.search)}" oninput="setChecklistSearch(this.value)"
-                                placeholder="Cari nama siswa / kelas / subkon..."
-                                class="flex-1 min-w-[180px] max-w-xs px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
+                                placeholder="🔍 Cari nama siswa / kelas / subkon..."
+                                class="col-span-2 md:flex-1 md:min-w-[180px] md:max-w-xs w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#0095FF]" />
                             <button type="button" onclick="toggleChecklistCompactCols()"
-                                class="px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${projectChecklistState.compactCols ? 'bg-[#EAF4FF] border-[#CBE5FF] text-[#0082E6] hover:bg-[#0095FF] hover:text-white' : 'bg-white border-[#E2E8F0] text-slate-600 hover:border-[#0095FF]'}">
+                                class="hidden md:inline-flex px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${projectChecklistState.compactCols ? 'bg-[#EAF4FF] border-[#CBE5FF] text-[#0082E6] hover:bg-[#0095FF] hover:text-white' : 'bg-white border-[#E2E8F0] text-slate-600 hover:border-[#0095FF]'}">
                                 ${projectChecklistState.compactCols ? '📊 Tampilkan Kolom Detail (WA/Drive/Pembimbing)' : '⚡ Mode Ringkas (Fokus STATUS)'}
                             </button>
-                            <span class="ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
+                            <div class="col-span-2 md:hidden flex items-center justify-between gap-2 pt-0.5">
+                                <span class="text-xs font-semibold text-slate-500 num-tabular">${filteredRows.length} siswa • ketuk kartu untuk edit</span>
+                                <button type="button" onclick="toggleChecklistMobileViewMode()"
+                                    class="px-3 py-1.5 rounded-xl bg-white border border-[#DCEBFF] text-[#0082E6] text-xs font-bold cursor-pointer shrink-0">
+                                    ${projectChecklistState.mobileViewMode === 'table' ? '📱 Mode Kartu' : '📊 Mode Tabel'}
+                                </button>
+                            </div>
+                            <span class="hidden md:inline ml-auto text-[11px] font-semibold text-slate-400 num-tabular">${filteredRows.length} siswa ditampilkan</span>
                         </div>
                     </div>
 
-                    <!-- Info Singkat Geser Kanan/Kiri (Sticky saat Scroll Bawah) -->
-                    <div id="checklistNavBar" class="sticky top-[64px] sm:top-[68px] z-20 px-4 py-2 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7]">
+                    ${(() => {
+                        const orderedGroups = [];
+                        if (!isSpecificSc && !isUnassignedTab) {
+                            const bySc = {};
+                            filteredRows.forEach((s) => {
+                                const k = s.sub_concentration || 'Belum Ada Sub-Konsentrasi';
+                                if (!bySc[k]) bySc[k] = [];
+                                bySc[k].push(s);
+                            });
+                            const scOrder = [...SUBCONCS, ...Object.keys(bySc).filter((k) => !SUBCONCS.includes(k))];
+                            scOrder.forEach((k) => {
+                                if (bySc[k]?.length) orderedGroups.push({ label: k, rows: bySc[k] });
+                            });
+                        } else if (filteredRows.length) {
+                            orderedGroups.push({ label: '', rows: filteredRows });
+                        }
+
+                        const renderMobileStudentCard = (s) => {
+                            const rowData = checklistRowMap[s.id] || { items: {}, notes: '', updated_by: '', updated_at: null };
+                            const stuSubconc = s.sub_concentration || '';
+                            const stuCanEdit = isAdminStaff || (stuSubconc && myPjSubconcs.includes(stuSubconc));
+                            const stuCols = getStuCols(s);
+                            const doneCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'done').length;
+                            const wipCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'wip').length;
+                            const revCount = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) === 'revisi').length;
+                            const progPct = stuCols.length ? Math.round((doneCount / stuCols.length) * 100) : 0;
+                            const mentorObj = s.mentor_id ? mentorMap[s.mentor_id] : null;
+                            const notDoneList = stuCols.filter((c) => normalizeChecklistStatus(rowData.items?.[c]) !== 'done');
+                            const waText = notDoneList.length
+                                ? `Halo ${s.full_name}, update Project Update (${stuSubconc || 'Animasi'}) — tahapan yang belum Done: ${notDoneList.join(', ')}.${rowData.notes ? ` Notes: ${rowData.notes}` : ''} Mohon segera dilengkapi di Folder Google Drive ya.`
+                                : `Halo ${s.full_name}, selamat! Semua tahapan Project Update kamu sudah Done (100%) ✓`;
+                            const isOpen = projectChecklistState.openMobileStudentId === s.id;
+
+                            const activePillMap = {
+                                none: 'bg-slate-600 text-white border-slate-600 shadow-xs',
+                                wip: 'bg-[#F59E0B] text-white border-[#F59E0B] shadow-xs',
+                                revisi: 'bg-[#E11D48] text-white border-[#E11D48] shadow-xs',
+                                done: 'bg-[#16A34A] text-white border-[#16A34A] shadow-xs'
+                            };
+
+                            return `
+                                <div class="rounded-2xl bg-white border ${isOpen ? 'border-[#0095FF] ring-2 ring-[#0095FF]/15 shadow-md' : 'border-[#E8EEF6] shadow-xs'} overflow-hidden transition">
+                                    <!-- Header Kartu Siswa (Ketuk untuk Buka/Tutup Editor 1-Tap) -->
+                                    <button type="button" onclick="toggleMobileChecklistStudent('${s.id}')"
+                                        class="w-full text-left p-3.5 space-y-2.5 cursor-pointer bg-white">
+                                        <div class="flex items-start justify-between gap-2.5">
+                                            <div class="min-w-0 flex-1">
+                                                <div class="font-extrabold text-[15px] text-[#1E293B] leading-snug">${esc(s.full_name)}</div>
+                                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                                    <span class="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-slate-600">${esc(s.class_name || '-')}</span>
+                                                    <span class="text-xs font-bold ${stuSubconc ? 'text-[#0082E6]' : 'text-[#E11D48]'}">${esc(stuSubconc || 'Belum ada subkon')}</span>
+                                                    ${revCount > 0 ? `<span class="px-2 py-0.5 rounded-md bg-[#FFF0F4] text-[#E11D48] text-xs font-extrabold">! ${revCount} Revisi</span>` : ''}
+                                                    ${wipCount > 0 ? `<span class="px-2 py-0.5 rounded-md bg-[#FFF6D6] text-[#B45309] text-xs font-extrabold">⏳ ${wipCount} WIP</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <span class="px-3 py-1.5 rounded-xl text-xs font-extrabold shrink-0 ${isOpen ? 'bg-[#1E293B] text-white' : (stuCanEdit ? 'bg-[#EAF4FF] text-[#0082E6]' : 'bg-[#F1F5F9] text-slate-600')}">
+                                                ${isOpen ? 'Tutup ▲' : (stuCanEdit ? '✏️ Edit' : 'Detail ▾')}
+                                            </span>
+                                        </div>
+
+                                        <div class="space-y-1 num-tabular">
+                                            <div class="flex items-center justify-between text-xs font-bold">
+                                                <span class="${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${doneCount}/${stuCols.length} tahapan Done</span>
+                                                <span class="font-mono ${progPct === 100 ? 'text-[#15803D]' : 'text-slate-600'}">${progPct}%</span>
+                                            </div>
+                                            <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                                                <div class="h-full rounded-full transition-all duration-300" style="width:${progPct}%;background:#4CAF50;"></div>
+                                            </div>
+                                        </div>
+
+                                        ${!isOpen && rowData.notes ? `<div class="text-xs text-slate-500 truncate bg-[#FAFBFD] rounded-lg px-2.5 py-1.5 border border-[#EDF1F7]">📝 ${esc(rowData.notes)}</div>` : ''}
+                                    </button>
+
+                                    ${isOpen ? `
+                                    <!-- Panel Editor 1-Tap khusus Smartphone -->
+                                    <div class="px-3.5 pb-4 pt-3 border-t border-[#EDF1F7] bg-[#FAFBFD] space-y-3.5">
+                                        <!-- Info Pembimbing & Tombol Cepat -->
+                                        <div class="space-y-2">
+                                            ${mentorObj ? `<div class="text-xs text-slate-500">Pembimbing: <strong class="text-[#1E293B]">${esc(mentorObj.full_name)}</strong></div>` : ''}
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                ${s.project_drive_url
+                                                    ? `<a href="${esc(s.project_drive_url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#EAF4FF] text-[#0082E6] text-xs font-bold">📁 Drive ↗</a>`
+                                                    : ''}
+                                                ${stuCanEdit ? `<button type="button" onclick="editStudentDriveQuick('${s.id}', '${esc(s.full_name)}')" class="px-3 py-2 rounded-xl bg-white border border-[#E2E8F0] text-slate-600 text-xs font-bold cursor-pointer">✎ ${s.project_drive_url ? 'Ubah Drive' : 'Isi Link Drive'}</button>` : ''}
+                                                ${renderWhatsappLink(s.whatsapp_number, true, waText)}
+                                                <button type="button" onclick="openStudentParentLink('${s.id}')" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#FFF6D6] text-[#9A6F00] text-xs font-bold cursor-pointer">👨‍👩‍👧 Ortu</button>
+                                                <button type="button" onclick="printStudentReportPdf('${s.id}')" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#E2F5F2] text-[#1D5E55] text-xs font-bold cursor-pointer">🖨️ PDF</button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Daftar Tahapan: Cukup 1 Ketuk Tombol Status (Tanpa Scroll Samping!) -->
+                                        <div class="space-y-2.5">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Status Tahapan (Ketuk 1x)</span>
+                                                ${stuCanEdit && doneCount < stuCols.length ? `
+                                                <button type="button" onclick="markAllChecklistDone('${s.id}')"
+                                                    class="px-2.5 py-1.5 rounded-xl bg-[#DCFCE7] text-[#15803D] border border-[#86EFAC] text-xs font-extrabold cursor-pointer">
+                                                    ✅ Semua Done
+                                                </button>` : ''}
+                                            </div>
+
+                                            ${stuCols.map((col, idx) => {
+                                                const stVal = normalizeChecklistStatus(rowData.items?.[col]);
+                                                const stOpt = CHECKLIST_STATUS_OPTIONS.find((o) => o.value === stVal) || CHECKLIST_STATUS_OPTIONS[0];
+                                                return `
+                                                    <div class="rounded-xl bg-white border border-[#E8EEF6] p-3 space-y-2">
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <div class="font-bold text-sm text-[#1E293B] leading-snug">${idx + 1}. ${esc(col)}</div>
+                                                            <span class="px-2 py-0.5 rounded-lg border text-xs font-extrabold shrink-0 ${stOpt.cls}">${stOpt.label}</span>
+                                                        </div>
+                                                        ${stuCanEdit ? `
+                                                        <div class="grid grid-cols-4 gap-1.5">
+                                                            ${CHECKLIST_STATUS_OPTIONS.map((o) => {
+                                                                const activeBtn = stVal === o.value;
+                                                                return `
+                                                                    <button type="button" onclick="updateChecklistCell('${s.id}', '${encodeURIComponent(col)}', '${o.value}')"
+                                                                        class="py-2 px-1 rounded-xl border text-xs font-extrabold text-center transition cursor-pointer ${activeBtn ? activePillMap[o.value] : 'bg-[#F8FAFC] text-slate-600 border-[#E2E8F0] hover:border-[#0095FF]'}">
+                                                                        ${o.label}
+                                                                    </button>`;
+                                                            }).join('')}
+                                                        </div>` : ''}
+                                                    </div>`;
+                                            }).join('')}
+                                        </div>
+
+                                        <!-- Notes / Catatan PJ -->
+                                        <div class="rounded-xl bg-white border border-[#E8EEF6] p-3 space-y-2">
+                                            <label for="ckNoteMob_${s.id}" class="block text-xs font-extrabold text-slate-600">📝 Notes / Catatan PJ Subkon</label>
+                                            ${stuCanEdit ? `
+                                                <textarea id="ckNoteMob_${s.id}" rows="2" placeholder="Tulis catatan revisi atau progres untuk siswa..."
+                                                    class="w-full px-3 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#0095FF]">${esc(rowData.notes || '')}</textarea>
+                                                <button type="button" onclick="saveChecklistNote('${s.id}', this, 'ckNoteMob_${s.id}')"
+                                                    class="w-full py-2.5 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white text-sm font-bold shadow-blueGlow transition cursor-pointer">
+                                                    💾 Simpan Catatan
+                                                </button>` : `
+                                                <div class="text-sm leading-relaxed ${rowData.notes ? 'text-slate-700' : 'text-slate-400 italic'}">${esc(rowData.notes || 'Belum ada catatan')}</div>`}
+                                            ${rowData.updated_at ? `<div class="text-xs text-slate-400">Terakhir diubah: ${esc(rowData.updated_by || 'PJ')} • ${esc(formatDateTime(rowData.updated_at))}</div>` : ''}
+                                        </div>
+                                    </div>` : ''}
+                                </div>`;
+                        };
+
+                        const showMobileCards = projectChecklistState.mobileViewMode !== 'table';
+                        const mobileCardsHtml = `
+                            <div id="checklistMobileCards" class="${showMobileCards ? 'md:hidden' : 'hidden'} p-3 space-y-3 bg-[#F3F6FB]/70">
+                                ${orderedGroups.length ? orderedGroups.map((grp) => `
+                                    ${grp.label ? `
+                                    <div class="flex items-center justify-between gap-2 px-1 pt-1">
+                                        <span class="text-xs font-extrabold text-[#0082E6]">📌 ${esc(grp.label)} (${grp.rows.length})</span>
+                                        ${SUBCONCS.includes(grp.label) ? `<button type="button" onclick="setChecklistSubconc('${esc(grp.label)}')" class="text-xs font-bold text-[#0082E6] underline cursor-pointer">Buka Tab →</button>` : ''}
+                                    </div>` : ''}
+                                    ${grp.rows.map(renderMobileStudentCard).join('')}
+                                `).join('') : `<div class="p-8 text-center text-sm text-slate-400 bg-white rounded-2xl border border-[#EDF1F7]">${isUnassignedTab ? 'Semua siswa sudah memiliki Sub-Konsentrasi ✓' : 'Belum ada siswa pada filter ini.'}</div>`}
+                            </div>`;
+
+                        const desktopTableWrapClass = showMobileCards ? 'hidden md:block' : 'block';
+
+                        return `
+                    ${mobileCardsHtml}
+
+                    <!-- Info Singkat Geser Kanan/Kiri (Khusus Desktop / Mode Tabel) -->
+                    <div id="checklistNavBar" class="${desktopTableWrapClass} sticky top-[64px] sm:top-[68px] z-20 px-4 py-2 bg-[#FAFBFD]/95 backdrop-blur border-b border-[#EDF1F7]">
                         <div class="flex items-center justify-between gap-2 text-[11px] text-slate-500">
                             <span class="inline-flex items-center gap-1.5 font-medium">
                                 <span class="text-[#0082E6] font-extrabold">↔</span>
-                                <span>Geser kanan/kiri: tahan <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-[10.5px] font-bold text-[#1E293B] shadow-2xs">Shift</kbd> + <strong>Scroll mouse</strong>, seret tabel, atau geser scrollbar di bawah</span>
+                                <span class="hidden md:inline">Geser kanan/kiri: tahan <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 font-mono text-[10.5px] font-bold text-[#1E293B] shadow-2xs">Shift</kbd> + <strong>Scroll mouse</strong>, seret tabel, atau geser scrollbar di bawah</span>
+                                <span class="md:hidden">Geser tabel ke kiri/kanan, atau beralih ke <strong>📱 Mode Kartu</strong> di atas agar lebih mudah diedit di HP.</span>
                             </span>
                         </div>
                     </div>
 
                     <!-- Tabel Project Update 2-Tingkat (Teks & Cell Lega, Header & Kolom Siswa Terkunci, Mulus Slide Kiri-Kanan) -->
-                    <div id="checklistTableScroll" class="anitrack-xscroll overflow-auto max-h-[75vh] relative cursor-grab">
+                    <div id="checklistTableScroll" class="${desktopTableWrapClass} anitrack-xscroll overflow-auto max-h-[75vh] relative cursor-grab">
                         ${(() => {
                             const compact = projectChecklistState.compactCols !== false;
                             const totalColSpan = activeCols.length + (compact ? 3 : 7);
@@ -6496,23 +6693,6 @@
                             const stageColPx = 156;
                             const notesMinPx = 380;
                             const tableMinPx = baseFixedPx + (activeCols.length * stageColPx) + notesMinPx;
-
-                            // Kelompokkan baris per Sub-Konsentrasi saat melihat tab gabungan (Semua 2D / Semua 3D / Semua) agar tidak selang-seling
-                            const orderedGroups = [];
-                            if (!isSpecificSc && !isUnassignedTab) {
-                                const bySc = {};
-                                filteredRows.forEach((s) => {
-                                    const k = s.sub_concentration || 'Belum Ada Sub-Konsentrasi';
-                                    if (!bySc[k]) bySc[k] = [];
-                                    bySc[k].push(s);
-                                });
-                                const scOrder = [...SUBCONCS, ...Object.keys(bySc).filter((k) => !SUBCONCS.includes(k))];
-                                scOrder.forEach((k) => {
-                                    if (bySc[k]?.length) orderedGroups.push({ label: k, rows: bySc[k] });
-                                });
-                            } else if (filteredRows.length) {
-                                orderedGroups.push({ label: '', rows: filteredRows });
-                            }
 
                             let globalRowIdx = 0;
                             const renderStudentRow = (s) => {
@@ -6662,7 +6842,8 @@
                             </tbody>
                         </table>`;
                         })()}
-                    </div>
+                    </div>`;
+                    })()}
                 </div>`;
             initChecklistScrollSync();
         }
@@ -7481,6 +7662,23 @@
             renderProjectUpdateView();
         };
 
+        global.toggleMobileChecklistStudent = function (studentId) {
+            const sy = global.scrollY || 0;
+            projectChecklistState.openMobileStudentId = (projectChecklistState.openMobileStudentId === studentId) ? null : studentId;
+            renderProjectUpdateView();
+            global.requestAnimationFrame?.(() => global.scrollTo(0, sy));
+        };
+
+        global.toggleChecklistMobileViewMode = function () {
+            projectChecklistState.mobileViewMode = (projectChecklistState.mobileViewMode === 'table') ? 'cards' : 'table';
+            renderProjectUpdateView();
+        };
+
+        global.toggleChecklistMobileCols = function () {
+            projectChecklistState.mobileColsOpen = !projectChecklistState.mobileColsOpen;
+            renderProjectUpdateView();
+        };
+
         function initChecklistScrollSync() {
             const navBar = document.getElementById('checklistNavBar');
             const mainSc = document.getElementById('checklistTableScroll');
@@ -7710,14 +7908,53 @@
                 showToast(`Gagal menyimpan status: ${error.message}`);
                 return;
             }
+            const sy = global.scrollY || 0;
             rowMap[studentId] = nextRow;
             projectDataCache.checklistRowMap = rowMap;
             showToast(`Project Update "${colName}" → ${stOpt.label} ✓`);
             renderProjectUpdateView();
+            global.requestAnimationFrame?.(() => global.scrollTo(0, sy));
         };
 
-        global.saveChecklistNote = async function (studentId, btn) {
-            const inp = document.getElementById(`ckNote_${studentId}`);
+        global.markAllChecklistDone = async function (studentId) {
+            if (!studentId) return;
+            const stu = (projectDataCache.allStudentsList || []).find((s) => s.id === studentId);
+            const colsMap = projectDataCache.checklistColsMap || {};
+            const stuCols = (stu?.sub_concentration && Array.isArray(colsMap[stu.sub_concentration]) && colsMap[stu.sub_concentration].length)
+                ? colsMap[stu.sub_concentration]
+                : DEFAULT_CHECKLIST_COLS;
+            if (!confirm(`Tandai semua ${stuCols.length} tahapan milik ${stu?.full_name || 'siswa ini'} menjadi DONE?`)) return;
+
+            const rowMap = projectDataCache.checklistRowMap || {};
+            const existing = rowMap[studentId] || { student_id: studentId, items: {}, notes: '' };
+            const nextItems = { ...(existing.items || {}) };
+            stuCols.forEach((c) => { nextItems[c] = 'done'; });
+            const nowIso = new Date().toISOString();
+            const nextRow = {
+                student_id: studentId,
+                items: nextItems,
+                notes: existing.notes || '',
+                updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
+                updated_at: nowIso
+            };
+
+            const { error } = await supabase.from('app_settings').upsert({
+                key: `${CHECKLIST_ROW_PREFIX}${studentId}`,
+                value: JSON.stringify(nextRow),
+                updated_at: nowIso
+            }, { onConflict: 'key' });
+
+            if (error) { showToast(`Gagal menyimpan: ${error.message}`); return; }
+            const sy = global.scrollY || 0;
+            rowMap[studentId] = nextRow;
+            projectDataCache.checklistRowMap = rowMap;
+            showToast(`Semua tahapan ${stu?.full_name || 'siswa'} ditandai DONE ✓`);
+            renderProjectUpdateView();
+            global.requestAnimationFrame?.(() => global.scrollTo(0, sy));
+        };
+
+        global.saveChecklistNote = async function (studentId, btn, customInputId) {
+            const inp = document.getElementById(customInputId || `ckNote_${studentId}`);
             if (!inp) return;
             const noteText = inp.value.trim();
             const rowMap = projectDataCache.checklistRowMap || {};
@@ -7730,18 +7967,21 @@
                 updated_by: currentUser.full_name || currentUser.username || 'PJ Subkon',
                 updated_at: nowIso
             };
-            if (btn) { btn.disabled = true; btn.textContent = '...'; }
+            const prevLabel = btn ? btn.textContent : 'Simpan';
+            if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
             const { error } = await supabase.from('app_settings').upsert({
                 key: `${CHECKLIST_ROW_PREFIX}${studentId}`,
                 value: JSON.stringify(nextRow),
                 updated_at: nowIso
             }, { onConflict: 'key' });
-            if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
+            if (btn) { btn.disabled = false; btn.textContent = prevLabel; }
             if (error) { showToast(`Gagal menyimpan Notes: ${error.message}`); return; }
+            const sy = global.scrollY || 0;
             rowMap[studentId] = nextRow;
             projectDataCache.checklistRowMap = rowMap;
             showToast('Catatan PJ Subkon tersimpan ✓');
             renderProjectUpdateView();
+            global.requestAnimationFrame?.(() => global.scrollTo(0, sy));
         };
 
         global.editStudentDriveQuick = async function (studentId, studentName) {
