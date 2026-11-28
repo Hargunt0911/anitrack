@@ -1944,7 +1944,6 @@
         const watchUrl = buildParentWatchUrl(token);
         const waText = `Yth. Orang Tua/Wali dari *${student.full_name}* (${student.class_name || 'Animasi SMKN 4 Malang'}),\n\nBerikut tautan resmi untuk memantau progres Project, Timeline, dan Daily Task putra/putri Bapak/Ibu secara real-time di AniTrack (tanpa perlu login):\n${watchUrl}\n\nTerima kasih atas kerja samanya.\n— Jurusan Animasi SMKN 4 Malang`;
         const waShareUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
-        const tgShareUrl = getTelegramShareUrl(watchUrl, `Yth. Orang Tua/Wali dari ${student.full_name} (${student.class_name || 'Animasi SMKN 4 Malang'}), berikut link pantau progres Project & Daily Task putra/putri Bapak/Ibu secara real-time di AniTrack:`);
 
         let modal = document.getElementById('anitrackParentLinkModal');
         if (!modal) {
@@ -1979,8 +1978,6 @@
                     class="px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0082E6] text-white font-bold transition cursor-pointer">📋 Salin Link</button>
                 <a href="${esc(waShareUrl)}" target="_blank" rel="noopener noreferrer"
                     class="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold transition">💬 Kirim via WhatsApp</a>
-                <a href="${esc(tgShareUrl)}" target="_blank" rel="noopener noreferrer"
-                    class="px-3.5 py-2 rounded-xl bg-[#229ED9] hover:bg-[#1B8BC0] text-white font-bold transition">✈️ Kirim via Telegram</a>
                 <a href="${esc(watchUrl)}" target="_blank" rel="noopener noreferrer"
                     class="px-3.5 py-2 rounded-xl bg-[#F3F6FB] hover:bg-[#EAF4FF] text-[#1E293B] border border-[#E2E8F0] font-bold transition">👁️ Buka Pratinjau</a>
             </div>

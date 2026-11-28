@@ -1516,35 +1516,26 @@
                     </div>
                 </section>
 
-                <!-- Modal Tersembunyi: Pengaturan Lanjutan Kanal (Bot PC Lokal / Telegram / Cloud) -->
+                <!-- Modal Tersembunyi: Pengaturan Lanjutan Kanal WhatsApp (Bot PC Lokal / Cloud Gateway) -->
                 <div id="notifChannelsModal" onclick="if(event.target===this)this.classList.add('hidden')"
                     class="fixed inset-0 z-[78] hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
                     <div class="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-[#EDF1F7] max-h-[88vh] flex flex-col">
                         <div class="px-5 py-4 border-b border-[#EDF1F7] bg-[#F7FAFF] flex items-center justify-between gap-3">
                             <div>
-                                <div class="text-sm font-extrabold text-[#1E293B]">⚙️ Pengaturan Kanal Pengiriman (WA &amp; Telegram)</div>
-                                <div class="text-[11px] text-slate-500">Default sudah memakai <strong>Bot WA PC Lokal (Gratis)</strong>. Buka ini hanya jika ingin mengatur Telegram atau Gateway Cloud.</div>
+                                <div class="text-sm font-extrabold text-[#1E293B]">⚙️ Pengaturan Kanal WhatsApp</div>
+                                <div class="text-[11px] text-slate-500">Default sudah memakai <strong>Bot WA PC Lokal (Gratis)</strong>. Buka ini hanya jika ingin ganti ke Gateway Cloud.</div>
                             </div>
                             <button type="button" onclick="document.getElementById('notifChannelsModal').classList.add('hidden')"
                                 class="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] hover:bg-[#FFF1F5] text-slate-600 hover:text-[#F13B6E] font-bold text-sm cursor-pointer shrink-0">✕</button>
                         </div>
                         <div class="p-5 overflow-y-auto space-y-4">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <label class="flex items-start gap-3 p-3.5 rounded-xl border-2 border-[#BBF7D0] bg-[#F5FBF7] cursor-pointer select-none">
-                                    <input id="waChannelEnabled" type="checkbox" checked onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#16A34A]" />
-                                    <div>
-                                        <div class="text-xs font-extrabold text-[#15803D]">💬 WhatsApp</div>
-                                        <div class="text-[11px] text-slate-600">Bot PC Lokal / Cloud Gateway</div>
-                                    </div>
-                                </label>
-                                <label class="flex items-start gap-3 p-3.5 rounded-xl border-2 border-[#BAE6FD] bg-[#F0F9FF] cursor-pointer select-none">
-                                    <input id="tgChannelEnabled" type="checkbox" onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#0284C7]" />
-                                    <div>
-                                        <div class="text-xs font-extrabold text-[#0369A1]">✈️ Telegram Bot</div>
-                                        <div class="text-[11px] text-slate-600">Gratis resmi (0% risiko banned)</div>
-                                    </div>
-                                </label>
-                            </div>
+                            <label class="flex items-start gap-3 p-3.5 rounded-xl border-2 border-[#BBF7D0] bg-[#F5FBF7] cursor-pointer select-none">
+                                <input id="waChannelEnabled" type="checkbox" checked onchange="toggleNotifChannelPanels()" class="mt-0.5 w-4 h-4 rounded accent-[#16A34A]" />
+                                <div>
+                                    <div class="text-xs font-extrabold text-[#15803D]">💬 Pengingat Otomatis via WhatsApp</div>
+                                    <div class="text-[11px] text-slate-600">Bot WA PC Lokal (Gratis) atau Cloud Gateway</div>
+                                </div>
+                            </label>
 
                             <div id="waGatewaySettingsWrap" class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2 border-t border-[#EDF1F7]">
                                 <div id="waProviderCol" class="md:col-span-6">
@@ -1577,43 +1568,9 @@
                                 </div>
                             </div>
 
-                            <div id="tgGatewaySettingsWrap" class="hidden pt-3 border-t border-[#EDF1F7] grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label for="tgBotUsernameInput" class="block text-xs font-semibold text-slate-600 mb-1">Username Bot Telegram (tanpa @)</label>
-                                    <input id="tgBotUsernameInput" type="text" placeholder="AniTrackSMKN4Bot" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
-                                </div>
-                                <div>
-                                    <label for="tgBotTokenInput" class="block text-xs font-semibold text-slate-600 mb-1">Telegram Bot Token (@BotFather)</label>
-                                    <input id="tgBotTokenInput" type="password" placeholder="7123456789:AAH..." class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
-                                </div>
-                                <div>
-                                    <label for="tgAdminChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Pribadi (untuk Tes)</label>
-                                    <input id="tgAdminChatIdInput" type="text" placeholder="Angka dari @userinfobot" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
-                                </div>
-                                <div>
-                                    <label for="tgChatIdInput" class="block text-xs font-semibold text-slate-600 mb-1">Chat ID Grup Utama (Opsional)</label>
-                                    <input id="tgChatIdInput" type="text" placeholder="Kosongkan jika DM saja" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono" />
-                                </div>
-                                <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl px-3 py-2">
-                                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[#0369A1]">
-                                        <input id="tgSendDmEnabled" type="checkbox" checked class="w-4 h-4 rounded accent-[#0284C7]" />
-                                        Kirim DM Pribadi ke Telegram siswa
-                                    </label>
-                                    <button id="syncTgStudentsBtn" type="button" onclick="syncTelegramStudentsNow()"
-                                        class="px-2.5 py-1 rounded-lg bg-white border border-[#BAE6FD] text-[#0369A1] text-[11px] font-bold cursor-pointer">
-                                        ↻ Sinkron Siswa Telegram
-                                    </button>
-                                </div>
-                                <div class="sm:col-span-2">
-                                    <label for="tgClassChatMapInput" class="block text-xs font-semibold text-slate-600 mb-1">Grup Per Kelas (Opsional: <code>X ANI A = -100...</code>)</label>
-                                    <textarea id="tgClassChatMapInput" rows="2" class="w-full px-3 py-2 bg-[#FAFBFD] border border-[#E2E8F0] rounded-xl text-xs font-mono"></textarea>
-                                </div>
-                            </div>
-
                             <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#EDF1F7]">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <button id="testWaBtn" type="button" onclick="testSendWaReminder()" class="hidden px-3 py-2 rounded-xl bg-white border border-[#BBF7D0] text-[#15803D] text-xs font-bold cursor-pointer">🧪 Tes WA Cloud</button>
-                                    <button id="testTgBtn" type="button" onclick="testSendTelegramReminder()" class="hidden px-3 py-2 rounded-xl bg-white border border-[#BAE6FD] text-[#0369A1] text-xs font-bold cursor-pointer">✈️ Tes Telegram</button>
                                     <button id="runWaNowBtn" type="button" onclick="runWaReminderNow()" class="hidden px-3 py-2 rounded-xl bg-[#0095FF] text-white text-xs font-bold cursor-pointer">📨 Jalankan Cloud</button>
                                     <span id="waCloudGuideFooter" class="hidden text-[11px] text-slate-400">Gateway cloud: fonnte.com / Wablas</span>
                                 </div>
@@ -1718,7 +1675,7 @@
         </nav>
     </div>
 
-    <script src="./anitrack-core.js?v=20261128a"></script>
+    <script src="./anitrack-core.js?v=20261128b"></script>
     <script>
         (function () {
             const A = window.AniTrack;
@@ -3047,10 +3004,8 @@
                 const prov = document.getElementById('waProviderSelect')?.value || 'local_pc';
                 const isLocal = prov === 'local_pc';
                 const waOn = Boolean(document.getElementById('waChannelEnabled')?.checked);
-                const tgOn = Boolean(document.getElementById('tgChannelEnabled')?.checked);
                 document.getElementById('testWaBtn')?.classList.toggle('hidden', !waOn || isLocal);
-                document.getElementById('testTgBtn')?.classList.toggle('hidden', !tgOn);
-                document.getElementById('runWaNowBtn')?.classList.toggle('hidden', (!waOn || isLocal) && !tgOn);
+                document.getElementById('runWaNowBtn')?.classList.toggle('hidden', !waOn || isLocal);
             }
 
             window.onWaProviderChange = function () {
@@ -3122,44 +3077,25 @@
 
             window.toggleNotifChannelPanels = function () {
                 const waOn = Boolean(document.getElementById('waChannelEnabled')?.checked);
-                const tgOn = Boolean(document.getElementById('tgChannelEnabled')?.checked);
                 document.getElementById('waGatewaySettingsWrap')?.classList.toggle('opacity-50', !waOn);
-                document.getElementById('tgGatewaySettingsWrap')?.classList.toggle('hidden', !tgOn);
                 syncNotifActionButtons();
             };
-
-            function parseTgClassMapText(raw) {
-                const map = {};
-                String(raw || '').split(/\r?\n/).forEach((line) => {
-                    const idx = line.indexOf('=');
-                    if (idx === -1) return;
-                    const cls = line.slice(0, idx).trim();
-                    const cid = line.slice(idx + 1).trim();
-                    if (cls && cid) map[cls] = cid;
-                });
-                return map;
-            }
-
-            function formatTgClassMapText(obj) {
-                if (!obj || typeof obj !== 'object') return '';
-                return Object.entries(obj).map(([k, v]) => `${k} = ${v}`).join('\n');
-            }
 
             function readWaConfigForm() {
                 return {
                     waEnabled: Boolean(document.getElementById('waChannelEnabled')?.checked),
-                    provider: document.getElementById('waProviderSelect')?.value || 'fonnte',
+                    provider: document.getElementById('waProviderSelect')?.value || 'local_pc',
                     apiToken: (document.getElementById('waApiTokenInput')?.value || '').trim(),
                     customUrl: (document.getElementById('waCustomUrlInput')?.value || '').trim(),
                     waTestPhone: (document.getElementById('waTestPhoneInput')?.value || '081259699623').trim(),
                     waDummyMode: Boolean(document.getElementById('waDummyModeEnabled')?.checked),
-                    tgEnabled: Boolean(document.getElementById('tgChannelEnabled')?.checked),
-                    tgBotUsername: (document.getElementById('tgBotUsernameInput')?.value || '').trim().replace(/^@+/, ''),
-                    tgBotToken: (document.getElementById('tgBotTokenInput')?.value || '').trim(),
-                    tgAdminChatId: (document.getElementById('tgAdminChatIdInput')?.value || '').trim(),
-                    tgSendDm: Boolean(document.getElementById('tgSendDmEnabled')?.checked),
-                    tgChatId: (document.getElementById('tgChatIdInput')?.value || '').trim(),
-                    tgClassChatMap: parseTgClassMapText(document.getElementById('tgClassChatMapInput')?.value || ''),
+                    tgEnabled: false,
+                    tgBotUsername: '',
+                    tgBotToken: '',
+                    tgAdminChatId: '',
+                    tgSendDm: false,
+                    tgChatId: '',
+                    tgClassChatMap: {},
                     appUrl: (document.getElementById('waAppUrlInput')?.value || '').trim(),
                     messageTemplate: (document.getElementById('waMessageTemplateInput')?.value || '').trim(),
                     autoReplyEnabled: Boolean(document.getElementById('waAutoReplyEnabled')?.checked),
@@ -3186,7 +3122,6 @@
                     { data: tasks },
                     { data: subs },
                     { data: logs },
-                    { data: tgStudentRows },
                     checklistColsMap,
                     { data: ckRowsRaw }
                 ] = await Promise.all([
@@ -3195,19 +3130,10 @@
                     supabase.from('project_tasks').select('id, title, pipeline_stage, sub_concentration, due_date'),
                     supabase.from('project_submissions').select('project_task_id, student_id, status'),
                     supabase.from('wa_notification_logs').select('*').order('created_at', { ascending: false }).limit(15),
-                    supabase.from('app_settings').select('key, value').like('key', 'student_telegram::%'),
                     A.loadChecklistColsMap(),
                     supabase.from('app_settings').select('key, value, updated_at').like('key', `${A.CHECKLIST_ROW_PREFIX}%`)
                 ]);
                 const checklistRowMap = A.parseChecklistRowMap(ckRowsRaw || []);
-
-                const studentTgMap = {};
-                (tgStudentRows || []).forEach((r) => {
-                    try {
-                        const p = JSON.parse(r.value || '{}');
-                        if (p?.student_id && p?.chat_id) studentTgMap[p.student_id] = p;
-                    } catch { /* ignore */ }
-                });
 
                 // Muat konfigurasi tersimpan (untuk Admin & Superadmin)
                 const isAdminStaff = A.isAnyAdmin(A.getUser());
@@ -3218,10 +3144,7 @@
                         loadedCfg = cfg || {};
                         if (isAdminStaff) {
                             const waChk = document.getElementById('waChannelEnabled');
-                            const tgChk = document.getElementById('tgChannelEnabled');
                             if (waChk) waChk.checked = cfg.waEnabled !== undefined ? Boolean(cfg.waEnabled) : true;
-                            if (tgChk) tgChk.checked = Boolean(cfg.tgEnabled);
-                            // Jika belum pernah isi API Token cloud (Fonnte/Wablas), otomatis pakai Bot WA PC Lokal
                             const effectiveProv = (!cfg.apiToken && (!cfg.provider || cfg.provider === 'fonnte'))
                                 ? 'local_pc'
                                 : (cfg.provider || 'local_pc');
@@ -3232,15 +3155,6 @@
                             if (waTestInp) waTestInp.value = cfg.waTestPhone || '081259699623';
                             const waDummyChk = document.getElementById('waDummyModeEnabled');
                             if (waDummyChk) waDummyChk.checked = cfg.waDummyMode !== undefined ? Boolean(cfg.waDummyMode) : true;
-                            if (cfg.tgBotUsername) document.getElementById('tgBotUsernameInput').value = cfg.tgBotUsername;
-                            if (cfg.tgBotToken) document.getElementById('tgBotTokenInput').value = cfg.tgBotToken;
-                            const myTgInp = document.getElementById('tgAdminChatIdInput');
-                            if (myTgInp) myTgInp.value = cfg.tgAdminChatId || localStorage.getItem('anitrack_my_tg_chat_id') || '';
-                            const tgDmChk = document.getElementById('tgSendDmEnabled');
-                            if (tgDmChk) tgDmChk.checked = cfg.tgSendDm !== undefined ? Boolean(cfg.tgSendDm) : true;
-                            if (cfg.tgChatId) document.getElementById('tgChatIdInput').value = cfg.tgChatId;
-                            const tgMapEl = document.getElementById('tgClassChatMapInput');
-                            if (tgMapEl) tgMapEl.value = formatTgClassMapText(cfg.tgClassChatMap);
                             if (cfg.appUrl) document.getElementById('waAppUrlInput').value = cfg.appUrl;
                             const tplEl = document.getElementById('waMessageTemplateInput');
                             if (tplEl) {
@@ -3261,12 +3175,9 @@
                         }
                         if (badgeEl) {
                             const waReady = (cfg.waEnabled !== false) && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook' || cfg.provider === 'local_pc');
-                            const tgReady = Boolean(cfg.tgEnabled && cfg.tgBotToken && (cfg.tgSendDm !== false || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
-                            const chList = [];
-                            if (waReady) chList.push(cfg.provider === 'local_pc' ? 'WA PC Lokal' : 'WA');
-                            if (tgReady) chList.push('Telegram');
-                            const active = Boolean(cfg.enabled && chList.length && (cfg.provider === 'local_pc' || A.getGasUrl()));
-                            badgeEl.textContent = active ? `Aktif (${chList.join(' + ')}) • 07:00 WIB` : (chList.length ? `Siap (${chList.join(' + ')})` : 'Belum Aktif');
+                            const chLabel = cfg.provider === 'local_pc' ? 'WA PC Lokal' : 'WhatsApp';
+                            const active = Boolean(cfg.enabled && waReady && (cfg.provider === 'local_pc' || A.getGasUrl()));
+                            badgeEl.textContent = active ? `Aktif (${chLabel}) • 07:00 WIB` : (waReady ? `Siap (${chLabel})` : 'Belum Aktif');
                             badgeEl.className = `inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${active ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-500'}`;
                         }
                     } catch { /* ignore */ }
@@ -3291,13 +3202,11 @@
                 const overdueCnt = queue.filter((q) => q.overdue.length > 0).length;
                 const upcomingCnt = queue.filter((q) => q.upcoming.length > 0 && q.overdue.length === 0).length;
                 const noWaCnt = queue.filter((q) => !q.hasWa).length;
-                const tgConnectedTotal = students.filter((s) => Boolean(studentTgMap[s.id]?.chat_id)).length;
 
                 if (queueSummaryEl) {
                     queueSummaryEl.innerHTML = `
                         <span class="px-2.5 py-1 rounded-lg bg-[#FFF0F4] text-[#E11D48] font-bold num-tabular">🔴 ${overdueCnt} Lewat Deadline</span>
                         <span class="px-2.5 py-1 rounded-lg bg-[#FFF6D6] text-[#B88600] font-bold num-tabular">🟡 ${upcomingCnt} H-2 s/d Hari-H</span>
-                        <span class="px-2.5 py-1 rounded-lg bg-[#E0F2FE] text-[#0369A1] font-bold num-tabular">✈️ ${tgConnectedTotal}/${students.length} Terhubung Telegram</span>
                         ${noWaCnt ? `<span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 font-semibold num-tabular">${noWaCnt} belum isi WA</span>` : ''}
                     `;
                 }
@@ -3332,19 +3241,14 @@
                                                     <div class="font-bold text-[#1E293B]">${A.esc(q.student.full_name)}</div>
                                                     <div class="text-[10.5px] text-slate-400">
                                                         ${A.esc(q.student.class_name || '-')} • ${q.hasWa ? A.formatWhatsappDisplay(q.student.whatsapp_number) : 'WA belum diisi'}
-                                                        ${studentTgMap[q.student.id] ? ` • <span class="text-[#0369A1] font-bold">✈️ ${A.esc(studentTgMap[q.student.id].username ? '@' + studentTgMap[q.student.id].username : 'TG Aktif')}</span>` : ' • TG belum hubung'}
                                                     </div>
                                                 </td>
                                                 <td class="py-2.5 px-3">${catBadge}</td>
                                                 <td class="py-2.5 px-3 text-slate-600 max-w-xs truncate" title="${A.esc(itemsText)}">${A.esc(itemsText)}</td>
                                                 <td class="py-2.5 px-3 text-right">
-                                                    <div class="inline-flex items-center gap-1.5">
-                                                        ${waUrl
-                                                            ? `<a href="${A.esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white font-bold transition">💬 WA</a>`
-                                                            : `<span class="text-[10.5px] text-slate-400">No WA</span>`}
-                                                        <a href="${A.esc(A.getTelegramShareUrl(loadedCfg.appUrl || window.location.origin, q.message))}" target="_blank" rel="noopener noreferrer"
-                                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#0284C7] text-[#0369A1] hover:text-white font-bold transition">✈️ Telegram</a>
-                                                    </div>
+                                                    ${waUrl
+                                                        ? `<a href="${A.esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E7F9EE] hover:bg-[#16A34A] text-[#15803D] hover:text-white font-bold transition">💬 WA</a>`
+                                                        : `<span class="text-[10.5px] text-slate-400">No WA</span>`}
                                                 </td>
                                             </tr>`;
                                     }).join('')}
@@ -3401,35 +3305,34 @@
                 const cfg = readWaConfigForm();
                 const btn = document.getElementById('saveWaConfigBtn');
                 const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook' || cfg.provider === 'local_pc');
-                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgSendDm || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
-                if (cfg.enabled && !waReady && !tgReady) {
-                    setWaConfigFeedback('Pilih dan lengkapi minimal 1 kanal pengiriman (Bot WA PC Lokal / API Token WA / Bot Token Telegram) sebelum mengaktifkan jadwal otomatis.', true);
+                if (cfg.enabled && !waReady) {
+                    setWaConfigFeedback('Aktifkan dan lengkapi kanal WhatsApp (Bot WA PC Lokal atau API Token WA) sebelum mengaktifkan jadwal otomatis.', true);
                     return;
                 }
 
                 btn.disabled = true;
                 btn.textContent = 'Menyimpan...';
 
-                // 1. Simpan ke app_settings Supabase (+ metadata publik tg_public_bot tanpa token rahasia untuk portal siswa)
+                // 1. Simpan ke app_settings Supabase (WhatsApp saja, nonaktifkan Telegram)
                 const nowIso = new Date().toISOString();
                 const [{ error: dbErr }] = await Promise.all([
                     supabase.from('app_settings').upsert({ key: 'wa_gateway_config', value: JSON.stringify(cfg), updated_at: nowIso }, { onConflict: 'key' }),
                     supabase.from('app_settings').upsert({
                         key: 'tg_public_bot',
-                        value: JSON.stringify({ botUsername: cfg.tgBotUsername || '', enabled: Boolean(cfg.tgEnabled && cfg.tgSendDm && cfg.tgBotUsername) }),
+                        value: JSON.stringify({ botUsername: '', enabled: false }),
                         updated_at: nowIso
                     }, { onConflict: 'key' })
                 ]);
 
                 if (dbErr) {
                     btn.disabled = false;
-                    btn.textContent = '💾 Simpan & Pasang Jadwal 07:00';
+                    btn.textContent = '💾 Simpan Pengaturan';
                     setWaConfigFeedback(`Gagal menyimpan ke database: ${dbErr.message}`, true);
                     return;
                 }
 
-                // 2. Jika pakai Bot WA PC Lokal saja (tanpa Telegram), cukup simpan ke Supabase (bot PC langsung baca otomatis)
-                if (cfg.provider === 'local_pc' && !tgReady) {
+                // 2. Jika pakai Bot WA PC Lokal, cukup simpan ke Supabase (bot PC langsung baca otomatis)
+                if (cfg.provider === 'local_pc') {
                     btn.disabled = false;
                     btn.textContent = '💾 Simpan Pengaturan';
                     setWaConfigFeedback('Pengaturan Bot WA PC Lokal (template pengingat, balas otomatis, & Mode Dummy) tersimpan di database ✓ Bot di PC kantor otomatis sinkron tanpa perlu restart.');
@@ -3438,7 +3341,7 @@
                     return;
                 }
 
-                // 3. Sinkronkan & pasang trigger harian 07:00 WIB di Google Apps Script (untuk Telegram / Fonnte / Wablas)
+                // 3. Sinkronkan & pasang trigger harian 07:00 WIB di Google Apps Script (untuk Cloud Gateway Fonnte / Wablas)
                 if (!A.getGasUrl()) {
                     btn.disabled = false;
                     btn.textContent = '💾 Simpan Pengaturan';
@@ -3507,78 +3410,14 @@
                 }
             };
 
-            window.testSendTelegramReminder = async function () {
-                if (!A.isAnyAdmin(A.getUser())) {
-                    setWaConfigFeedback('Hanya Admin / Superadmin yang dapat menjalankan tes kirim Telegram.', true);
-                    return;
-                }
-                const cfg = readWaConfigForm();
-                if (!A.getGasUrl()) {
-                    setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
-                    return;
-                }
-                if (!cfg.tgBotToken) {
-                    setWaConfigFeedback('Masukkan Telegram Bot Token dari @BotFather terlebih dahulu.', true);
-                    document.getElementById('tgBotTokenInput')?.focus();
-                    return;
-                }
-                let targetChat = (cfg.tgAdminChatId || localStorage.getItem('anitrack_my_tg_chat_id') || '').trim();
-                if (!targetChat) {
-                    const entered = prompt('Masukkan Telegram Chat ID pribadi Anda (angka dari @userinfobot, tanpa -100):', '');
-                    if (!entered || !entered.trim()) return;
-                    targetChat = entered.trim();
-                    const myTgInp = document.getElementById('tgAdminChatIdInput');
-                    if (myTgInp) myTgInp.value = targetChat;
-                }
-                try { localStorage.setItem('anitrack_my_tg_chat_id', targetChat); } catch { /* ignore */ }
-
-                const btn = document.getElementById('testTgBtn');
-                btn.disabled = true;
-                btn.textContent = 'Mengirim...';
-                try {
-                    const res = await A.postToGas({ action: 'test_send_telegram', tgBotToken: cfg.tgBotToken, chatId: targetChat, config: cfg });
-                    btn.disabled = false;
-                    btn.textContent = '✈️ Tes Telegram';
-                    if (!res?.ok) throw new Error(res?.error || res?.detail || 'Pengiriman Telegram gagal.');
-                    setWaConfigFeedback(`Pesan tes Telegram berhasil dikirim ke Chat ID pribadi Anda (${targetChat}) ✓`);
-                    A.showToast('Pesan Telegram tes terkirim ✓');
-                    loadWaAutomationPanel();
-                } catch (err) {
-                    btn.disabled = false;
-                    btn.textContent = '✈️ Tes Telegram';
-                    setWaConfigFeedback(`Tes Telegram gagal: ${err.message}`, true);
-                }
-            };
-
-            window.syncTelegramStudentsNow = async function () {
-                if (!A.isAnyAdmin(A.getUser())) return;
-                const cfg = readWaConfigForm();
-                if (!A.getGasUrl()) { setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true); return; }
-                if (!cfg.tgBotToken) { setWaConfigFeedback('Masukkan Telegram Bot Token terlebih dahulu.', true); return; }
-                const btn = document.getElementById('syncTgStudentsBtn');
-                if (btn) { btn.disabled = true; btn.textContent = 'Menyinkronkan...'; }
-                try {
-                    const res = await A.postToGas({ action: 'sync_telegram_students', config: cfg });
-                    if (btn) { btn.disabled = false; btn.textContent = '↻ Sinkronkan Akun Telegram Siswa'; }
-                    if (!res?.ok) throw new Error(res?.error || 'Sinkronisasi gagal.');
-                    setWaConfigFeedback(`Sinkronisasi Telegram selesai: ${res.linkedCount || 0} akun siswa baru terhubung (dari ${res.checkedUpdates || 0} pesan /start).`);
-                    A.showToast(`${res.linkedCount || 0} akun Telegram siswa tersinkron ✓`);
-                    loadWaAutomationPanel();
-                } catch (err) {
-                    if (btn) { btn.disabled = false; btn.textContent = '↻ Sinkronkan Akun Telegram Siswa'; }
-                    setWaConfigFeedback(`Gagal sinkron Telegram: ${err.message}`, true);
-                }
-            };
-
             window.runWaReminderNow = async function () {
                 if (!A.isAnyAdmin(A.getUser())) {
-                    setWaConfigFeedback('Hanya Admin / Superadmin yang dapat memicu pengiriman massal WA/Telegram.', true);
+                    setWaConfigFeedback('Hanya Admin / Superadmin yang dapat memicu pengiriman massal WhatsApp.', true);
                     return;
                 }
                 const cfg = readWaConfigForm();
                 const waReady = cfg.waEnabled && Boolean(cfg.apiToken || cfg.provider === 'custom_webhook');
-                const tgReady = cfg.tgEnabled && Boolean(cfg.tgBotToken && (cfg.tgSendDm || cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length));
-                if (cfg.provider === 'local_pc' && !tgReady) {
+                if (cfg.provider === 'local_pc') {
                     setWaConfigFeedback('Mode Bot WA PC Lokal dijalankan otomatis/manual dari PC kantor (http://127.0.0.1:3001). Perubahan template di sini otomatis tersinkron ke PC kantor.', false);
                     A.showToast('Bot WA PC Lokal dipicu dari panel PC kantor (127.0.0.1:3001).');
                     return;
@@ -3587,12 +3426,11 @@
                     setWaConfigFeedback('Atur & Simpan URL Google Apps Script terlebih dahulu.', true);
                     return;
                 }
-                if (!waReady && !tgReady) {
-                    setWaConfigFeedback('Aktifkan dan lengkapi minimal 1 kanal (WhatsApp atau Telegram Bot) terlebih dahulu.', true);
+                if (!waReady) {
+                    setWaConfigFeedback('Aktifkan dan lengkapi kanal WhatsApp Gateway terlebih dahulu.', true);
                     return;
                 }
-                const chLabel = [waReady ? 'WhatsApp' : '', tgReady ? 'Telegram' : ''].filter(Boolean).join(' + ');
-                if (!confirm(`Jalankan pengecekan & kirim notifikasi (${chLabel}) sekarang ke seluruh siswa yang masuk H-2 s/d Hari-H atau melewati deadline?`)) return;
+                if (!confirm('Jalankan pengecekan & kirim pengingat WhatsApp sekarang ke seluruh siswa yang masuk H-2 s/d Hari-H atau melewati deadline?')) return;
 
                 const btn = document.getElementById('runWaNowBtn');
                 btn.disabled = true;
@@ -3600,18 +3438,14 @@
                 try {
                     const res = await A.postToGas({ action: 'run_wa_deadline_check_now', config: cfg });
                     btn.disabled = false;
-                    btn.textContent = '📨 Jalankan Sekarang';
+                    btn.textContent = '📨 Jalankan Cloud';
                     if (!res?.ok) throw new Error(res?.error || 'Gagal menjalankan pengingat.');
-                    const parts = [];
-                    if (waReady) parts.push(`WA: ${res.sentCount || 0} terkirim, ${res.failedCount || 0} gagal, ${res.skippedNoWa || 0} belum isi WA`);
-                    if (tgReady && cfg.tgSendDm) parts.push(`Telegram DM: ${res.tgDmSentCount || 0} terkirim, ${res.skippedNoTg || 0} belum hubung`);
-                    if (tgReady && (cfg.tgChatId || Object.keys(cfg.tgClassChatMap || {}).length)) parts.push(`Telegram Grup: ${res.tgSentCount || 0} terkirim`);
-                    setWaConfigFeedback(`Selesai (${res.sentDate}) — ${parts.join(' | ')} (dari ${res.eligibleStudents} siswa memenuhi syarat).`);
-                    A.showToast(`Notifikasi ${chLabel} berhasil dijalankan ✓`);
+                    setWaConfigFeedback(`Selesai (${res.sentDate}) — WA: ${res.sentCount || 0} terkirim, ${res.failedCount || 0} gagal, ${res.skippedNoWa || 0} belum isi WA (dari ${res.eligibleStudents} siswa memenuhi syarat).`);
+                    A.showToast('Pengingat WhatsApp berhasil dijalankan ✓');
                     loadWaAutomationPanel();
                 } catch (err) {
                     btn.disabled = false;
-                    btn.textContent = '📨 Jalankan Sekarang';
+                    btn.textContent = '📨 Jalankan Cloud';
                     setWaConfigFeedback(`Gagal menjalankan pengingat: ${err.message}`, true);
                 }
             };
